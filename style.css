@@ -1,0 +1,82 @@
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Noto Serif KR", "Malgun Gothic", serif;
+  background: #ffffff;
+  color: #111111;
+  margin: 0;
+  padding: 20px;
+  line-height: 1.7;
+}
+
+.wrap { max-width: 640px; margin: 40px auto; }
+
+.site-title {
+  text-align: center;
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #000000;
+  margin-bottom: 0.2rem;
+}
+
+.tagline {
+  text-align: center;
+  color: #999999;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  margin-top: 0;
+  margin-bottom: 2.5rem;
+}
+
+.hub-list {
+  border-top: 1px solid #000000;
+}
+
+.hub-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 4px;
+  border-bottom: 1px solid #dddddd;
+  text-decoration: none;
+  color: #111111;
+}
+
+.hub-row.disabled {
+  color: #999999;
+  cursor: default;
+}
+
+.hub-cat {
+  flex: 0 0 48px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #999999;
+  letter-spacing: 0.05em;
+}
+
+.hub-row:not(.disabled) .hub-cat { color: #000000; }
+
+.hub-name {
+  flex: 1;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.hub-row.disabled .hub-name { font-weight: 400; color: #999999; }
+
+.hub-sub {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #999999;
+}
+
+.hub-go {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  color: #999999;
+  white-space: nowrap;
+}
+
+.hub-row:not(.disabled):hover { background: #f7f7f7; }
+.hub-row:not(.disabled):hover .hub-go { color: #000000; }
