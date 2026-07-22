@@ -47,7 +47,7 @@ a.link-btn, button, input[type="submit"] {
   width: 100%;
   padding: 14px 20px;
   background: #ffffff;
-  border: 2px solid #0f3d33;
+  border: none;
   border-radius: 3px;
   color: #0f3d33;
   text-decoration: none;
@@ -63,7 +63,6 @@ a.link-btn, button, input[type="submit"] {
 a.link-btn:hover, button:hover {
   background: #ffd93d;
   color: #0f3d33;
-  border-color: #ffd93d;
 }
 
 .accent {
