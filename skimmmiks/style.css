@@ -46,10 +46,10 @@ a.link-btn, button, input[type="submit"] {
   display: block;
   width: 100%;
   padding: 14px 20px;
-  background: #000000;
+  background: #4fc3f7;
   border: none;
   border-radius: 3px;
-  color: #ffffff;
+  color: #000000;
   text-decoration: none;
   font-size: 1rem;
   font-weight: 700;
@@ -61,8 +61,8 @@ a.link-btn, button, input[type="submit"] {
 }
 
 a.link-btn:hover, button:hover {
-  background: #4fc3f7;
-  color: #000000;
+  background: #ff7a1a;
+  color: #ffffff;
 }
 
 .accent {
