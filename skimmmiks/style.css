@@ -1,0 +1,130 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, "Malgun Gothic", sans-serif;
+  background: #ffffff;
+  color: #000000;
+  margin: 0;
+  padding: 20px;
+}
+
+.wrap, .card {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: #000000;
+}
+
+.card h1 {
+  font-size: 2.2rem;
+  margin-bottom: 0.3rem;
+  text-align: center;
+}
+
+p.role {
+  color: #0a84c4;
+  margin-top: 0;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+a.link-btn, button, input[type="submit"] {
+  display: block;
+  width: 100%;
+  padding: 14px 20px;
+  background: #ffffff;
+  border: 2px solid #000000;
+  border-radius: 3px;
+  color: #000000;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+a.link-btn:hover, button:hover {
+  background: #ff7a1a;
+  color: #ffffff;
+  border-color: #ff7a1a;
+}
+
+.accent {
+  color: #ff7a1a;
+}
+
+label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  color: #0a84c4;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+input, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 2px solid #000000;
+  border-radius: 3px;
+  color: #000000;
+  padding: 10px 12px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+button:disabled {
+  background: #eee;
+  border-color: #ccc;
+  color: #999;
+}
+
+.msg {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 3px;
+  font-size: 0.9rem;
+  display: none;
+  border: 2px solid transparent;
+}
+.msg.ok { background: #eaf6ea; color: #1a7a34; border-color: #1a7a34; display: block; }
+.msg.err { background: #fdeceb; color: #b3251a; border-color: #b3251a; display: block; }
+
+a.back {
+  display: inline-block;
+  margin-top: 10px;
+  margin-bottom: 20px;
+  color: #0a84c4;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.empty {
+  color: #0a84c4;
+  text-align: center;
+  margin-top: 40px;
+}

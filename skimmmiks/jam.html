@@ -4,30 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Skim Jam — 스킴밐스</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/skimmmiks/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0d1b2a">
+<meta name="theme-color" content="#ffffff">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
   .jam-item {
     background: #ffffff;
-    border: 2px solid #0d1b2a;
+    border: 2px solid #000000;
     border-radius: 3px;
     padding: 14px 16px;
     margin-bottom: 12px;
   }
   .jam-item .jam-date { font-weight: 800; margin-bottom: 4px; }
-  .jam-item .jam-meta { font-size: 0.85rem; color: #33475b; margin-bottom: 8px; }
+  .jam-item .jam-meta { font-size: 0.85rem; color: #0a84c4; margin-bottom: 8px; }
   .jam-item .jam-desc { font-size: 0.9rem; margin-bottom: 10px; }
-  .jam-item .attendees { font-size: 0.8rem; color: #33475b; margin-top: 8px; }
+  .jam-item .attendees { font-size: 0.8rem; color: #0a84c4; margin-top: 8px; }
   .jam-actions { display: flex; gap: 8px; }
   .jam-actions button { width: auto; padding: 6px 12px; font-size: 0.8rem; }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <a class="back" href="/skimmiks/index.html">← 스킴밐스</a>
+    <a class="back" href="/skimmmiks/index.html">← 스킴밐스</a>
     <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">Skim Jam</h1>
 
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
@@ -68,8 +68,8 @@
     const list = document.getElementById("list");
     try {
       const [eventsRes, attendeesRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_events?select=*&order=event_date.asc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_attendees?select=*`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_jam_events?select=*&order=event_date.asc`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_jam_attendees?select=*`, { headers }),
       ]);
       const events = await eventsRes.json();
       const attendees = await attendeesRes.json();
@@ -103,7 +103,7 @@
         btn.addEventListener("click", async () => {
           const name = prompt("이름을 입력하세요");
           if (!name || !name.trim()) return;
-          await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_attendees`, {
+          await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_jam_attendees`, {
             method: "POST",
             headers,
             body: JSON.stringify({ event_id: Number(btn.dataset.id), name: name.trim() }),
@@ -116,7 +116,7 @@
         document.querySelectorAll(".del-btn").forEach((btn) =>
           btn.addEventListener("click", async () => {
             if (!confirm("이 잼데이를 삭제할까요?")) return;
-            await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_events?id=eq.${btn.dataset.id}`, {
+            await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_jam_events?id=eq.${btn.dataset.id}`, {
               method: "DELETE",
               headers,
             });
@@ -132,7 +132,7 @@
             if (location === null) return;
             const desc = prompt("설명", ev.description || "");
             if (desc === null) return;
-            await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_events?id=eq.${btn.dataset.id}`, {
+            await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_jam_events?id=eq.${btn.dataset.id}`, {
               method: "PATCH",
               headers,
               body: JSON.stringify({ wave_condition: wave, location, description: desc }),
@@ -171,7 +171,7 @@
     btn.disabled = true;
     btn.textContent = "등록 중...";
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_events`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_jam_events`, {
         method: "POST",
         headers,
         body: JSON.stringify({

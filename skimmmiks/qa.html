@@ -4,31 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Q&amp;A — 스킴밐스</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/skimmmiks/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0d1b2a">
+<meta name="theme-color" content="#ffffff">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
   .q-item {
     background: #ffffff;
-    border: 2px solid #0d1b2a;
+    border: 2px solid #000000;
     border-radius: 3px;
     padding: 14px 16px;
     margin-bottom: 12px;
   }
-  .q-item .q-meta { font-size: 0.75rem; color: #33475b; margin-bottom: 4px; }
+  .q-item .q-meta { font-size: 0.75rem; color: #0a84c4; margin-bottom: 4px; }
   .q-item .q-text { font-weight: 700; margin-bottom: 8px; }
-  .q-item .a-text { background: #f0f6fa; border-radius: 3px; padding: 10px 12px; font-size: 0.95rem; }
-  .q-item .a-waiting { color: #33475b; font-size: 0.85rem; font-style: italic; }
-  .faq-group-title { font-size: 0.8rem; font-weight: 800; color: #33475b; margin: 18px 0 6px; text-transform: uppercase; }
+  .q-item .a-text { background: #fff3e8; border-radius: 3px; padding: 10px 12px; font-size: 0.95rem; }
+  .q-item .a-waiting { color: #0a84c4; font-size: 0.85rem; font-style: italic; }
+  .faq-group-title { font-size: 0.8rem; font-weight: 800; color: #ff7a1a; margin: 18px 0 6px; text-transform: uppercase; }
   .q-actions { display: flex; gap: 8px; margin-top: 8px; }
   .q-actions button { width: auto; padding: 4px 10px; font-size: 0.75rem; border-width: 1px; }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <a class="back" href="/skimmiks/index.html">← 스킴밐스</a>
+    <a class="back" href="/skimmmiks/index.html">← 스킴밐스</a>
     <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">Q&amp;A</h1>
 
     <form id="qForm">
@@ -74,7 +74,7 @@
   async function load() {
     const list = document.getElementById("list");
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions?select=*&order=created_at.desc`, { headers });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_questions?select=*&order=created_at.desc`, { headers });
       rows = await res.json();
       render();
     } catch (err) {
@@ -133,7 +133,7 @@
           const row = rows.find((r) => String(r.id) === id);
           const answer = prompt("답변을 입력하세요", row.answer || "");
           if (answer === null) return;
-          await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions?id=eq.${id}`, {
+          await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_questions?id=eq.${id}`, {
             method: "PATCH",
             headers,
             body: JSON.stringify({ answer }),
@@ -147,7 +147,7 @@
           const row = rows.find((r) => String(r.id) === id);
           const group = prompt("FAQ 그룹 이름 (비우면 그룹 해제)", row.faq_group || "");
           if (group === null) return;
-          await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions?id=eq.${id}`, {
+          await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_questions?id=eq.${id}`, {
             method: "PATCH",
             headers,
             body: JSON.stringify({ faq_group: group.trim() || null }),
@@ -158,7 +158,7 @@
       document.querySelectorAll(".delete-btn").forEach((btn) =>
         btn.addEventListener("click", async () => {
           if (!confirm("이 질문을 삭제할까요?")) return;
-          await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions?id=eq.${btn.dataset.id}`, {
+          await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_questions?id=eq.${btn.dataset.id}`, {
             method: "DELETE",
             headers,
           });
@@ -191,7 +191,7 @@
     btn.disabled = true;
     btn.textContent = "등록 중...";
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/skimmmiks_questions`, {
         method: "POST",
         headers,
         body: JSON.stringify({
