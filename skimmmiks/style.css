@@ -4,8 +4,8 @@
 
 body {
   font-family: -apple-system, "Malgun Gothic", sans-serif;
-  background: #ffffff;
-  color: #000000;
+  background: #000000;
+  color: #ffffff;
   margin: 0;
   padding: 20px;
 }
@@ -19,7 +19,7 @@ h1 {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-transform: uppercase;
-  color: #000000;
+  color: #ffffff;
 }
 
 .card h1 {
@@ -29,7 +29,7 @@ h1 {
 }
 
 p.role {
-  color: #0a84c4;
+  color: #4fc3f7;
   margin-top: 0;
   margin-bottom: 2rem;
   line-height: 1.5;
@@ -46,10 +46,10 @@ a.link-btn, button, input[type="submit"] {
   display: block;
   width: 100%;
   padding: 14px 20px;
-  background: #ffffff;
-  border: 2px solid #000000;
+  background: #000000;
+  border: none;
   border-radius: 3px;
-  color: #000000;
+  color: #ffffff;
   text-decoration: none;
   font-size: 1rem;
   font-weight: 700;
@@ -57,13 +57,12 @@ a.link-btn, button, input[type="submit"] {
   text-transform: uppercase;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 a.link-btn:hover, button:hover {
-  background: #ff7a1a;
-  color: #ffffff;
-  border-color: #ff7a1a;
+  background: #4fc3f7;
+  color: #000000;
 }
 
 .accent {
@@ -74,7 +73,7 @@ label {
   display: block;
   margin-top: 14px;
   margin-bottom: 6px;
-  color: #0a84c4;
+  color: #4fc3f7;
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -83,7 +82,7 @@ input, textarea {
   width: 100%;
   box-sizing: border-box;
   background: #ffffff;
-  border: 2px solid #000000;
+  border: 2px solid #ffffff;
   border-radius: 3px;
   color: #000000;
   padding: 10px 12px;
@@ -97,9 +96,8 @@ textarea {
 }
 
 button:disabled {
-  background: #eee;
-  border-color: #ccc;
-  color: #999;
+  background: #333;
+  color: #777;
 }
 
 .msg {
@@ -117,14 +115,14 @@ a.back {
   display: inline-block;
   margin-top: 10px;
   margin-bottom: 20px;
-  color: #0a84c4;
+  color: #4fc3f7;
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 600;
 }
 
 .empty {
-  color: #0a84c4;
+  color: #4fc3f7;
   text-align: center;
   margin-top: 40px;
 }
