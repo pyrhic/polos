@@ -1,7 +1,7 @@
 (function () {
   // 순서: 스킴밐스 - 글쓰기 - 사교원(홈) - 트레이딩
   const PAGES = [
-    { url: "https://polos-cxn.pages.dev/skimmmiks/index.html", color: "#000000" },
+    { url: "https://polos-cxn.pages.dev/skimmmiks/index.html", color: "#ffffff" },
     { url: "https://polos-cxn.pages.dev/writing/index.html", color: "#111111" },
     { url: "https://sakyowon-site-5m5.pages.dev/", color: "#0d1b2a" },
     { url: "https://polos-cxn.pages.dev/trading/index.html", color: "#0f3d33" },
