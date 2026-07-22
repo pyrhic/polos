@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 자산현황 — 트레이딩</title>
+<link rel="stylesheet" href="/trading/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f3d33">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .stat-row { display: flex; gap: 10px; margin-bottom: 18px; }
+  .stat-tile {
+    flex: 1;
+    background: #ffffff;
+    border: 2px solid #0f3d33;
+    border-radius: 3px;
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .stat-tile .label { font-size: 0.75rem; color: #3a6659; margin-bottom: 4px; }
+  .stat-tile .value { font-size: 1.05rem; font-weight: 800; }
+  .chart-wrap { background: #ffffff; border: 2px solid #0f3d33; border-radius: 3px; padding: 14px; }
+  .chart-wrap h3 { margin: 0 0 10px; font-size: 0.95rem; }
+  .point-tooltip {
+    position: absolute;
+    background: #0f3d33;
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 3px;
+    pointer-events: none;
+    white-space: nowrap;
+    transform: translate(-50%, -130%);
+    display: none;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/trading/index.html">← 트레이딩 허브</a>
+    <h1 style="font-size:1.4rem;margin-bottom:0.6rem;">내 자산현황</h1>
+
+    <div class="stat-row" id="statRow"></div>
+
+    <div class="chart-wrap">
+      <h3>누적 총자산 추이</h3>
+      <div style="position:relative;">
+        <svg id="assetChart" viewBox="0 0 400 160" style="width:100%;height:160px;display:block;"></svg>
+        <div class="point-tooltip" id="pointTooltip"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  const fmtWon = (n) => (n === null || n === undefined ? "-" : Math.round(n).toLocaleString() + "원");
+
+  function renderStats(points, latest) {
+    const row = document.getElementById("statRow");
+    if (!latest) { row.innerHTML = ""; return; }
+    const first = points[0];
+    const cumPct = first.assets > 0 ? ((latest.assets - first.assets) / first.assets) * 100 : null;
+    const goalPct = (latest.assets / latest.goal) * 100;
+    row.innerHTML = `
+      <div class="stat-tile"><div class="label">현재 총자산</div><div class="value">${fmtWon(latest.assets)}</div></div>
+      <div class="stat-tile"><div class="label">누적 수익률</div><div class="value">${cumPct === null ? "-" : (cumPct >= 0 ? "+" : "") + cumPct.toFixed(1) + "%"}</div></div>
+      <div class="stat-tile"><div class="label">1억 목표 달성률</div><div class="value">${goalPct.toFixed(1)}%</div></div>
+    `;
+  }
+
+  function renderChart(points) {
+    const svg = document.getElementById("assetChart");
+    const tooltip = document.getElementById("pointTooltip");
+
+    if (points.length < 2) {
+      svg.innerHTML = '<text x="200" y="80" text-anchor="middle" fill="#3a6659" font-size="12">주간 리포트가 2주 이상 쌓이면 그래프가 표시됩니다</text>';
+      return;
+    }
+
+    const w = 400, h = 160, padL = 40, padR = 10, padT = 10, padB = 20;
+    const values = points.map((p) => p.assets);
+    const min = Math.min(...values), max = Math.max(...values);
+    const range = max - min || 1;
+    const x = (i) => padL + (i * (w - padL - padR)) / (points.length - 1);
+    const y = (v) => padT + (h - padT - padB) * (1 - (v - min) / range);
+
+    const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.assets).toFixed(1)}`).join(" ");
+
+    let svgHtml = `<line x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}" stroke="#d9e5e1" stroke-width="1"/>`;
+    svgHtml += `<path d="${line}" fill="none" stroke="#0f3d33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    points.forEach((p, i) => {
+      svgHtml += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.assets).toFixed(1)}" r="4" fill="#0f3d33"
+        data-label="${p.label}" data-assets="${p.assets}" class="pt"/>`;
+    });
+    svg.innerHTML = svgHtml;
+
+    svg.querySelectorAll(".pt").forEach((pt) => {
+      pt.addEventListener("mouseenter", () => {
+        const rect = svg.getBoundingClientRect();
+        const bx = pt.getBoundingClientRect();
+        tooltip.style.display = "block";
+        tooltip.style.left = (bx.left - rect.left + bx.width / 2) + "px";
+        tooltip.style.top = (bx.top - rect.top) + "px";
+        tooltip.textContent = `${pt.dataset.label}: ${Number(pt.dataset.assets).toLocaleString()}원`;
+      });
+      pt.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+    });
+  }
+
+  async function load() {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/trading_weekly_reports?select=report_data&archived=eq.false&order=report_date.asc`,
+        { headers }
+      );
+      const rows = await res.json();
+      const points = rows
+        .filter((r) => r.report_data && r.report_data.currentAssets !== undefined)
+        .map((r) => ({ label: r.report_data.periodEnd, assets: r.report_data.currentAssets, goal: r.report_data.goalAmount || 100000000 }));
+
+      renderChart(points);
+      renderStats(points, points[points.length - 1]);
+    } catch (err) {
+      document.getElementById("statRow").innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  load();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>

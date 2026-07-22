@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billionaire Ambition — 트레이딩</title>
+<link rel="stylesheet" href="/trading/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f3d33">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .ambition-num { font-size: 2.6rem; font-weight: 800; text-align: center; margin: 10px 0 4px; }
+  .ambition-sub { text-align: center; color: #3a6659; margin-bottom: 22px; }
+  .progress-outer {
+    width: 100%;
+    height: 22px;
+    background: #ffffff;
+    border: 2px solid #0f3d33;
+    border-radius: 11px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .progress-inner {
+    height: 100%;
+    background: #ffd93d;
+    transition: width 0.4s;
+  }
+  .motivate {
+    background: #ffffff;
+    border: 2px solid #0f3d33;
+    border-radius: 3px;
+    padding: 16px 18px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/trading/index.html">← 트레이딩 허브</a>
+    <h1 style="font-size:1.4rem;margin-bottom:0.6rem;text-align:center;">Billionaire Ambition</h1>
+    <div id="content"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  const fmtWon = (n) => Math.round(n).toLocaleString() + "원";
+
+  function motivateMessage(pct) {
+    if (pct >= 100) return "1억 달성! 다음 목표를 세울 시간입니다.";
+    if (pct >= 75) return "거의 다 왔어요 — 마지막까지 페이스 유지!";
+    if (pct >= 50) return "절반 넘었습니다. 이 흐름 그대로!";
+    if (pct >= 25) return "꾸준히 쌓이고 있어요. 하루치 목표만 생각하세요.";
+    return "시작이 반입니다. 오늘의 매매일지부터 채워보세요.";
+  }
+
+  async function load() {
+    const box = document.getElementById("content");
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/trading_weekly_reports?select=report_data&archived=eq.false&order=report_date.desc&limit=1`,
+        { headers }
+      );
+      const rows = await res.json();
+      if (!rows.length) {
+        box.innerHTML = '<div class="empty">아직 주간 리포트가 없습니다. 트레이딩 입력 후 주간 리포트를 생성해주세요.</div>';
+        return;
+      }
+      const d = rows[0].report_data;
+      const pct = Math.max(0, Math.min(100, (d.currentAssets / d.goalAmount) * 100));
+
+      box.innerHTML = `
+        <div class="ambition-num">${pct.toFixed(1)}%</div>
+        <div class="ambition-sub">${fmtWon(d.currentAssets)} / ${fmtWon(d.goalAmount)}</div>
+        <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+        <div class="motivate">${motivateMessage(pct)}</div>
+        <div class="ambition-sub" style="margin-top:16px;">올해 말까지 ${d.remainingDays}일 남음 · 하루 ${fmtWon(d.requiredDailyProfit)} 필요</div>
+      `;
+    } catch (err) {
+      box.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  load();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>

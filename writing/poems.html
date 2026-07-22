@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>일일일시 — 글쓰기</title>
+<link rel="stylesheet" href="/writing/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#faf6ec">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/writing/index.html">← 글쓰기</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">일일일시</h1>
+    <div id="list"><div class="empty">불러오는 중...</div></div>
+  </div>
+<script>
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  async function load() {
+    const list = document.getElementById("list");
+    try {
+      const res = await fetch("/api/writing-doc?tab=" + encodeURIComponent("시"));
+      const rows = await res.json();
+      if (!res.ok) throw new Error(rows.error || "알 수 없는 오류");
+      if (!rows.length) {
+        list.innerHTML = '<div class="empty">아직 공개된 글이 없습니다.</div>';
+        return;
+      }
+      list.innerHTML = rows
+        .map((r) => {
+          const body = r.paragraphs
+            .map((p) => (p.trim() ? `<p>${escapeHtml(p)}</p>` : '<div class="blank-line"></div>'))
+            .join("");
+          return `<div class="essay"><h2>${escapeHtml(r.title)}</h2><div class="content">${body}</div></div>`;
+        })
+        .join("");
+    } catch (err) {
+      list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  load();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>

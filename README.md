@@ -2,14 +2,16 @@
 
 이규영의 개인 허브 홈페이지. `sakyowon-site`(직장 정체성 전용 페이지)보다 상위에서, 직장/사업/취미/농사/일상 등 여러 정체성을 한곳에 모으는 진입점.
 
-## 현재 상태 (뼈대)
-- 직장(사교원 SW매니저)만 실제 사이트로 연결됨
-- 나머지(SKIMMMIKS, 물든책방, 취미, 농사, 일상)는 "준비중" 표시만 있고 아직 별도 사이트/기능 없음
-
-## 다음에 할 것
-- 농사(파종 일정관리), 일상(장보기 리스트 등)은 별도 사이트가 없으므로 이 허브 안에 직접 D1 기반 기능으로 구현 예정
-- 취미(음악과 건축)는 "진행 관리" 성격의 도구로 발전 예정
-- SKIMMMIKS, 물든책방은 별도 사이트가 생기면 링크만 연결
+## 현재 상태
+- 최상위 허브(`index.html`): 이규영 홈페이지 스타일(로고+버튼), 4개 아이덴티티로 연결
+  - 직장(사교원) → `sakyowon-site` (별도 도메인)
+  - 사업(스킴밐스) → `/skimmiks` (Q&A, Lessons, Skim Jam, Skim Session)
+  - 트레이딩 → `/trading` (원래 sakyowon-site에 있었으나 이전됨)
+  - 글쓰기 → `/writing` (양양전설/에세이/일일일시/습작의기억, 원래 sakyowon-site에 있었으나 이전됨)
+- 4개 아이덴티티 페이지는 서로 캐러셀(스와이프/점 클릭)로 전환 가능 (`hub-nav.js`, 크로스도메인)
+- 물든책방, 취미(음악과 건축), 농사, 일상은 아직 미착수
 
 ## 셋업
-Cloudflare Pages에서 이 레포를 Connect to Git으로 연결하면 끝 (지금은 정적 페이지, 백엔드 없음)
+- Cloudflare Pages: 이 레포를 Connect to Git으로 연결 (정적 페이지 + Functions)
+- 환경변수: `GOOGLE_SERVICE_ACCOUNT_KEY` (trading/writing 기능에 필요, sakyowon-site와 동일한 값)
+- Supabase: `sakyowon-wiki-db` 프로젝트 재사용. `skimmiks_tables.sql`을 SQL Editor에서 실행 필요

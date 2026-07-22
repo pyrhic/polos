@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skim Jam — 스킴밐스</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d1b2a">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .jam-item {
+    background: #ffffff;
+    border: 2px solid #0d1b2a;
+    border-radius: 3px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .jam-item .jam-date { font-weight: 800; margin-bottom: 4px; }
+  .jam-item .jam-meta { font-size: 0.85rem; color: #33475b; margin-bottom: 8px; }
+  .jam-item .jam-desc { font-size: 0.9rem; margin-bottom: 10px; }
+  .jam-item .attendees { font-size: 0.8rem; color: #33475b; margin-top: 8px; }
+  .jam-actions { display: flex; gap: 8px; }
+  .jam-actions button { width: auto; padding: 6px 12px; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/skimmiks/index.html">← 스킴밐스</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">Skim Jam</h1>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button type="button" id="adminBtn" style="width:auto;padding:6px 12px;font-size:0.8rem;">관리자 모드</button>
+    </div>
+
+    <form id="addForm" class="msg" style="display:none;padding:14px 16px;">
+      <label for="date">날짜</label>
+      <input type="date" id="date" required>
+      <label for="wave">파도 상황</label>
+      <input type="text" id="wave" placeholder="예: 무릎~허벅지, 온쇼어 약함">
+      <label for="location">장소</label>
+      <input type="text" id="location" placeholder="예: 후진항 방파제 앞">
+      <label for="desc">설명</label>
+      <textarea id="desc" placeholder="예: 오후 3시 집합, 초보자 환영"></textarea>
+      <button type="submit" id="addBtn">잼데이 등록</button>
+    </form>
+
+    <div id="list" style="margin-top:14px;"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const ADMIN_PW = "0130";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+  let isAdmin = false;
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  async function load() {
+    const list = document.getElementById("list");
+    try {
+      const [eventsRes, attendeesRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_events?select=*&order=event_date.asc`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_attendees?select=*`, { headers }),
+      ]);
+      const events = await eventsRes.json();
+      const attendees = await attendeesRes.json();
+
+      if (!events.length) {
+        list.innerHTML = '<div class="empty">예정된 잼데이가 없습니다.</div>';
+        return;
+      }
+
+      list.innerHTML = events
+        .map((ev) => {
+          const evAttendees = attendees.filter((a) => a.event_id === ev.id);
+          const adminControls = isAdmin
+            ? `<div class="jam-actions">
+                <button type="button" class="edit-btn" data-id="${ev.id}">수정</button>
+                <button type="button" class="del-btn" data-id="${ev.id}">삭제</button>
+              </div>`
+            : "";
+          return `<div class="jam-item" data-id="${ev.id}">
+            <div class="jam-date">${new Date(ev.event_date + "T00:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</div>
+            <div class="jam-meta">${ev.wave_condition ? "🌊 " + escapeHtml(ev.wave_condition) : ""}${ev.wave_condition && ev.location ? " · " : ""}${ev.location ? "📍 " + escapeHtml(ev.location) : ""}</div>
+            ${ev.description ? `<div class="jam-desc">${escapeHtml(ev.description)}</div>` : ""}
+            <button type="button" class="attend-btn" data-id="${ev.id}" style="width:auto;padding:6px 14px;font-size:0.85rem;">참석</button>
+            <div class="attendees">참석: ${evAttendees.length ? evAttendees.map((a) => escapeHtml(a.name)).join(", ") : "아직 없음"} (${evAttendees.length}명)</div>
+            ${adminControls}
+          </div>`;
+        })
+        .join("");
+
+      document.querySelectorAll(".attend-btn").forEach((btn) =>
+        btn.addEventListener("click", async () => {
+          const name = prompt("이름을 입력하세요");
+          if (!name || !name.trim()) return;
+          await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_attendees`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ event_id: Number(btn.dataset.id), name: name.trim() }),
+          });
+          load();
+        })
+      );
+
+      if (isAdmin) {
+        document.querySelectorAll(".del-btn").forEach((btn) =>
+          btn.addEventListener("click", async () => {
+            if (!confirm("이 잼데이를 삭제할까요?")) return;
+            await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_events?id=eq.${btn.dataset.id}`, {
+              method: "DELETE",
+              headers,
+            });
+            load();
+          })
+        );
+        document.querySelectorAll(".edit-btn").forEach((btn) =>
+          btn.addEventListener("click", async () => {
+            const ev = events.find((e) => String(e.id) === btn.dataset.id);
+            const wave = prompt("파도 상황", ev.wave_condition || "");
+            if (wave === null) return;
+            const location = prompt("장소", ev.location || "");
+            if (location === null) return;
+            const desc = prompt("설명", ev.description || "");
+            if (desc === null) return;
+            await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_events?id=eq.${btn.dataset.id}`, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({ wave_condition: wave, location, description: desc }),
+            });
+            load();
+          })
+        );
+      }
+    } catch (err) {
+      list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  document.getElementById("adminBtn").addEventListener("click", () => {
+    if (isAdmin) {
+      isAdmin = false;
+      document.getElementById("adminBtn").textContent = "관리자 모드";
+      document.getElementById("addForm").style.display = "none";
+      load();
+      return;
+    }
+    const pw = prompt("관리자 비밀번호");
+    if (pw === ADMIN_PW) {
+      isAdmin = true;
+      document.getElementById("adminBtn").textContent = "관리자 모드 종료";
+      document.getElementById("addForm").style.display = "block";
+      load();
+    } else if (pw !== null) {
+      alert("틀렸습니다.");
+    }
+  });
+
+  document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("addBtn");
+    btn.disabled = true;
+    btn.textContent = "등록 중...";
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_jam_events`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          event_date: document.getElementById("date").value,
+          wave_condition: document.getElementById("wave").value.trim(),
+          location: document.getElementById("location").value.trim(),
+          description: document.getElementById("desc").value.trim(),
+        }),
+      });
+      document.getElementById("addForm").reset();
+      load();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "잼데이 등록";
+    }
+  });
+
+  load();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>

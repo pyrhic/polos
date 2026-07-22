@@ -4,8 +4,8 @@
 
 body {
   font-family: -apple-system, "Malgun Gothic", sans-serif;
-  background: #cfe9f5;
-  color: #0d1b2a;
+  background: #d3f2e6;
+  color: #0f3d33;
   margin: 0;
   padding: 20px;
 }
@@ -19,7 +19,7 @@ h1 {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-transform: uppercase;
-  color: #0d1b2a;
+  color: #0f3d33;
 }
 
 .card h1 {
@@ -29,7 +29,7 @@ h1 {
 }
 
 p.role {
-  color: #33475b;
+  color: #3a6659;
   margin-top: 0;
   margin-bottom: 2rem;
   line-height: 1.5;
@@ -47,9 +47,9 @@ a.link-btn, button, input[type="submit"] {
   width: 100%;
   padding: 14px 20px;
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: 2px solid #0f3d33;
   border-radius: 3px;
-  color: #0d1b2a;
+  color: #0f3d33;
   text-decoration: none;
   font-size: 1rem;
   font-weight: 700;
@@ -61,20 +61,20 @@ a.link-btn, button, input[type="submit"] {
 }
 
 a.link-btn:hover, button:hover {
-  background: #e8362a;
-  color: #fff;
-  border-color: #e8362a;
+  background: #ffd93d;
+  color: #0f3d33;
+  border-color: #ffd93d;
 }
 
 .accent {
-  color: #e8362a;
+  color: #d99a00;
 }
 
 label {
   display: block;
   margin-top: 14px;
   margin-bottom: 6px;
-  color: #33475b;
+  color: #3a6659;
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -83,9 +83,9 @@ input, textarea {
   width: 100%;
   box-sizing: border-box;
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: 2px solid #0f3d33;
   border-radius: 3px;
-  color: #0d1b2a;
+  color: #0f3d33;
   padding: 10px 12px;
   font-size: 1rem;
   font-family: inherit;
@@ -121,7 +121,7 @@ a.back {
   display: inline-block;
   margin-top: 10px;
   margin-bottom: 20px;
-  color: #33475b;
+  color: #3a6659;
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 600;
@@ -129,7 +129,7 @@ a.back {
 
 .report {
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: 2px solid #0f3d33;
   border-radius: 3px;
   padding: 16px 18px;
   margin-bottom: 14px;
@@ -144,19 +144,19 @@ a.back {
   font-size: 0.9rem;
 }
 .report .day .dow {
-  color: #33475b;
+  color: #3a6659;
   margin-right: 6px;
   font-weight: 700;
 }
 .report .day .leave {
-  color: #e8362a;
+  color: #d99a00;
   margin-left: 6px;
   font-size: 0.8rem;
   font-weight: 700;
 }
 
 .empty {
-  color: #33475b;
+  color: #3a6659;
   text-align: center;
   margin-top: 40px;
 }
@@ -166,7 +166,7 @@ a.back {
   align-items: center;
   gap: 12px;
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: 2px solid #0f3d33;
   border-radius: 3px;
   padding: 12px 14px;
   margin-bottom: 10px;
@@ -175,7 +175,7 @@ a.back {
   width: 20px;
   height: 20px;
   min-width: 20px;
-  accent-color: #e8362a;
+  accent-color: #d99a00;
   cursor: pointer;
 }
 .todo-item .todo-text {
@@ -187,11 +187,11 @@ a.back {
   border-radius: 2px;
 }
 .todo-item .todo-text:focus {
-  background: #f0f6fa;
+  background: #eafaf3;
 }
 .todo-item.completed .todo-text {
   text-decoration: line-through;
-  color: #9aa7b0;
+  color: #9ab5ac;
 }
 .todo-item .todo-del {
   width: auto;

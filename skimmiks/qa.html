@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q&amp;A — 스킴밐스</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d1b2a">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .q-item {
+    background: #ffffff;
+    border: 2px solid #0d1b2a;
+    border-radius: 3px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .q-item .q-meta { font-size: 0.75rem; color: #33475b; margin-bottom: 4px; }
+  .q-item .q-text { font-weight: 700; margin-bottom: 8px; }
+  .q-item .a-text { background: #f0f6fa; border-radius: 3px; padding: 10px 12px; font-size: 0.95rem; }
+  .q-item .a-waiting { color: #33475b; font-size: 0.85rem; font-style: italic; }
+  .faq-group-title { font-size: 0.8rem; font-weight: 800; color: #33475b; margin: 18px 0 6px; text-transform: uppercase; }
+  .q-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .q-actions button { width: auto; padding: 4px 10px; font-size: 0.75rem; border-width: 1px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/skimmiks/index.html">← 스킴밐스</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">Q&amp;A</h1>
+
+    <form id="qForm">
+      <label for="name">이름</label>
+      <input type="text" id="name" required>
+      <label for="pw">비밀번호 (수정/삭제 시 필요)</label>
+      <input type="password" id="pw" required>
+      <label for="question">질문</label>
+      <textarea id="question" required></textarea>
+      <button type="submit" id="submitBtn">질문 등록</button>
+      <div class="msg" id="msg"></div>
+    </form>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:20px;">
+      <button type="button" id="adminBtn" style="width:auto;padding:6px 12px;font-size:0.8rem;">관리자 모드</button>
+    </div>
+
+    <div id="list" style="margin-top:14px;"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const ADMIN_PW = "0130";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+  let isAdmin = false;
+  let rows = [];
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  function showMsg(text, ok) {
+    const msg = document.getElementById("msg");
+    msg.className = "msg " + (ok ? "ok" : "err");
+    msg.textContent = text;
+  }
+
+  async function load() {
+    const list = document.getElementById("list");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions?select=*&order=created_at.desc`, { headers });
+      rows = await res.json();
+      render();
+    } catch (err) {
+      list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  function render() {
+    const list = document.getElementById("list");
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty">아직 등록된 질문이 없습니다.</div>';
+      return;
+    }
+
+    const grouped = {};
+    const ungrouped = [];
+    rows.forEach((r) => {
+      if (r.faq_group) {
+        (grouped[r.faq_group] ||= []).push(r);
+      } else {
+        ungrouped.push(r);
+      }
+    });
+
+    function renderItem(r) {
+      const adminControls = isAdmin
+        ? `<div class="q-actions">
+            <button type="button" class="answer-btn" data-id="${r.id}">답변 작성</button>
+            <button type="button" class="group-btn" data-id="${r.id}">그룹 지정</button>
+            <button type="button" class="delete-btn" data-id="${r.id}">삭제</button>
+          </div>`
+        : "";
+      return `<div class="q-item" data-id="${r.id}">
+        <div class="q-meta">${escapeHtml(r.name)} · ${new Date(r.created_at).toLocaleDateString("ko-KR")}</div>
+        <div class="q-text">${escapeHtml(r.question)}</div>
+        ${r.answer ? `<div class="a-text">${escapeHtml(r.answer)}</div>` : '<div class="a-waiting">답변 대기중</div>'}
+        ${adminControls}
+      </div>`;
+    }
+
+    let html = "";
+    Object.keys(grouped).forEach((g) => {
+      html += `<div class="faq-group-title">${escapeHtml(g)}</div>`;
+      html += grouped[g].map(renderItem).join("");
+    });
+    if (ungrouped.length) {
+      if (Object.keys(grouped).length) html += `<div class="faq-group-title">기타</div>`;
+      html += ungrouped.map(renderItem).join("");
+    }
+    list.innerHTML = html;
+
+    if (isAdmin) {
+      document.querySelectorAll(".answer-btn").forEach((btn) =>
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+          const row = rows.find((r) => String(r.id) === id);
+          const answer = prompt("답변을 입력하세요", row.answer || "");
+          if (answer === null) return;
+          await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions?id=eq.${id}`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ answer }),
+          });
+          load();
+        })
+      );
+      document.querySelectorAll(".group-btn").forEach((btn) =>
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+          const row = rows.find((r) => String(r.id) === id);
+          const group = prompt("FAQ 그룹 이름 (비우면 그룹 해제)", row.faq_group || "");
+          if (group === null) return;
+          await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions?id=eq.${id}`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ faq_group: group.trim() || null }),
+          });
+          load();
+        })
+      );
+      document.querySelectorAll(".delete-btn").forEach((btn) =>
+        btn.addEventListener("click", async () => {
+          if (!confirm("이 질문을 삭제할까요?")) return;
+          await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions?id=eq.${btn.dataset.id}`, {
+            method: "DELETE",
+            headers,
+          });
+          load();
+        })
+      );
+    }
+  }
+
+  document.getElementById("adminBtn").addEventListener("click", () => {
+    if (isAdmin) {
+      isAdmin = false;
+      document.getElementById("adminBtn").textContent = "관리자 모드";
+      render();
+      return;
+    }
+    const pw = prompt("관리자 비밀번호");
+    if (pw === ADMIN_PW) {
+      isAdmin = true;
+      document.getElementById("adminBtn").textContent = "관리자 모드 종료";
+      render();
+    } else if (pw !== null) {
+      alert("틀렸습니다.");
+    }
+  });
+
+  document.getElementById("qForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = true;
+    btn.textContent = "등록 중...";
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/skimmiks_questions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          name: document.getElementById("name").value.trim(),
+          password: document.getElementById("pw").value,
+          question: document.getElementById("question").value.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showMsg("질문이 등록됐습니다.", true);
+      document.getElementById("qForm").reset();
+      load();
+    } catch (err) {
+      showMsg("등록 실패: " + err.message, false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "질문 등록";
+    }
+  });
+
+  load();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>

@@ -4,8 +4,8 @@
 
 body {
   font-family: -apple-system, "Malgun Gothic", sans-serif;
-  background: #cfe9f5;
-  color: #0d1b2a;
+  background: #faf6ec;
+  color: #111111;
   margin: 0;
   padding: 20px;
 }
@@ -19,7 +19,7 @@ h1 {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-transform: uppercase;
-  color: #0d1b2a;
+  color: #111111;
 }
 
 .card h1 {
@@ -29,7 +29,7 @@ h1 {
 }
 
 p.role {
-  color: #33475b;
+  color: #6b6b6b;
   margin-top: 0;
   margin-bottom: 2rem;
   line-height: 1.5;
@@ -47,9 +47,9 @@ a.link-btn, button, input[type="submit"] {
   width: 100%;
   padding: 14px 20px;
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: 2px solid #111111;
   border-radius: 3px;
-  color: #0d1b2a;
+  color: #111111;
   text-decoration: none;
   font-size: 1rem;
   font-weight: 700;
@@ -61,20 +61,20 @@ a.link-btn, button, input[type="submit"] {
 }
 
 a.link-btn:hover, button:hover {
-  background: #e8362a;
-  color: #fff;
-  border-color: #e8362a;
+  background: #111111;
+  color: #faf6ec;
+  border-color: #111111;
 }
 
 .accent {
-  color: #e8362a;
+  color: #8a6d3b;
 }
 
 label {
   display: block;
   margin-top: 14px;
   margin-bottom: 6px;
-  color: #33475b;
+  color: #6b6b6b;
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -83,9 +83,9 @@ input, textarea {
   width: 100%;
   box-sizing: border-box;
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: 2px solid #111111;
   border-radius: 3px;
-  color: #0d1b2a;
+  color: #111111;
   padding: 10px 12px;
   font-size: 1rem;
   font-family: inherit;
@@ -94,10 +94,6 @@ input, textarea {
 textarea {
   min-height: 120px;
   resize: vertical;
-}
-
-button[type="submit"] {
-  margin-top: 24px;
 }
 
 button:disabled {
@@ -121,95 +117,39 @@ a.back {
   display: inline-block;
   margin-top: 10px;
   margin-bottom: 20px;
-  color: #33475b;
+  color: #6b6b6b;
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 600;
 }
 
-.report {
-  background: #ffffff;
-  border: 2px solid #0d1b2a;
-  border-radius: 3px;
-  padding: 16px 18px;
-  margin-bottom: 14px;
-}
-.report .period {
-  font-weight: 800;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-}
-.report .day {
-  margin-bottom: 6px;
-  font-size: 0.9rem;
-}
-.report .day .dow {
-  color: #33475b;
-  margin-right: 6px;
-  font-weight: 700;
-}
-.report .day .leave {
-  color: #e8362a;
-  margin-left: 6px;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
 .empty {
-  color: #33475b;
+  color: #6b6b6b;
   text-align: center;
   margin-top: 40px;
 }
 
-.todo-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.essay {
   background: #ffffff;
-  border: 2px solid #0d1b2a;
-  border-radius: 3px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-}
-.todo-item input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  accent-color: #e8362a;
-  cursor: pointer;
-}
-.todo-item .todo-text {
-  flex: 1;
-  font-size: 1rem;
-  word-break: break-word;
-  cursor: text;
-  outline: none;
-  border-radius: 2px;
-}
-.todo-item .todo-text:focus {
-  background: #f0f6fa;
-}
-.todo-item.completed .todo-text {
-  text-decoration: line-through;
-  color: #9aa7b0;
-}
-.todo-item .todo-del {
-  width: auto;
-  margin-top: 0;
-  padding: 4px 10px;
-  font-size: 0.8rem;
-  border-width: 1px;
-}
-.todo-add-row {
-  display: flex;
-  gap: 8px;
+  border: 1px solid #ddd6c4;
+  border-radius: 6px;
+  padding: 20px 22px;
   margin-bottom: 20px;
 }
-.todo-add-row input {
-  flex: 1;
+.essay h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+  text-transform: none;
+  letter-spacing: normal;
 }
-.todo-add-row button {
-  width: auto;
-  margin-top: 0;
-  padding: 10px 16px;
+.essay .content p {
+  margin: 0 0 1.3em;
+  line-height: 2.1;
+  font-size: 1rem;
+}
+.essay .content p:last-child {
+  margin-bottom: 0;
+}
+.essay .content .blank-line {
+  height: 1.3em;
 }
