@@ -1,7 +1,7 @@
 {
-  "name": "이규영",
-  "short_name": "이규영",
-  "description": "이규영의 개인 허브 — 사교원, 트레이딩, 글쓰기, 스킴밐스",
+  "name": "뽈로",
+  "short_name": "뽈로",
+  "description": "개인 허브 — 사교원, 트레이딩, 글쓰기, 스킴밐스",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
