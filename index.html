@@ -257,13 +257,19 @@
     });
   }
   logoScroll.addEventListener("scroll", updateCoverflow, { passive: true });
+
+  // 초기 위치: 사교원(인덱스 2)이 가운데. 아이템 실제 위치 기준으로 계산(폭 비율에 안 흔들리게)
+  function centerOn(idx, smooth) {
+    const item = logoItems[idx];
+    const target = item.offsetLeft - (logoScroll.clientWidth - item.clientWidth) / 2;
+    logoScroll.scrollTo({ left: target, behavior: smooth ? "smooth" : "instant" });
+  }
   window.addEventListener("resize", () => {
-    logoScroll.scrollLeft = 2 * logoScroll.clientWidth;
+    centerOn(2, false);
     updateCoverflow();
   });
 
-  // 초기 위치: 사교원(인덱스 2)이 가운데
-  logoScroll.scrollLeft = 2 * logoScroll.clientWidth;
+  centerOn(2, false);
   updateCoverflow();
 
   // PC 마우스 휠(세로 휠)을 가로 스크롤로 변환
