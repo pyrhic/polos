@@ -65,6 +65,7 @@
 
   /* 화면 2: 로고 캐러셀 */
   #screenCarousel { flex-direction: column; overflow: hidden; }
+  .logo-viewport { width: 100%; overflow: hidden; }
   .chevron-down {
     position: absolute;
     top: 24px;
@@ -162,6 +163,7 @@
 
     <div class="screen" id="screenCarousel">
       <div class="chevron-down">﹀</div>
+      <div class="logo-viewport">
       <div class="logo-track" id="logoTrack">
         <div class="logo-slide" data-idx="0">
           <div>
@@ -187,6 +189,7 @@
             <div class="logo-name">트레이딩</div>
           </div>
         </div>
+      </div>
       </div>
       <div class="carousel-dots" id="carouselDots"></div>
     </div>
