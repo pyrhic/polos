@@ -108,26 +108,29 @@
   .logo-item a {
     display: block;
     width: 100%;
-    border-radius: 20px;
-    overflow: hidden;
     text-decoration: none;
     pointer-events: none;
   }
   .logo-item img {
-    width: 100%;
-    height: 220px;
-    object-fit: cover;
     display: block;
     -webkit-user-drag: none;
     user-select: none;
   }
-  .logo-name {
-    margin-top: 14px;
-    text-align: center;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    font-size: 0.95rem;
+  /* 사교원/트레이딩/글쓰기: 각 페이지에서 쓰는 것과 같은 180px 박스 */
+  .logo-item.boxed a {
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .logo-item.boxed img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+  }
+  /* 스킴밐스: 투명 로고라 박스 없이 원래 페이지처럼 그대로 */
+  .logo-item.plain img {
+    width: 70%;
+    height: auto;
+    margin: 0 auto;
   }
 
   /* 홈버튼(설치) - 화분, 설명 없음. 캐러셀 화면에서만 노출 */
@@ -168,21 +171,17 @@
     <div class="screen" id="screenCarousel">
       <div class="chevron-down" id="chevronDown">﹀</div>
       <div class="logo-scroll" id="logoScroll">
-        <div class="logo-item" data-href="/skimmmiks/index.html">
+        <div class="logo-item plain" data-href="/skimmmiks/index.html">
           <a href="/skimmmiks/index.html" tabindex="-1"><img src="/skimmmiks/logo.png"></a>
-          <div class="logo-name">스킴밐스</div>
         </div>
-        <div class="logo-item" data-href="/writing/index.html">
+        <div class="logo-item boxed" data-href="/writing/index.html">
           <a href="/writing/index.html" tabindex="-1"><img src="/writing/logo.jpg"></a>
-          <div class="logo-name">글쓰기</div>
         </div>
-        <div class="logo-item" data-href="/sakyowon/index.html">
+        <div class="logo-item boxed" data-href="/sakyowon/index.html">
           <a href="/sakyowon/index.html" tabindex="-1"><img src="/sakyowon/logo.jpg"></a>
-          <div class="logo-name">사교원</div>
         </div>
-        <div class="logo-item" data-href="/trading/index.html">
+        <div class="logo-item boxed" data-href="/trading/index.html">
           <a href="/trading/index.html" tabindex="-1"><img src="/trading/logo.jpg"></a>
-          <div class="logo-name">트레이딩</div>
         </div>
       </div>
     </div>
@@ -258,6 +257,20 @@
   }
   logoScroll.addEventListener("scroll", updateCoverflow, { passive: true });
 
+  // 로고 폭(70%)과 좌우 여백을 같은 기준(컨테이너 전체 폭)으로 JS에서 직접 계산
+  // - CSS % 패딩만 쓰면 패딩이 "안쪽 콘텐츠 박스" 기준으로 계산돼서, 맨 앞/뒤 로고는
+  //   중앙까지 스크롤이 물리적으로 닿지 않아(경계에 막혀) 완전히 평면으로 안 펴지는 문제가 있었음
+  function layoutCoverflow() {
+    const w = logoScroll.clientWidth;
+    const itemW = w * 0.7;
+    const pad = (w - itemW) / 2;
+    logoScroll.style.paddingLeft = pad + "px";
+    logoScroll.style.paddingRight = pad + "px";
+    logoItems.forEach((item) => {
+      item.style.flex = `0 0 ${itemW}px`;
+    });
+  }
+
   // 초기 위치: 사교원(인덱스 2)이 가운데. 아이템 실제 위치 기준으로 계산(폭 비율에 안 흔들리게)
   function centerOn(idx, smooth) {
     const item = logoItems[idx];
@@ -265,10 +278,12 @@
     logoScroll.scrollTo({ left: target, behavior: smooth ? "smooth" : "instant" });
   }
   window.addEventListener("resize", () => {
+    layoutCoverflow();
     centerOn(2, false);
     updateCoverflow();
   });
 
+  layoutCoverflow();
   centerOn(2, false);
   updateCoverflow();
 
