@@ -4,30 +4,284 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>뽈로</title>
-<link rel="stylesheet" href="/style.css">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0d1b2a">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #0d1b2a;
+    font-family: -apple-system, "Malgun Gothic", sans-serif;
+    color: #ffffff;
+  }
+
+  .screens {
+    position: fixed;
+    inset: 0;
+    height: 200vh;
+    transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .screens.at-carousel { transform: translateY(-100vh); }
+
+  .screen {
+    height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* 화면 1: 문구/소개 */
+  #screenQuote { flex-direction: column; padding: 0 32px; text-align: center; }
+  .quote-text {
+    font-size: 1.4rem;
+    font-weight: 700;
+    line-height: 1.6;
+    max-width: 420px;
+  }
+  .quote-source {
+    margin-top: 14px;
+    font-size: 0.85rem;
+    color: #8fa3b8;
+  }
+  .chevron-up {
+    position: absolute;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.6rem;
+    color: #4a5f75;
+    animation: bounceUp 1.8s ease-in-out infinite;
+  }
+  @keyframes bounceUp {
+    0%, 100% { transform: translate(-50%, 0); opacity: 0.4; }
+    50% { transform: translate(-50%, -8px); opacity: 1; }
+  }
+
+  /* 화면 2: 로고 캐러셀 */
+  #screenCarousel { flex-direction: column; overflow: hidden; }
+  .chevron-down {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.4rem;
+    color: #4a5f75;
+    animation: bounceDown 1.8s ease-in-out infinite;
+  }
+  @keyframes bounceDown {
+    0%, 100% { transform: translate(-50%, 0); opacity: 0.4; }
+    50% { transform: translate(-50%, 8px); opacity: 1; }
+  }
+  .logo-track {
+    display: flex;
+    width: 400%;
+    height: 260px;
+    transition: transform 0.4s ease;
+  }
+  .logo-slide {
+    width: 25%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 40px;
+  }
+  .logo-slide a {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    border-radius: 20px;
+    overflow: hidden;
+    text-decoration: none;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+  .logo-slide img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+  }
+  .logo-slide.dim a { opacity: 0.35; transform: scale(0.88); }
+  .logo-name {
+    margin-top: 14px;
+    text-align: center;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 0.95rem;
+  }
+  .carousel-dots {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .carousel-dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ffffff;
+  }
+
+  /* 홈버튼(설치) - 화분, 설명 없음 */
+  #installBtn {
+    position: fixed;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    transition: transform 0.12s ease, background 0.15s ease;
+  }
+  #installBtn:active { transform: translateX(-50%) scale(0.9); background: rgba(255, 255, 255, 0.16); }
+  #installBtn img { width: 34px; height: 34px; object-fit: contain; }
+</style>
 </head>
 <body>
-  <div class="card" style="padding-top:40px;">
-    <div style="width:100%;">
-      <div style="height:180px;border-radius:16px;overflow:hidden;margin-bottom:1rem;">
-        <img src="/logo.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
+  <div class="screens" id="screens">
+    <div class="screen" id="screenQuote">
+      <div>
+        <p class="quote-text" id="quoteText"></p>
+        <p class="quote-source" id="quoteSource"></p>
       </div>
-      <div class="links">
-        <a class="link-btn" href="/sakyowon/index.html">사교원</a>
-        <a class="link-btn" href="/trading/index.html">트레이딩</a>
-        <a class="link-btn" href="/writing/index.html">글쓰기</a>
-        <a class="link-btn" href="/skimmmiks/index.html">스킴밐스</a>
+      <div class="chevron-up">︿</div>
+    </div>
+
+    <div class="screen" id="screenCarousel">
+      <div class="chevron-down">﹀</div>
+      <div class="logo-track" id="logoTrack">
+        <div class="logo-slide" data-idx="0">
+          <div>
+            <a href="/skimmmiks/index.html"><img src="/skimmmiks/logo.png"></a>
+            <div class="logo-name">스킴밐스</div>
+          </div>
+        </div>
+        <div class="logo-slide" data-idx="1">
+          <div>
+            <a href="/writing/index.html"><img src="/writing/logo.jpg"></a>
+            <div class="logo-name">글쓰기</div>
+          </div>
+        </div>
+        <div class="logo-slide" data-idx="2">
+          <div>
+            <a href="/sakyowon/index.html"><img src="/sakyowon/logo.jpg"></a>
+            <div class="logo-name">사교원</div>
+          </div>
+        </div>
+        <div class="logo-slide" data-idx="3">
+          <div>
+            <a href="/trading/index.html"><img src="/trading/logo.jpg"></a>
+            <div class="logo-name">트레이딩</div>
+          </div>
+        </div>
       </div>
+      <div class="carousel-dots" id="carouselDots"></div>
     </div>
   </div>
+
+  <button type="button" id="installBtn"><img src="/flowerpot.png" alt=""></button>
+
 <script>
+  const QUOTES = [
+    { text: "시작이 반이다.", source: "" },
+    { text: "오늘 걷지 않으면 내일은 뛰어야 한다.", source: "" },
+    { text: "작은 습관이 쌓여 방향이 된다.", source: "" },
+    { text: "포기하지 않는 한 실패는 없다.", source: "" },
+    { text: "지금 이 순간에 집중하라.", source: "" },
+    { text: "완벽한 때는 없다, 지금이 그때다.", source: "" },
+  ];
+  const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  document.getElementById("quoteText").textContent = q.text;
+  document.getElementById("quoteSource").textContent = q.source;
+
+  const screens = document.getElementById("screens");
+  const logoTrack = document.getElementById("logoTrack");
+  const dotsWrap = document.getElementById("carouselDots");
+  const slides = document.querySelectorAll(".logo-slide");
+  let atCarousel = false;
+  let logoIdx = 2; // 사교원부터 시작
+
+  slides.forEach((_, i) => {
+    const dot = document.createElement("span");
+    dotsWrap.appendChild(dot);
+  });
+
+  function renderLogoIdx() {
+    logoTrack.style.transform = `translateX(-${logoIdx * 25}%)`;
+    slides.forEach((s, i) => s.classList.toggle("dim", i !== logoIdx));
+    [...dotsWrap.children].forEach((d, i) => (d.style.opacity = i === logoIdx ? "0.9" : "0.25"));
+  }
+  renderLogoIdx();
+
+  function goToCarousel(show) {
+    atCarousel = show;
+    screens.classList.toggle("at-carousel", show);
+  }
+
+  let startX = null;
+  let startY = null;
+  document.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener("touchend", (e) => {
+    if (startX === null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    startX = null;
+
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 60) {
+      // 세로 스와이프: 화면 전환
+      if (!atCarousel && dy < 0) goToCarousel(true);
+      else if (atCarousel && dy > 0) goToCarousel(false);
+      return;
+    }
+
+    if (atCarousel && Math.abs(dx) > 60) {
+      // 가로 스와이프: 로고 넘기기
+      if (dx < 0 && logoIdx < slides.length - 1) logoIdx++;
+      else if (dx > 0 && logoIdx > 0) logoIdx--;
+      renderLogoIdx();
+    }
+  }, { passive: true });
+
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js");
   }
+
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+
+  document.getElementById("installBtn").addEventListener("click", async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    } else if (window.matchMedia("(display-mode: standalone)").matches) {
+      alert("이미 앱으로 설치되어 있습니다.");
+    } else if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      alert("아이폰에서는: 하단 공유 버튼(□↑) → \"홈 화면에 추가\"를 눌러주세요.");
+    } else {
+      alert("이 브라우저에서는 자동 설치를 지원하지 않아요. 브라우저 메뉴에서 \"앱 설치\" 또는 \"홈 화면에 추가\"를 찾아주세요.");
+    }
+  });
 </script>
 </body>
 </html>
