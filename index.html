@@ -244,6 +244,9 @@
     const rect = logoScroll.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     logoItems.forEach((item) => {
+      // 측정 전에 transform을 잠깐 초기화 - 회전된 상태 그대로 재면
+      // bounding box가 찌그러져서(원근 축소) 중심 계산이 매번 어긋남(양끝 항목이 평면으로 안 펴지는 원인)
+      item.style.transform = "none";
       const r = item.getBoundingClientRect();
       const itemCenter = r.left + r.width / 2;
       const dist = (itemCenter - centerX) / rect.width;
