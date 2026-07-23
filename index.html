@@ -168,20 +168,19 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* 홈버튼(설치) - 화분, 설명 없음. 캐러셀/메뉴 화면에서 노출 */
+  /* 홈버튼(설치) - 스킴밐스 로고, 설명 없음. 맨 아래 고정, 캐러셀/메뉴 화면에서 노출 */
   #installBtn {
     position: fixed;
-    bottom: 22px;
+    bottom: 14px;
     left: 50%;
     transform: translateX(-50%);
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: #0d1b2a;
-    border: none;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 6px;
     cursor: pointer;
     z-index: 20;
     opacity: 0;
@@ -189,8 +188,15 @@
     transition: transform 0.12s ease, opacity 0.3s ease;
   }
   #installBtn.visible { opacity: 1; pointer-events: auto; }
-  #installBtn:active { transform: translateX(-50%) scale(0.9); }
-  #installBtn img { width: 34px; height: 34px; object-fit: contain; }
+  #installBtn:active { transform: translateX(-50%) scale(0.94); }
+  #installBtn img { width: 64px; height: auto; display: block; }
+  #installBtn .copyright {
+    font-size: 0.6rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #8fa3b8;
+    white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -232,7 +238,10 @@
     </div>
   </div>
 
-  <button type="button" id="installBtn"><img src="/flowerpot.png" alt=""></button>
+  <button type="button" id="installBtn">
+    <img src="/skimmmiks/logo.png" alt="">
+    <span class="copyright">All copy rights reserved @SKIMMMIKS</span>
+  </button>
 
 <script>
   const QUOTES = [
@@ -383,7 +392,8 @@
   //   중앙까지 스크롤이 물리적으로 닿지 않아(경계에 막혀) 완전히 평면으로 안 펴지는 문제가 있었음
   function layoutCoverflow() {
     const w = logoScroll.clientWidth;
-    const itemW = w * 0.7;
+    // PC처럼 화면이 넓을 때 폭의 70%를 그대로 쓰면 카드가 너무 커져서 옆 로고가 화면 밖으로 밀려남 - 상한선을 둠
+    const itemW = Math.min(w * 0.7, 480);
     const pad = (w - itemW) / 2;
     logoScroll.style.paddingLeft = pad + "px";
     logoScroll.style.paddingRight = pad + "px";
@@ -444,7 +454,9 @@
     justDragged = dragMoved >= 6;
   });
 
-  // 클릭(마우스)/탭(터치) 둘 다 여기서 처리 - 드래그 직후엔 무시. 로고를 누르면 그 자리에서 메뉴가 펼쳐짐
+  // 클릭(마우스)/탭(터치) 둘 다 여기서 처리 - 드래그 직후엔 무시.
+  // 이미 가운데 있는(선택된) 로고를 누르면 메뉴가 펼쳐지고,
+  // 옆에 살짝 보이는(아직 안 골라진) 로고를 누르면 스와이프하듯 그 로고를 가운데로 이동만 함
   logoScroll.addEventListener("click", (e) => {
     if (justDragged) {
       justDragged = false;
@@ -452,7 +464,12 @@
       return;
     }
     const item = e.target.closest(".logo-item");
-    if (item && item.dataset.id) openMenu(item.dataset.id);
+    if (!item || !item.dataset.id) return;
+    if (item.dataset.id === centeredId) {
+      openMenu(item.dataset.id);
+    } else {
+      centerOn(logoItems.indexOf(item), true);
+    }
   });
 
   if ("serviceWorker" in navigator) {
