@@ -1,16 +1,16 @@
 (function () {
-  // 순서: 스킴밐스 - 글쓰기 - 사교원(홈) - 트레이딩
+  // 순서: 스킴밐스 - 글쓰기 - 사교원(홈) - 트레이딩 (전부 같은 도메인 아래 경로)
   const PAGES = [
-    { url: "https://polos-cxn.pages.dev/skimmmiks/index.html", color: "#ffffff" },
-    { url: "https://polos-cxn.pages.dev/writing/index.html", color: "#111111" },
-    { url: "https://sakyowon-site-5m5.pages.dev/", color: "#0d1b2a" },
-    { url: "https://polos-cxn.pages.dev/trading/index.html", color: "#0f3d33" },
+    { url: "/skimmmiks/index.html", color: "#ffffff" },
+    { url: "/writing/index.html", color: "#111111" },
+    { url: "/sakyowon/index.html", color: "#0d1b2a" },
+    { url: "/trading/index.html", color: "#0f3d33" },
   ];
 
   function getSection() {
-    if (location.hostname.includes("sakyowon-site")) return 2;
     if (location.pathname.startsWith("/skimmmiks")) return 0;
     if (location.pathname.startsWith("/writing")) return 1;
+    if (location.pathname.startsWith("/sakyowon")) return 2;
     if (location.pathname.startsWith("/trading")) return 3;
     return -1;
   }

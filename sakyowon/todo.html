@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>투두리스트 — 사교원</title>
+<link rel="stylesheet" href="/sakyowon/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d1b2a">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/sakyowon/index.html">← 돌아가기</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">투두리스트</h1>
+
+    <div class="todo-add-row">
+      <input type="text" id="newTodo" placeholder="할 일 입력 후 Enter">
+      <button type="button" id="addBtn">추가</button>
+    </div>
+    <div class="msg" id="msg"></div>
+
+    <div id="list"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+
+  function showError(err) {
+    const msg = document.getElementById("msg");
+    msg.className = "msg err";
+    msg.textContent = "오류: " + err;
+  }
+
+  async function loadTodos() {
+    const list = document.getElementById("list");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/todos?select=*&order=id.asc`, { headers });
+      const rows = await res.json();
+
+      if (!rows.length) {
+        list.innerHTML = '<div class="empty">할 일이 없습니다.</div>';
+        return;
+      }
+
+      list.innerHTML = rows
+        .map(
+          (row) => `<div class="todo-item ${row.completed ? "completed" : ""}" data-id="${row.id}">
+            <input type="checkbox" ${row.completed ? "checked" : ""} class="todo-check">
+            <span class="todo-text" contenteditable="true" spellcheck="false"></span>
+            <button type="button" class="todo-del">삭제</button>
+          </div>`
+        )
+        .join("");
+
+      // 텍스트는 XSS 방지를 위해 textContent로 안전하게 채움
+      document.querySelectorAll(".todo-item").forEach((el, i) => {
+        el.querySelector(".todo-text").textContent = rows[i].text;
+      });
+
+      document.querySelectorAll(".todo-check").forEach((cb) => {
+        cb.addEventListener("change", async (e) => {
+          const item = e.target.closest(".todo-item");
+          const id = item.dataset.id;
+          const completed = e.target.checked;
+          item.classList.toggle("completed", completed);
+          try {
+            await fetch(`${SUPABASE_URL}/rest/v1/todos?id=eq.${id}`, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({ completed }),
+            });
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+      });
+
+      document.querySelectorAll(".todo-text").forEach((span, i) => {
+        const originalText = rows[i].text;
+        span.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            span.blur();
+          }
+        });
+        span.addEventListener("blur", async () => {
+          const item = span.closest(".todo-item");
+          const id = item.dataset.id;
+          const newText = span.textContent.trim();
+          if (!newText) {
+            span.textContent = originalText; // 빈 값이면 되돌림
+            return;
+          }
+          if (newText === originalText) return;
+          try {
+            await fetch(`${SUPABASE_URL}/rest/v1/todos?id=eq.${id}`, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({ text: newText }),
+            });
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+      });
+
+      document.querySelectorAll(".todo-del").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          const item = e.target.closest(".todo-item");
+          const id = item.dataset.id;
+          try {
+            await fetch(`${SUPABASE_URL}/rest/v1/todos?id=eq.${id}`, {
+              method: "DELETE",
+              headers,
+            });
+            loadTodos();
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+      });
+    } catch (err) {
+      list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  async function addTodo() {
+    const input = document.getElementById("newTodo");
+    const text = input.value.trim();
+    if (!text) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/todos`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ text }),
+      });
+      input.value = "";
+      loadTodos();
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  document.getElementById("addBtn").addEventListener("click", addTodo);
+  document.getElementById("newTodo").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addTodo();
+  });
+
+  loadTodos();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>

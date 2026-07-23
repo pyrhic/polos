@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>오늘 업무 입력 — 사교원</title>
+<link rel="stylesheet" href="/sakyowon/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d1b2a">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <div class="wrap">
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">오늘 업무 입력</h1>
+    <form id="logForm">
+      <label for="date">날짜</label>
+      <input type="date" id="date" required>
+
+      <label for="tasks">오늘 한 일</label>
+      <textarea id="tasks" placeholder="예: 활어회센터 운영진 워크숍 보조 및 촬영" required></textarea>
+
+      <label for="leave">추가 부재시간 (없으면 비워두세요)</label>
+      <input type="text" id="leave" placeholder="예: 14:00-15:00 병원">
+
+      <button type="submit" id="submitBtn">구글시트에 저장</button>
+      <div class="msg" id="msg"></div>
+    </form>
+    <a class="back" href="/sakyowon/index.html">← 돌아가기</a>
+
+    <h2 style="font-size:1.1rem;margin-top:10px;">이번 주 업무일지</h2>
+    <div id="logList"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const dowNames = ["일", "월", "화", "수", "목", "금", "토"];
+  const dateInput = document.getElementById("date");
+  dateInput.value = new Date().toISOString().slice(0, 10);
+
+  let editingDate = null;
+
+  function resetForm() {
+    editingDate = null;
+    document.getElementById("submitBtn").textContent = "구글시트에 저장";
+    document.getElementById("tasks").value = "";
+    document.getElementById("leave").value = "";
+  }
+
+  async function loadWeekLogs() {
+    const box = document.getElementById("logList");
+    try {
+      const res = await fetch("/api/week-logs");
+      const rows = await res.json();
+      if (!rows.length) {
+        box.innerHTML = '<div class="empty">이번 주 입력된 기록이 없습니다.</div>';
+        return;
+      }
+      box.innerHTML = rows
+        .map(
+          (row) => `<div class="report">
+            <div class="period">${row.date}(${row.dow})${row.leave ? `<span class="leave">${row.leave}</span>` : ""}</div>
+            <div class="day">${(row.tasks || "").replace(/\n/g, "<br>") || "(비어있음)"}</div>
+            <button type="button" class="edit-btn" data-date="${row.date}" data-dow="${row.dow}"
+              data-tasks="${encodeURIComponent(row.tasks || "")}" data-leave="${encodeURIComponent(row.leave || "")}"
+              style="margin-top:10px;width:auto;padding:6px 14px;font-size:0.85rem;">수정</button>
+          </div>`
+        )
+        .join("");
+
+      document.querySelectorAll(".edit-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          editingDate = { date: btn.dataset.date, dow: btn.dataset.dow };
+          document.getElementById("tasks").value = decodeURIComponent(btn.dataset.tasks);
+          document.getElementById("leave").value = decodeURIComponent(btn.dataset.leave);
+          document.getElementById("submitBtn").textContent = "수정 완료";
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+    } catch (err) {
+      box.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  document.getElementById("logForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("submitBtn");
+    const msg = document.getElementById("msg");
+    msg.className = "msg";
+    msg.textContent = "";
+    btn.disabled = true;
+    btn.textContent = "저장 중...";
+
+    let date, dow;
+    if (editingDate) {
+      date = editingDate.date;
+      dow = editingDate.dow;
+    } else {
+      const d = new Date(dateInput.value + "T00:00:00");
+      dow = dowNames[d.getDay()];
+      date = `${d.getMonth() + 1}/${d.getDate()}`;
+    }
+
+    try {
+      const res = await fetch("/api/submit-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          dow,
+          tasks: document.getElementById("tasks").value.trim(),
+          leave: document.getElementById("leave").value.trim(),
+          overwrite: !!editingDate,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        msg.className = "msg ok";
+        msg.textContent = editingDate ? "수정됐습니다." : "저장됐습니다.";
+        resetForm();
+        loadWeekLogs();
+      } else {
+        msg.className = "msg err";
+        msg.textContent = "저장 실패: " + (data.error || "알 수 없는 오류");
+      }
+    } catch (err) {
+      msg.className = "msg err";
+      msg.textContent = "저장 실패: " + err.message;
+    } finally {
+      btn.disabled = false;
+      if (!editingDate) btn.textContent = "구글시트에 저장";
+    }
+  });
+
+  loadWeekLogs();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>
