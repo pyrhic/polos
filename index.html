@@ -85,6 +85,7 @@
   .logo-scroll {
     display: flex;
     width: 100%;
+    padding: 0 15%;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
@@ -96,18 +97,17 @@
   .logo-scroll::-webkit-scrollbar { display: none; }
   .logo-scroll.dragging { cursor: grabbing; scroll-snap-type: none; }
   .logo-item {
-    flex: 0 0 100%;
+    flex: 0 0 70%;
     scroll-snap-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0 40px;
+    padding: 0 14px;
   }
   .logo-item a {
     display: block;
     width: 100%;
-    max-width: 260px;
     border-radius: 20px;
     overflow: hidden;
     text-decoration: none;
