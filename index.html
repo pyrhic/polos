@@ -88,6 +88,7 @@
     top: 50%;
     left: 0;
     transform: translateY(-50%);
+    transition: top 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
     display: flex;
     width: 100%;
     padding: 0 15%;
@@ -103,6 +104,8 @@
   .logo-scroll.dragging { cursor: grabbing; scroll-snap-type: none; }
   /* 메뉴가 펼쳐진 동안엔 캐러셀을 잠가서 로고 위치가 그대로 유지되게 함 */
   .logo-scroll.locked { overflow-x: hidden; cursor: default; }
+  /* 로고 선택시 위쪽 고정 위치로 살짝 올라감 - 아래에 메뉴 붙을 공간을 넉넉히 확보 */
+  .logo-scroll.docked { top: 20%; }
   .logo-item {
     flex: 0 0 70%;
     scroll-snap-align: center;
@@ -158,7 +161,9 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    transition: top 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
   }
+  .menu-links.docked { top: calc(20% + 140px); }
   .menu-link {
     display: block;
     text-align: center;
@@ -334,30 +339,41 @@
     }, 400);
   }
 
+  // 로고가 위쪽 고정 위치로 올라가 자리잡은 다음(450ms), 그 아래로 메뉴 버튼들이 이어서 페이드인됨
   function expandMenu(id) {
     const data = IDENTITIES[id];
     if (!data) return;
     selectedId = id;
     expanded = true;
-    menuLinks.innerHTML = data.links
-      .map(
-        (l, i) =>
-          `<a class="menu-link" style="--i:${i}" href="${l.href}"${l.external ? ' target="_blank"' : ""}>${l.label}</a>`
-      )
-      .join("");
     logoScroll.classList.add("locked");
+    logoScroll.classList.add("docked");
+    menuLinks.classList.add("docked");
     setDimmed(true);
+    setTimeout(() => {
+      if (selectedId !== id) return; // 그 사이 접혔으면 무시
+      menuLinks.innerHTML = data.links
+        .map(
+          (l, i) =>
+            `<a class="menu-link" style="--i:${i}" href="${l.href}"${l.external ? ' target="_blank"' : ""}>${l.label}</a>`
+        )
+        .join("");
+    }, 450);
   }
 
+  // 반대 순서: 메뉴 버튼들이 먼저 사라진 다음, 로고가 원래 가운데 위치로 내려옴
   function collapseMenu() {
     expanded = false;
     [...menuLinks.children].forEach((el) => {
       el.style.transition = "opacity 0.25s ease";
       el.style.opacity = "0";
     });
-    setTimeout(() => { menuLinks.innerHTML = ""; }, 250);
-    logoScroll.classList.remove("locked");
-    setDimmed(false);
+    setTimeout(() => {
+      menuLinks.innerHTML = "";
+      menuLinks.classList.remove("docked");
+      logoScroll.classList.remove("docked");
+      logoScroll.classList.remove("locked");
+      setDimmed(false);
+    }, 250);
   }
 
   document.getElementById("chevronUp").addEventListener("click", () => setLevel(1));
