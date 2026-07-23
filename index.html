@@ -22,10 +22,11 @@
   .screens {
     position: fixed;
     inset: 0;
-    height: 200vh;
+    height: 300vh;
     transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
   }
   .screens.at-carousel { transform: translateY(-100vh); }
+  .screens.at-menu { transform: translateY(-200vh); }
 
   .screen {
     height: 100vh;
@@ -77,6 +78,7 @@
     animation: bounceDown 1.8s ease-in-out infinite;
     cursor: pointer;
     padding: 16px;
+    z-index: 5;
   }
   @keyframes bounceDown {
     0%, 100% { transform: translate(-50%, 0); opacity: 0.4; }
@@ -105,35 +107,68 @@
     justify-content: center;
     padding: 0 14px;
   }
-  .logo-item a {
-    display: block;
-    width: 100%;
-    text-decoration: none;
+  /* 양끝 빈 로고: 보이지 않고, 스냅 정렬도 없어서 스크롤이 여기서 멈추지 못하고
+     항상 실제 로고 쪽으로 되돌아감 (양끝 로고가 완전히 평면으로 펴지도록 여유 공간만 제공) */
+  .logo-item.spacer {
+    visibility: hidden;
     pointer-events: none;
+    scroll-snap-align: none;
+  }
+  .logo-item .logo-box { width: 100%; }
+  /* 사교원/트레이딩/글쓰기: 각 페이지에서 쓰는 것과 같은 460px 박스 */
+  .logo-item.boxed .logo-box {
+    max-width: 460px;
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .logo-item.boxed .logo-box img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+  }
+  /* 스킴밐스: 투명 로고라 박스 없이 원래 페이지처럼 그대로(70%, 최대 322px) */
+  .logo-item.plain .logo-box img {
+    width: 70%;
+    max-width: 322px;
+    height: auto;
+    margin: 0 auto;
   }
   .logo-item img {
     display: block;
     -webkit-user-drag: none;
     user-select: none;
   }
-  /* 사교원/트레이딩/글쓰기: 각 페이지에서 쓰는 것과 같은 180px 박스 */
-  .logo-item.boxed a {
-    border-radius: 16px;
-    overflow: hidden;
+
+  /* 화면 3: 선택한 아이덴티티 메뉴 */
+  #screenMenu { flex-direction: column; overflow-y: auto; padding: 90px 24px 40px; }
+  .menu-inner { width: 100%; max-width: 460px; margin: 0 auto; }
+  .menu-logo { width: 100%; margin-bottom: 1.2rem; }
+  .menu-logo.boxed { max-width: 460px; margin-left: auto; margin-right: auto; border-radius: 16px; overflow: hidden; }
+  .menu-logo.boxed img { width: 100%; height: 180px; object-fit: cover; display: block; }
+  .menu-logo.plain img { width: 70%; max-width: 322px; height: auto; margin: 0 auto; display: block; }
+  .menu-links { display: flex; flex-direction: column; gap: 12px; }
+  .menu-link {
+    display: block;
+    text-align: center;
+    padding: 14px 20px;
+    background: #16324a;
+    color: #ffffff;
+    text-decoration: none;
+    border-radius: 3px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translateY(14px);
+    animation: menuFadeIn 0.4s ease forwards;
+    animation-delay: calc(var(--i) * 90ms);
   }
-  .logo-item.boxed img {
-    width: 100%;
-    height: 180px;
-    object-fit: cover;
-  }
-  /* 스킴밐스: 투명 로고라 박스 없이 원래 페이지처럼 그대로 */
-  .logo-item.plain img {
-    width: 70%;
-    height: auto;
-    margin: 0 auto;
+  @keyframes menuFadeIn {
+    to { opacity: 1; transform: translateY(0); }
   }
 
-  /* 홈버튼(설치) - 화분, 설명 없음. 캐러셀 화면에서만 노출 */
+  /* 홈버튼(설치) - 화분, 설명 없음. 캐러셀/메뉴 화면에서 노출 */
   #installBtn {
     position: fixed;
     bottom: 22px;
@@ -171,18 +206,28 @@
     <div class="screen" id="screenCarousel">
       <div class="chevron-down" id="chevronDown">﹀</div>
       <div class="logo-scroll" id="logoScroll">
-        <div class="logo-item plain" data-href="/skimmmiks/index.html">
-          <a href="/skimmmiks/index.html" tabindex="-1"><img src="/skimmmiks/logo.png"></a>
+        <div class="logo-item spacer" aria-hidden="true"></div>
+        <div class="logo-item plain" data-id="skimmmiks">
+          <div class="logo-box"><img src="/skimmmiks/logo.png" alt=""></div>
         </div>
-        <div class="logo-item boxed" data-href="/writing/index.html">
-          <a href="/writing/index.html" tabindex="-1"><img src="/writing/logo.jpg"></a>
+        <div class="logo-item boxed" data-id="writing">
+          <div class="logo-box"><img src="/writing/logo.jpg" alt=""></div>
         </div>
-        <div class="logo-item boxed" data-href="/sakyowon/index.html">
-          <a href="/sakyowon/index.html" tabindex="-1"><img src="/sakyowon/logo.jpg"></a>
+        <div class="logo-item boxed" data-id="sakyowon">
+          <div class="logo-box"><img src="/sakyowon/logo.jpg" alt=""></div>
         </div>
-        <div class="logo-item boxed" data-href="/trading/index.html">
-          <a href="/trading/index.html" tabindex="-1"><img src="/trading/logo.jpg"></a>
+        <div class="logo-item boxed" data-id="trading">
+          <div class="logo-box"><img src="/trading/logo.jpg" alt=""></div>
         </div>
+        <div class="logo-item spacer" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <div class="screen" id="screenMenu">
+      <div class="chevron-down" id="chevronMenuDown">﹀</div>
+      <div class="menu-inner">
+        <div class="menu-logo" id="menuLogoBox"></div>
+        <div class="menu-links" id="menuLinks"></div>
       </div>
     </div>
   </div>
@@ -202,27 +247,90 @@
   document.getElementById("quoteText").textContent = q.text;
   document.getElementById("quoteSource").textContent = q.source;
 
+  const IDENTITIES = {
+    skimmmiks: {
+      logo: "/skimmmiks/logo.png",
+      plain: true,
+      links: [
+        { label: "Q&A", href: "/skimmmiks/qa.html" },
+        { label: "Lessons", href: "https://map.naver.com/p/entry/place/1613482741?placePath=%2Fhome%3Fentry%3Dplt&searchType=place&lng=128.6832774&lat=38.0540714&c=15.00,0,0,2,dh", external: true },
+        { label: "Skim Jam", href: "/skimmmiks/jam.html" },
+        { label: "Skim Session", href: "https://www.instagram.com/skimmmiks/", external: true },
+      ],
+    },
+    writing: {
+      logo: "/writing/logo.jpg",
+      plain: false,
+      links: [
+        { label: "양양전설", href: "https://yangyang-legend.pages.dev", external: true },
+        { label: "에세이", href: "/writing/essays.html" },
+        { label: "일일일시", href: "/writing/poems.html" },
+        { label: "습작의기억", href: "/writing/drafts.html" },
+      ],
+    },
+    sakyowon: {
+      logo: "/sakyowon/logo.jpg",
+      plain: false,
+      links: [
+        { label: "오늘 업무 입력", href: "/sakyowon/daily-log.html" },
+        { label: "주간보고서", href: "/sakyowon/reports.html" },
+        { label: "투두리스트", href: "/sakyowon/todo.html" },
+        { label: "내 위키", href: "https://sakyowon-wiki-2a5.pages.dev", external: true },
+      ],
+    },
+    trading: {
+      logo: "/trading/logo.jpg",
+      plain: false,
+      links: [
+        { label: "오늘 트레이딩 입력", href: "/trading/log.html" },
+        { label: "주간 리포트", href: "/trading/weekly.html" },
+        { label: "투두리스트", href: "/trading/todo.html" },
+        { label: "내 자산현황", href: "/trading/assets.html" },
+        { label: "Billionaire Ambition", href: "/trading/ambition.html" },
+      ],
+    },
+  };
+
   const screens = document.getElementById("screens");
   const logoScroll = document.getElementById("logoScroll");
   const logoItems = [...document.querySelectorAll(".logo-item")];
-  let atCarousel = false;
-
   const installBtn = document.getElementById("installBtn");
+  const menuLogoBox = document.getElementById("menuLogoBox");
+  const menuLinks = document.getElementById("menuLinks");
 
-  function goToCarousel(show) {
-    atCarousel = show;
-    screens.classList.toggle("at-carousel", show);
-    installBtn.classList.toggle("visible", show);
+  // level: 0=문구, 1=캐러셀, 2=선택된 아이덴티티 메뉴
+  let level = 0;
+  let centeredId = null;
+
+  function setLevel(n) {
+    level = n;
+    screens.classList.toggle("at-carousel", level === 1);
+    screens.classList.toggle("at-menu", level === 2);
+    installBtn.classList.toggle("visible", level >= 1);
   }
 
-  document.getElementById("chevronUp").addEventListener("click", () => goToCarousel(true));
-  document.getElementById("chevronDown").addEventListener("click", () => goToCarousel(false));
+  function openMenu(id) {
+    const data = IDENTITIES[id];
+    if (!data) return;
+    menuLogoBox.className = "menu-logo " + (data.plain ? "plain" : "boxed");
+    menuLogoBox.innerHTML = `<img src="${data.logo}" alt="">`;
+    menuLinks.innerHTML = data.links
+      .map(
+        (l, i) =>
+          `<a class="menu-link" style="--i:${i}" href="${l.href}"${l.external ? ' target="_blank"' : ""}>${l.label}</a>`
+      )
+      .join("");
+    setLevel(2);
+  }
 
-  // 세로 스와이프: 문구 화면 <-> 캐러셀 화면 전환 (터치 전용, 가로 스크롤은 브라우저 네이티브 스크롤이 처리)
+  document.getElementById("chevronUp").addEventListener("click", () => setLevel(1));
+  document.getElementById("chevronDown").addEventListener("click", () => setLevel(0));
+  document.getElementById("chevronMenuDown").addEventListener("click", () => setLevel(1));
+
+  // 세로 스와이프: 문구 → 캐러셀 → (선택한 로고) 메뉴, 순서대로 한 단계씩 이동
   let startX = null;
   let startY = null;
   document.addEventListener("touchstart", (e) => {
-    if (e.target.closest("#logoScroll")) { startX = null; return; }
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
   }, { passive: true });
@@ -234,8 +342,13 @@
     startX = null;
 
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 60) {
-      if (!atCarousel && dy < 0) goToCarousel(true);
-      else if (atCarousel && dy > 0) goToCarousel(false);
+      if (dy < 0) {
+        if (level === 0) setLevel(1);
+        else if (level === 1 && centeredId) openMenu(centeredId);
+      } else {
+        if (level === 2) setLevel(1);
+        else if (level === 1) setLevel(0);
+      }
     }
   }, { passive: true });
 
@@ -243,6 +356,7 @@
   function updateCoverflow() {
     const rect = logoScroll.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
+    let best = { id: null, dist: Infinity };
     logoItems.forEach((item) => {
       // 측정 전에 transform을 잠깐 초기화 - 회전된 상태 그대로 재면
       // bounding box가 찌그러져서(원근 축소) 중심 계산이 매번 어긋남(양끝 항목이 평면으로 안 펴지는 원인)
@@ -256,7 +370,11 @@
       const opacity = 1 - Math.abs(clamped) * 0.55;
       item.style.transform = `perspective(900px) rotateY(${rotateY}deg) scale(${scale})`;
       item.style.opacity = opacity;
+      if (item.dataset.id && Math.abs(dist) < Math.abs(best.dist)) {
+        best = { id: item.dataset.id, dist };
+      }
     });
+    centeredId = best.id;
   }
   logoScroll.addEventListener("scroll", updateCoverflow, { passive: true });
 
@@ -274,20 +392,21 @@
     });
   }
 
-  // 초기 위치: 사교원(인덱스 2)이 가운데. 아이템 실제 위치 기준으로 계산(폭 비율에 안 흔들리게)
+  // 초기 위치: 사교원이 가운데. 아이템 실제 위치 기준으로 계산(폭 비율에 안 흔들리게)
   function centerOn(idx, smooth) {
     const item = logoItems[idx];
     const target = item.offsetLeft - (logoScroll.clientWidth - item.clientWidth) / 2;
     logoScroll.scrollTo({ left: target, behavior: smooth ? "smooth" : "instant" });
   }
+  const initialIndex = logoItems.findIndex((it) => it.dataset.id === "sakyowon");
   window.addEventListener("resize", () => {
     layoutCoverflow();
-    centerOn(2, false);
+    centerOn(initialIndex, false);
     updateCoverflow();
   });
 
   layoutCoverflow();
-  centerOn(2, false);
+  centerOn(initialIndex, false);
   updateCoverflow();
 
   // PC 마우스 휠(세로 휠)을 가로 스크롤로 변환
@@ -325,7 +444,7 @@
     justDragged = dragMoved >= 6;
   });
 
-  // 클릭(마우스)/탭(터치) 둘 다 여기서 처리 - 드래그 직후엔 무시
+  // 클릭(마우스)/탭(터치) 둘 다 여기서 처리 - 드래그 직후엔 무시. 로고를 누르면 그 자리에서 메뉴가 펼쳐짐
   logoScroll.addEventListener("click", (e) => {
     if (justDragged) {
       justDragged = false;
@@ -333,7 +452,7 @@
       return;
     }
     const item = e.target.closest(".logo-item");
-    if (item) location.href = item.dataset.href;
+    if (item && item.dataset.id) openMenu(item.dataset.id);
   });
 
   if ("serviceWorker" in navigator) {
