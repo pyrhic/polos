@@ -57,6 +57,8 @@
     font-size: 1.6rem;
     color: #4a5f75;
     animation: bounceUp 1.8s ease-in-out infinite;
+    cursor: pointer;
+    padding: 16px;
   }
   @keyframes bounceUp {
     0%, 100% { transform: translate(-50%, 0); opacity: 0.4; }
@@ -74,6 +76,8 @@
     font-size: 1.4rem;
     color: #4a5f75;
     animation: bounceDown 1.8s ease-in-out infinite;
+    cursor: pointer;
+    padding: 16px;
   }
   @keyframes bounceDown {
     0%, 100% { transform: translate(-50%, 0); opacity: 0.4; }
@@ -129,7 +133,7 @@
     background: #ffffff;
   }
 
-  /* 홈버튼(설치) - 화분, 설명 없음 */
+  /* 홈버튼(설치) - 화분, 설명 없음. 캐러셀 화면에서만 노출 */
   #installBtn {
     position: fixed;
     bottom: 22px;
@@ -138,16 +142,19 @@
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
+    background: #0d1b2a;
     border: none;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     z-index: 20;
-    transition: transform 0.12s ease, background 0.15s ease;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.12s ease, opacity 0.3s ease;
   }
-  #installBtn:active { transform: translateX(-50%) scale(0.9); background: rgba(255, 255, 255, 0.16); }
+  #installBtn.visible { opacity: 1; pointer-events: auto; }
+  #installBtn:active { transform: translateX(-50%) scale(0.9); }
   #installBtn img { width: 34px; height: 34px; object-fit: contain; }
 </style>
 </head>
@@ -158,11 +165,11 @@
         <p class="quote-text" id="quoteText"></p>
         <p class="quote-source" id="quoteSource"></p>
       </div>
-      <div class="chevron-up">︿</div>
+      <div class="chevron-up" id="chevronUp">︿</div>
     </div>
 
     <div class="screen" id="screenCarousel">
-      <div class="chevron-down">﹀</div>
+      <div class="chevron-down" id="chevronDown">﹀</div>
       <div class="logo-viewport">
       <div class="logo-track" id="logoTrack">
         <div class="logo-slide" data-idx="0">
@@ -229,10 +236,16 @@
   }
   renderLogoIdx();
 
+  const installBtn = document.getElementById("installBtn");
+
   function goToCarousel(show) {
     atCarousel = show;
     screens.classList.toggle("at-carousel", show);
+    installBtn.classList.toggle("visible", show);
   }
+
+  document.getElementById("chevronUp").addEventListener("click", () => goToCarousel(true));
+  document.getElementById("chevronDown").addEventListener("click", () => goToCarousel(false));
 
   let startX = null;
   let startY = null;
@@ -272,7 +285,7 @@
     deferredPrompt = e;
   });
 
-  document.getElementById("installBtn").addEventListener("click", async () => {
+  installBtn.addEventListener("click", async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       await deferredPrompt.userChoice;
