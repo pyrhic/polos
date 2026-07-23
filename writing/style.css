@@ -82,7 +82,7 @@ input, textarea {
   width: 100%;
   box-sizing: border-box;
   background: #ffffff;
-  border: 2px solid #111111;
+  border: none;
   border-radius: 3px;
   color: #111111;
   padding: 10px 12px;
@@ -107,10 +107,9 @@ button:disabled {
   border-radius: 3px;
   font-size: 0.9rem;
   display: none;
-  border: 2px solid transparent;
 }
-.msg.ok { background: #e6f6ea; color: #1a7a34; border-color: #1a7a34; display: block; }
-.msg.err { background: #fdeceb; color: #b3251a; border-color: #b3251a; display: block; }
+.msg.ok { background: #e6f6ea; color: #1a7a34; display: block; }
+.msg.err { background: #fdeceb; color: #b3251a; display: block; }
 
 a.back {
   display: inline-block;
@@ -130,7 +129,7 @@ a.back {
 
 .essay {
   background: #ffffff;
-  border: 1px solid #ddd6c4;
+  border: none;
   border-radius: 6px;
   padding: 20px 22px;
   margin-bottom: 20px;

@@ -82,7 +82,7 @@ input, textarea {
   width: 100%;
   box-sizing: border-box;
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: none;
   border-radius: 3px;
   color: #0d1b2a;
   padding: 10px 12px;
@@ -111,10 +111,9 @@ button:disabled {
   border-radius: 3px;
   font-size: 0.9rem;
   display: none;
-  border: 2px solid transparent;
 }
-.msg.ok { background: #e6f6ea; color: #1a7a34; border-color: #1a7a34; display: block; }
-.msg.err { background: #fdeceb; color: #b3251a; border-color: #b3251a; display: block; }
+.msg.ok { background: #e6f6ea; color: #1a7a34; display: block; }
+.msg.err { background: #fdeceb; color: #b3251a; display: block; }
 
 a.back {
   display: inline-block;
@@ -128,7 +127,7 @@ a.back {
 
 .report {
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: none;
   border-radius: 3px;
   padding: 16px 18px;
   margin-bottom: 14px;
@@ -154,6 +153,16 @@ a.back {
   font-weight: 700;
 }
 
+a.hwp-btn {
+  text-transform: none;
+  background: #cfe9f5;
+  color: #0d1b2a;
+}
+a.hwp-btn:hover {
+  background: #a9d7ec;
+  color: #0d1b2a;
+}
+
 .empty {
   color: #33475b;
   text-align: center;
@@ -165,7 +174,7 @@ a.back {
   align-items: center;
   gap: 12px;
   background: #ffffff;
-  border: 2px solid #0d1b2a;
+  border: none;
   border-radius: 3px;
   padding: 12px 14px;
   margin-bottom: 10px;
@@ -197,7 +206,6 @@ a.back {
   margin-top: 0;
   padding: 4px 10px;
   font-size: 0.8rem;
-  border-width: 1px;
 }
 .todo-add-row {
   display: flex;
