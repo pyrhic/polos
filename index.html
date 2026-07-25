@@ -122,11 +122,14 @@
     pointer-events: none;
     scroll-snap-align: none;
   }
-  .logo-item .logo-box { width: 100%; }
-  /* 사교원/트레이딩/글쓰기: 각 페이지에서 쓰는 것과 같은 460px 박스 */
-  .logo-item.boxed .logo-box {
-    max-width: 460px;
+  /* 로고 박스 폭은 캐러셀 칸(코버플로우용 70% 폭)이 아니라 각 페이지의 카드 폭(min(460px, 화면폭-40px))과
+     똑같은 기준으로 계산 - 칸 폭 기준으로 하면 좁은 화면(폰)에서 로고가 버튼보다 훨씬 작아 보이는 문제가 있었음 */
+  .logo-item .logo-box {
+    width: min(460px, calc(100vw - 40px));
     margin: 0 auto;
+  }
+  /* 사교원/트레이딩/글쓰기: 각 페이지에서 쓰는 것과 같은 박스 */
+  .logo-item.boxed .logo-box {
     border-radius: 16px;
     overflow: hidden;
   }
@@ -135,10 +138,9 @@
     height: 180px;
     object-fit: cover;
   }
-  /* 스킴밐스: 투명 로고라 박스 없이 원래 페이지처럼 그대로(70%, 최대 322px) */
+  /* 스킴밐스: 투명 로고라 박스 없이 원래 페이지처럼 그대로(카드 폭의 70%) */
   .logo-item.plain .logo-box img {
     width: 70%;
-    max-width: 322px;
     height: auto;
     margin: 0 auto;
   }
@@ -154,8 +156,7 @@
     top: calc(50% + 140px);
     left: 0;
     right: 0;
-    width: 460px;
-    max-width: calc(100% - 48px);
+    width: min(460px, calc(100vw - 40px));
     margin: 0 auto;
     box-sizing: border-box;
     display: flex;
@@ -424,6 +425,9 @@
       const scale = 1 - Math.abs(clamped) * 0.3;
       const opacity = 1 - Math.abs(clamped) * 0.55;
       item.style.transform = `perspective(900px) rotateY(${rotateY}deg) scale(${scale})`;
+      // 로고 박스 폭이 이제 화면폭 기준이라 칸 폭보다 넓어질 수 있어(옆 항목과 살짝 겹침) -
+      // 가운데에 가까운 항목이 항상 위로 쌓이게 해서 자연스럽게 덮이도록 함
+      item.style.zIndex = Math.round((1 - Math.abs(clamped)) * 100);
       // 메뉴가 펼쳐진 동안엔 선택 안 된 로고들의 투명도(0)를 건드리지 않음 - 리사이즈 등으로
       // updateCoverflow가 다시 불려도 숨겨둔 옆 로고들이 되살아나 보이면 안 되기 때문
       if (!expanded || item.dataset.id === selectedId) {
