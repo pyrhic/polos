@@ -4,8 +4,8 @@
 
 body {
   font-family: -apple-system, "Malgun Gothic", sans-serif;
-  background: #cfe9f5;
-  color: #0d1b2a;
+  background: #0d1b2a;
+  color: #ffffff;
   margin: 0;
   padding: 20px;
 }
@@ -19,7 +19,7 @@ h1 {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-transform: uppercase;
-  color: #0d1b2a;
+  color: #ffffff;
 }
 
 .card h1 {
@@ -29,7 +29,7 @@ h1 {
 }
 
 p.role {
-  color: #33475b;
+  color: #8fa3b8;
   margin-top: 0;
   margin-bottom: 2rem;
   line-height: 1.5;
@@ -46,10 +46,10 @@ a.link-btn, button, input[type="submit"] {
   display: block;
   width: 100%;
   padding: 14px 20px;
-  background: #ffffff;
+  background: #16324a;
   border: none;
   border-radius: 3px;
-  color: #0d1b2a;
+  color: #ffffff;
   text-decoration: none;
   font-size: 1rem;
   font-weight: 700;
@@ -73,7 +73,7 @@ label {
   display: block;
   margin-top: 14px;
   margin-bottom: 6px;
-  color: #33475b;
+  color: #8fa3b8;
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -119,14 +119,14 @@ a.back {
   display: inline-block;
   margin-top: 10px;
   margin-bottom: 20px;
-  color: #33475b;
+  color: #8fa3b8;
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 600;
 }
 
 .report {
-  background: #ffffff;
+  background: #16324a;
   border: none;
   border-radius: 3px;
   padding: 16px 18px;
@@ -142,7 +142,7 @@ a.back {
   font-size: 0.9rem;
 }
 .report .day .dow {
-  color: #33475b;
+  color: #8fa3b8;
   margin-right: 6px;
   font-weight: 700;
 }
@@ -164,7 +164,7 @@ a.hwp-btn:hover {
 }
 
 .empty {
-  color: #33475b;
+  color: #8fa3b8;
   text-align: center;
   margin-top: 40px;
 }
@@ -173,7 +173,7 @@ a.hwp-btn:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #ffffff;
+  background: #16324a;
   border: none;
   border-radius: 3px;
   padding: 12px 14px;
@@ -195,11 +195,11 @@ a.hwp-btn:hover {
   border-radius: 2px;
 }
 .todo-item .todo-text:focus {
-  background: #f0f6fa;
+  background: #1e3a52;
 }
 .todo-item.completed .todo-text {
   text-decoration: line-through;
-  color: #9aa7b0;
+  color: #6b7d8f;
 }
 .todo-item .todo-del {
   width: auto;

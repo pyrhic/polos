@@ -1,10 +1,11 @@
 (function () {
   // 순서: 스킴밐스 - 글쓰기 - 사교원(홈) - 트레이딩 (전부 같은 도메인 아래 경로)
+  // 모든 페이지 배경이 네이비(#0d1b2a)로 통일되어 점 색깔도 하나로 맞춤
   const PAGES = [
     { url: "/skimmmiks/index.html", color: "#ffffff" },
-    { url: "/writing/index.html", color: "#111111" },
-    { url: "/sakyowon/index.html", color: "#0d1b2a" },
-    { url: "/trading/index.html", color: "#0f3d33" },
+    { url: "/writing/index.html", color: "#ffffff" },
+    { url: "/sakyowon/index.html", color: "#ffffff" },
+    { url: "/trading/index.html", color: "#ffffff" },
   ];
 
   function getSection() {

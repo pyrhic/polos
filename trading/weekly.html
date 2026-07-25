@@ -6,22 +6,22 @@
 <title>주간 리포트 — 트레이딩</title>
 <link rel="stylesheet" href="/trading/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f3d33">
+<meta name="theme-color" content="#0d1b2a">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
   .stat-row { display: flex; gap: 10px; margin-bottom: 18px; }
   .stat-tile {
     flex: 1;
-    background: #ffffff;
+    background: #16324a;
     border: none;
     border-radius: 3px;
     padding: 12px 10px;
     text-align: center;
   }
-  .stat-tile .label { font-size: 0.75rem; color: #3a6659; margin-bottom: 4px; }
+  .stat-tile .label { font-size: 0.75rem; color: #8fa3b8; margin-bottom: 4px; }
   .stat-tile .value { font-size: 1.05rem; font-weight: 800; }
-  .chart-wrap { background: #ffffff; border: none; border-radius: 3px; padding: 14px; margin-bottom: 18px; }
+  .chart-wrap { background: #16324a; border: none; border-radius: 3px; padding: 14px; margin-bottom: 18px; }
   .chart-wrap h3 { margin: 0 0 10px; font-size: 0.95rem; }
   .bar-tooltip {
     position: absolute;
@@ -84,7 +84,7 @@
       .slice(-12);
 
     if (!points.length) {
-      svg.innerHTML = '<text x="200" y="70" text-anchor="middle" fill="#3a6659" font-size="12">아직 수익률 데이터가 없습니다 (2주 이상 쌓이면 표시됩니다)</text>';
+      svg.innerHTML = '<text x="200" y="70" text-anchor="middle" fill="#8fa3b8" font-size="12">아직 수익률 데이터가 없습니다 (2주 이상 쌓이면 표시됩니다)</text>';
       return;
     }
 
@@ -94,7 +94,7 @@
     const scale = (h - padT - padB) / 2 / maxAbs;
     const bw = (w - padL - padR) / points.length;
 
-    let svgHtml = `<line x1="${padL}" y1="${baseline}" x2="${w - padR}" y2="${baseline}" stroke="#d9e5e1" stroke-width="1"/>`;
+    let svgHtml = `<line x1="${padL}" y1="${baseline}" x2="${w - padR}" y2="${baseline}" stroke="#2a4a66" stroke-width="1"/>`;
     points.forEach((p, i) => {
       const x = padL + i * bw + bw * 0.2;
       const barW = bw * 0.6;

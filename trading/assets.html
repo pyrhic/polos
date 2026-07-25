@@ -6,22 +6,22 @@
 <title>내 자산현황 — 트레이딩</title>
 <link rel="stylesheet" href="/trading/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f3d33">
+<meta name="theme-color" content="#0d1b2a">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
   .stat-row { display: flex; gap: 10px; margin-bottom: 18px; }
   .stat-tile {
     flex: 1;
-    background: #ffffff;
+    background: #16324a;
     border: none;
     border-radius: 3px;
     padding: 12px 10px;
     text-align: center;
   }
-  .stat-tile .label { font-size: 0.75rem; color: #3a6659; margin-bottom: 4px; }
+  .stat-tile .label { font-size: 0.75rem; color: #8fa3b8; margin-bottom: 4px; }
   .stat-tile .value { font-size: 1.05rem; font-weight: 800; }
-  .chart-wrap { background: #ffffff; border: none; border-radius: 3px; padding: 14px; }
+  .chart-wrap { background: #16324a; border: none; border-radius: 3px; padding: 14px; }
   .chart-wrap h3 { margin: 0 0 10px; font-size: 0.95rem; }
   .point-tooltip {
     position: absolute;
@@ -77,7 +77,7 @@
     const tooltip = document.getElementById("pointTooltip");
 
     if (points.length < 2) {
-      svg.innerHTML = '<text x="200" y="80" text-anchor="middle" fill="#3a6659" font-size="12">주간 리포트가 2주 이상 쌓이면 그래프가 표시됩니다</text>';
+      svg.innerHTML = '<text x="200" y="80" text-anchor="middle" fill="#8fa3b8" font-size="12">주간 리포트가 2주 이상 쌓이면 그래프가 표시됩니다</text>';
       return;
     }
 
@@ -90,10 +90,10 @@
 
     const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.assets).toFixed(1)}`).join(" ");
 
-    let svgHtml = `<line x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}" stroke="#d9e5e1" stroke-width="1"/>`;
-    svgHtml += `<path d="${line}" fill="none" stroke="#0f3d33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    let svgHtml = `<line x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}" stroke="#2a4a66" stroke-width="1"/>`;
+    svgHtml += `<path d="${line}" fill="none" stroke="#ffd93d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
     points.forEach((p, i) => {
-      svgHtml += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.assets).toFixed(1)}" r="4" fill="#0f3d33"
+      svgHtml += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.assets).toFixed(1)}" r="4" fill="#ffd93d"
         data-label="${p.label}" data-assets="${p.assets}" class="pt"/>`;
     });
     svg.innerHTML = svgHtml;

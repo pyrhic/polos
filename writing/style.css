@@ -4,8 +4,8 @@
 
 body {
   font-family: -apple-system, "Malgun Gothic", sans-serif;
-  background: #faf6ec;
-  color: #111111;
+  background: #0d1b2a;
+  color: #ffffff;
   margin: 0;
   padding: 20px;
 }
@@ -19,7 +19,7 @@ h1 {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-transform: uppercase;
-  color: #111111;
+  color: #ffffff;
 }
 
 .card h1 {
@@ -29,7 +29,7 @@ h1 {
 }
 
 p.role {
-  color: #6b6b6b;
+  color: #8fa3b8;
   margin-top: 0;
   margin-bottom: 2rem;
   line-height: 1.5;
@@ -46,10 +46,10 @@ a.link-btn, button, input[type="submit"] {
   display: block;
   width: 100%;
   padding: 14px 20px;
-  background: #ffffff;
+  background: #16324a;
   border: none;
   border-radius: 3px;
-  color: #111111;
+  color: #ffffff;
   text-decoration: none;
   font-size: 1rem;
   font-weight: 700;
@@ -61,8 +61,8 @@ a.link-btn, button, input[type="submit"] {
 }
 
 a.link-btn:hover, button:hover {
-  background: #111111;
-  color: #faf6ec;
+  background: #faf6ec;
+  color: #111111;
 }
 
 .accent {
@@ -73,7 +73,7 @@ label {
   display: block;
   margin-top: 14px;
   margin-bottom: 6px;
-  color: #6b6b6b;
+  color: #8fa3b8;
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -115,20 +115,20 @@ a.back {
   display: inline-block;
   margin-top: 10px;
   margin-bottom: 20px;
-  color: #6b6b6b;
+  color: #8fa3b8;
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 600;
 }
 
 .empty {
-  color: #6b6b6b;
+  color: #8fa3b8;
   text-align: center;
   margin-top: 40px;
 }
 
 .essay {
-  background: #ffffff;
+  background: #16324a;
   border: none;
   border-radius: 6px;
   padding: 20px 22px;
