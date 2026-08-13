@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>기획 — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <div class="wrap" style="padding-top:20px;">
+    <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
+    <h1 style="font-size:1.6rem;">기획</h1>
+    <p class="role">주제어를 검색하면 인기 영상 패턴(제목/조회수/길이)을 보여줘요. 특정 영상을 베끼지 말고 패턴만 참고하세요.</p>
+
+    <label for="q">검색어</label>
+    <div style="display:flex; gap:8px;">
+      <input id="q" type="text" placeholder="예: 음모론, 오래된 미스터리, 논문 발표">
+      <button id="searchBtn" type="button" style="width:auto; padding:10px 18px;">검색</button>
+    </div>
+    <div class="msg" id="searchMsg"></div>
+    <div id="results" style="margin-top:16px;"></div>
+
+    <div style="margin-top:32px; border-top:1px solid #2a2235; padding-top:20px;">
+      <h1 style="font-size:1.2rem;">참고 경제지표</h1>
+      <p class="role" style="margin-bottom:1rem;">금융/재테크 관련 주제를 다룰 때 실제 출처 있는 숫자로 쓰세요.</p>
+      <button id="statsBtn" type="button">기준금리 · 물가지수 불러오기</button>
+      <div class="msg" id="statsMsg"></div>
+      <div id="statsResults" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+<script>
+  const qInput = document.getElementById("q");
+  const searchBtn = document.getElementById("searchBtn");
+  const searchMsg = document.getElementById("searchMsg");
+  const results = document.getElementById("results");
+
+  function fmtDuration(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function showMsg(el, text, type) {
+    el.textContent = text;
+    el.className = "msg " + type;
+  }
+
+  async function runSearch() {
+    const q = qInput.value.trim();
+    if (!q) return;
+    results.innerHTML = "";
+    searchBtn.disabled = true;
+    showMsg(searchMsg, "검색 중...", "ok");
+
+    try {
+      const res = await fetch(`/api/youtube-trends?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "검색 실패");
+
+      searchMsg.style.display = "none";
+      if (data.length === 0) {
+        results.innerHTML = '<p class="empty">결과 없음</p>';
+      } else {
+        results.innerHTML = data.slice(0, 10).map((v) => `
+          <div class="card-box">
+            <div class="title">${v.title}</div>
+            <div class="meta">
+              <span class="accent">${v.viewCount.toLocaleString()}회</span>
+              · ${fmtDuration(v.durationSec)}
+              · ${v.channelTitle}
+            </div>
+          </div>
+        `).join("");
+      }
+    } catch (err) {
+      showMsg(searchMsg, err.message, "err");
+    } finally {
+      searchBtn.disabled = false;
+    }
+  }
+
+  searchBtn.addEventListener("click", runSearch);
+  qInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
+
+  const statsBtn = document.getElementById("statsBtn");
+  const statsMsg = document.getElementById("statsMsg");
+  const statsResults = document.getElementById("statsResults");
+  const HIGHLIGHT = ["한국은행 기준금리", "소비자물가지수", "예금은행 수신금리", "원/달러 환율(종가)"];
+
+  statsBtn.addEventListener("click", async () => {
+    statsBtn.disabled = true;
+    showMsg(statsMsg, "불러오는 중...", "ok");
+    try {
+      const res = await fetch("/api/econ-stats");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "조회 실패");
+
+      statsMsg.style.display = "none";
+      const picked = data.filter((s) => HIGHLIGHT.includes(s.name));
+      statsResults.innerHTML = picked.map((s) => `
+        <div class="card-box">
+          <div class="title">${s.name}</div>
+          <div class="meta"><span class="accent">${s.value}</span> ${s.unit} (기준: ${s.asOf})</div>
+        </div>
+      `).join("");
+    } catch (err) {
+      showMsg(statsMsg, err.message, "err");
+    } finally {
+      statsBtn.disabled = false;
+    }
+  });
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wicked Wiki — 뽈로</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <div class="card" style="padding-top:40px;">
+    <div style="width:100%;">
+      <div style="height:180px;border-radius:16px;overflow:hidden;margin-bottom:1rem;">
+        <img src="/youtube/logo.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
+      </div>
+      <div class="links">
+        <a class="link-btn" href="/youtube/plan.html">기획</a>
+        <a class="link-btn" href="/youtube/script.html">대본</a>
+        <a class="link-btn" href="/youtube/upload.html">소재 업로드</a>
+        <a class="link-btn" href="/youtube/review.html">영상 점검</a>
+        <a class="link-btn" href="/youtube/archive.html">완성 영상 모음</a>
+      </div>
+    </div>
+  </div>
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>
