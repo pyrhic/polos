@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>영상 점검 — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  video { width: 100%; border-radius: 3px; margin-top: 10px; background:#000; }
+  .status-tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:800; text-transform:uppercase; }
+  .status-idle { background:#3a2f14; color:#ffd93d; }
+  .status-running { background:#16324a; color:#4fc3f7; }
+  .status-done { background:#17331a; color:#7cff4a; }
+  .status-error { background:#3a1414; color:#ff8a80; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">영상 점검</h1>
+    <p class="role">승인된 대본을 골라 생성을 시작하세요. 업로드해둔 소재가 있으면 그걸 쓰고, 없으면 Pexels 무료 영상으로 자동 채워집니다.</p>
+    <div id="list"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  let pollTimer = null;
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  function assetPublicUrl(path) {
+    return `${SUPABASE_URL}/storage/v1/object/public/youtube-assets/${path}`;
+  }
+
+  function toMarkdown(r) {
+    return `---
+category: "${r.category}"
+format: shorts
+fact_sources:
+${(r.fact_sources || "").split("\n").filter(Boolean).map((s) => `  - "${s.trim()}"`).join("\n")}
+is_conspiracy_or_unverified: ${r.is_conspiracy_or_unverified}
+emphasize_terms: [${(r.emphasize_terms || "").split(",").filter(Boolean).map((s) => `"${s.trim()}"`).join(", ")}]
+keep_together_terms: [${(r.keep_together_terms || "").split(",").filter(Boolean).map((s) => `"${s.trim()}"`).join(", ")}]
+status: approved
+revision_log:
+  - "폰 앱에서 생성"
+---
+
+# 대본
+
+## 후킹 (0~2초)
+${r.hook}
+
+## 스토리 (2~40초)
+${r.story}
+
+## 클로징 (짧게, 2~5초)
+${r.closing || ""}
+`;
+  }
+
+  async function loadAssetUrls(scriptId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_assets?select=storage_path&script_id=eq.${scriptId}`, { headers });
+    const rows = await res.json();
+    return rows.map((a) => assetPublicUrl(a.storage_path));
+  }
+
+  async function load() {
+    const list = document.getElementById("list");
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&order=created_at.desc`, { headers });
+    const rows = await res.json();
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty">승인된 대본이 없습니다. 대본 페이지에서 먼저 승인하세요.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map((r) => `
+      <div class="card-box" data-id="${r.id}">
+        <div class="s-meta" style="margin-bottom:6px;">
+          <span class="status-tag status-${r.generation_status || "idle"}">${r.generation_status || "idle"}</span>
+          · ${escapeHtml(r.category || "")}
+        </div>
+        <div class="title" style="font-weight:700;margin-bottom:8px;">${escapeHtml(r.hook)}</div>
+        <button type="button" class="gen-btn" data-id="${r.id}" ${r.generation_status === "running" ? "disabled" : ""}>
+          ${r.generation_status === "running" ? "생성 중..." : "생성 시작"}
+        </button>
+        <div class="video-wrap" id="video-${r.id}">
+          ${r.generation_status === "done" && r.video_url
+            ? `<video controls src="${r.video_url}"></video><a class="link-btn" style="margin-top:8px;" href="${r.video_url}" download>다운로드</a>`
+            : ""}
+        </div>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".gen-btn").forEach((btn) =>
+      btn.addEventListener("click", () => startGeneration(btn.dataset.id, rows.find((r) => String(r.id) === btn.dataset.id)))
+    );
+
+    if (rows.some((r) => r.generation_status === "running")) {
+      clearTimeout(pollTimer);
+      pollTimer = setTimeout(load, 8000);
+    }
+  }
+
+  async function startGeneration(scriptId, row) {
+    if (!confirm("이 대본으로 영상 생성을 시작할까요? 몇 분 정도 걸립니다.")) return;
+    const assetUrls = await loadAssetUrls(scriptId);
+    const scriptContent = toMarkdown(row);
+
+    const res = await fetch("/api/trigger-generation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scriptId, scriptContent, assetUrls, channel: "wicked-wiki" }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert("실행 실패: " + (data.error || "알 수 없는 오류"));
+      return;
+    }
+    load();
+  }
+
+  load();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>
