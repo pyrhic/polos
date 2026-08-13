@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대본 — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .s-item { }
+  .s-item .s-meta { font-size: 0.75rem; color: #7cff4a; margin-bottom: 4px; }
+  .s-item .s-hook { font-weight: 700; margin-bottom: 8px; }
+  .s-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .s-actions button { width: auto; padding: 6px 12px; font-size: 0.75rem; }
+  .status-tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:800; text-transform:uppercase; }
+  .status-draft { background:#3a2f14; color:#ffd93d; }
+  .status-approved { background:#17331a; color:#7cff4a; }
+  .conspiracy-tag { background:#3a1414; color:#ff8a80; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:800; margin-left:6px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">대본</h1>
+
+    <form id="scriptForm">
+      <label for="category">카테고리</label>
+      <select id="category" required>
+        <option value="">선택하세요</option>
+        <option>브랜드 비하인드</option>
+        <option>창업자 일화</option>
+        <option>기업 경쟁/분쟁</option>
+        <option>부의 비밀·습관</option>
+        <option>뉴스/이슈</option>
+        <option>논문/연구 발표</option>
+        <option>음모론</option>
+        <option>오래된 미스터리</option>
+      </select>
+
+      <label for="hook">후킹 (0~2초)</label>
+      <textarea id="hook" style="min-height:60px;" required placeholder="충격적 반전/의외의 사실 한 줄"></textarea>
+
+      <label for="story">스토리 (2~40초)</label>
+      <textarea id="story" style="min-height:140px;" required placeholder="기승전결로 하나의 이야기만"></textarea>
+
+      <label for="closing">클로징</label>
+      <textarea id="closing" style="min-height:50px;" placeholder="구독/좋아요 한 줄"></textarea>
+
+      <label for="factSources">출처 (한 줄에 하나씩)</label>
+      <textarea id="factSources" style="min-height:70px;" placeholder="https://ko.wikipedia.org/wiki/..."></textarea>
+
+      <label for="emphasizeTerms">강조 단어 (콤마로 구분, 선택)</label>
+      <input id="emphasizeTerms" type="text" placeholder="예: 지수 ETF">
+
+      <label for="keepTogetherTerms">붙여읽기 단어 (콤마로 구분, 선택)</label>
+      <input id="keepTogetherTerms" type="text" placeholder="예: 코스피200, S&amp;P500">
+
+      <label style="display:flex; align-items:center; gap:8px; margin-top:16px;">
+        <input id="isConspiracy" type="checkbox" style="width:auto;">
+        <span style="margin:0;">음모론/미검증설을 다룸 (확정된 사실과 구분해서 서술했는지 확인)</span>
+      </label>
+
+      <button type="submit" id="submitBtn">대본 저장 (초안)</button>
+      <div class="msg" id="msg"></div>
+    </form>
+
+    <h1 style="font-size:1.1rem;margin-top:32px;">저장된 대본</h1>
+    <div id="list" style="margin-top:14px;"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+  let rows = [];
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  function showMsg(text, ok) {
+    const msg = document.getElementById("msg");
+    msg.className = "msg " + (ok ? "ok" : "err");
+    msg.textContent = text;
+  }
+
+  function slugify(text) {
+    const d = new Date().toISOString().slice(0, 10);
+    const short = text.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20).replace(/^-+|-+$/g, "");
+    return `${d}_${short}-쇼츠`;
+  }
+
+  function toMarkdown(r) {
+    return `---
+category: "${r.category}"
+format: shorts
+fact_sources:
+${(r.fact_sources || "").split("\n").filter(Boolean).map((s) => `  - "${s.trim()}"`).join("\n")}
+is_conspiracy_or_unverified: ${r.is_conspiracy_or_unverified}
+emphasize_terms: [${(r.emphasize_terms || "").split(",").filter(Boolean).map((s) => `"${s.trim()}"`).join(", ")}]
+keep_together_terms: [${(r.keep_together_terms || "").split(",").filter(Boolean).map((s) => `"${s.trim()}"`).join(", ")}]
+status: ${r.status}
+revision_log:
+  - "1차 초안"
+---
+
+# 대본
+
+## 후킹 (0~2초)
+${r.hook}
+
+## 스토리 (2~40초)
+${r.story}
+
+## 클로징 (짧게, 2~5초)
+${r.closing || ""}
+`;
+  }
+
+  async function load() {
+    const list = document.getElementById("list");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&order=created_at.desc`, { headers });
+      rows = await res.json();
+      render();
+    } catch (err) {
+      list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  function render() {
+    const list = document.getElementById("list");
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty">아직 저장된 대본이 없습니다.</div>';
+      return;
+    }
+    list.innerHTML = rows.map((r) => `
+      <div class="card-box s-item" data-id="${r.id}">
+        <div class="s-meta">
+          <span class="status-tag status-${r.status}">${r.status}</span>
+          ${r.is_conspiracy_or_unverified ? '<span class="conspiracy-tag">미검증설</span>' : ""}
+          · ${escapeHtml(r.category || "")} · ${new Date(r.created_at).toLocaleDateString("ko-KR")}
+        </div>
+        <div class="s-hook">${escapeHtml(r.hook)}</div>
+        <div class="s-actions">
+          ${r.status === "draft" ? `<button type="button" class="approve-btn" data-id="${r.id}">승인</button>` : ""}
+          <button type="button" class="copy-btn" data-id="${r.id}">.md 복사</button>
+          <button type="button" class="delete-btn" data-id="${r.id}">삭제</button>
+        </div>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".approve-btn").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${btn.dataset.id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ status: "approved" }),
+        });
+        load();
+      })
+    );
+    document.querySelectorAll(".copy-btn").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        const row = rows.find((r) => String(r.id) === btn.dataset.id);
+        const md = toMarkdown(row);
+        try {
+          await navigator.clipboard.writeText(md);
+          showMsg("클립보드에 .md 내용을 복사했습니다.", true);
+        } catch {
+          prompt("복사해서 쓰세요:", md);
+        }
+      })
+    );
+    document.querySelectorAll(".delete-btn").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        if (!confirm("이 대본을 삭제할까요?")) return;
+        await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${btn.dataset.id}`, {
+          method: "DELETE",
+          headers,
+        });
+        load();
+      })
+    );
+  }
+
+  document.getElementById("scriptForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = true;
+    btn.textContent = "저장 중...";
+    try {
+      const hook = document.getElementById("hook").value.trim();
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          category: document.getElementById("category").value,
+          hook,
+          story: document.getElementById("story").value.trim(),
+          closing: document.getElementById("closing").value.trim(),
+          fact_sources: document.getElementById("factSources").value.trim(),
+          emphasize_terms: document.getElementById("emphasizeTerms").value.trim(),
+          keep_together_terms: document.getElementById("keepTogetherTerms").value.trim(),
+          is_conspiracy_or_unverified: document.getElementById("isConspiracy").checked,
+          slug: slugify(hook),
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showMsg("대본이 저장됐습니다.", true);
+      document.getElementById("scriptForm").reset();
+      load();
+    } catch (err) {
+      showMsg("저장 실패: " + err.message, false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "대본 저장 (초안)";
+    }
+  });
+
+  load();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>
