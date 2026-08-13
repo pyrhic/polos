@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>소재 업로드 — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .a-item { display:flex; align-items:center; gap:10px; }
+  .a-item .a-thumb { width:56px; height:56px; border-radius:3px; object-fit:cover; background:#0f0a14; flex-shrink:0; }
+  .a-item .a-name { flex:1; font-size:0.85rem; word-break:break-all; }
+  .a-item button { width:auto; padding:4px 10px; font-size:0.75rem; flex-shrink:0; }
+  .progress-note { font-size:0.8rem; color:#a89bb5; margin-top:8px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">소재 업로드</h1>
+
+    <label for="scriptSelect">대본 선택</label>
+    <select id="scriptSelect">
+      <option value="">불러오는 중...</option>
+    </select>
+
+    <label for="fileInput" style="margin-top:20px;">사진/영상 첨부 (여러 개 선택 가능)</label>
+    <input id="fileInput" type="file" accept="image/*,video/*" multiple>
+    <button type="button" id="uploadBtn" style="margin-top:14px;">업로드</button>
+    <div class="progress-note" id="progressNote"></div>
+    <div class="msg" id="msg"></div>
+
+    <h1 style="font-size:1.1rem;margin-top:32px;">첨부된 소재</h1>
+    <div id="assetList" style="margin-top:14px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const BUCKET = "youtube-assets";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  };
+  const jsonHeaders = { ...headers, "Content-Type": "application/json" };
+
+  function showMsg(text, ok) {
+    const msg = document.getElementById("msg");
+    msg.className = "msg " + (ok ? "ok" : "err");
+    msg.textContent = text;
+  }
+
+  function publicUrl(path) {
+    return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+  }
+
+  function isImage(name) {
+    return /\.(jpe?g|png|gif|webp)$/i.test(name);
+  }
+
+  async function loadScripts() {
+    const sel = document.getElementById("scriptSelect");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id,hook,status,category&order=created_at.desc`, { headers });
+      const rows = await res.json();
+      if (!rows.length) {
+        sel.innerHTML = '<option value="">저장된 대본이 없습니다</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">선택하세요</option>' +
+        rows.map((r) => `<option value="${r.id}">[${r.status}] ${(r.hook || "").slice(0, 30)}</option>`).join("");
+    } catch (err) {
+      sel.innerHTML = '<option value="">불러오기 실패</option>';
+    }
+  }
+
+  async function loadAssets(scriptId) {
+    const list = document.getElementById("assetList");
+    if (!scriptId) {
+      list.innerHTML = '<div class="empty">대본을 먼저 선택하세요.</div>';
+      return;
+    }
+    list.innerHTML = '<div class="empty">불러오는 중...</div>';
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_assets?select=*&script_id=eq.${scriptId}&order=created_at.desc`, { headers });
+    const rows = await res.json();
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty">첨부된 소재가 없습니다.</div>';
+      return;
+    }
+    list.innerHTML = rows.map((a) => `
+      <div class="card-box a-item" data-id="${a.id}" data-path="${a.storage_path}">
+        ${isImage(a.file_name)
+          ? `<img class="a-thumb" src="${publicUrl(a.storage_path)}" alt="">`
+          : `<div class="a-thumb" style="display:flex;align-items:center;justify-content:center;color:#7cff4a;font-size:0.7rem;">VIDEO</div>`}
+        <div class="a-name">${a.file_name}</div>
+        <button type="button" class="asset-del-btn" data-id="${a.id}" data-path="${a.storage_path}">삭제</button>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".asset-del-btn").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${btn.dataset.path}`, { method: "DELETE", headers });
+        await fetch(`${SUPABASE_URL}/rest/v1/youtube_assets?id=eq.${btn.dataset.id}`, { method: "DELETE", headers });
+        loadAssets(document.getElementById("scriptSelect").value);
+      })
+    );
+  }
+
+  document.getElementById("scriptSelect").addEventListener("change", (e) => loadAssets(e.target.value));
+
+  document.getElementById("uploadBtn").addEventListener("click", async () => {
+    const scriptId = document.getElementById("scriptSelect").value;
+    const files = document.getElementById("fileInput").files;
+    if (!scriptId) { showMsg("대본을 먼저 선택하세요.", false); return; }
+    if (!files.length) { showMsg("파일을 선택하세요.", false); return; }
+
+    const btn = document.getElementById("uploadBtn");
+    btn.disabled = true;
+    const note = document.getElementById("progressNote");
+
+    let done = 0;
+    for (const file of files) {
+      note.textContent = `업로드 중... (${done + 1}/${files.length}) ${file.name}`;
+      const safeName = file.name.replace(/[^\w.\-]/g, "_");
+      const path = `${scriptId}/${Date.now()}_${safeName}`;
+      try {
+        const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!upRes.ok) throw new Error(await upRes.text());
+
+        await fetch(`${SUPABASE_URL}/rest/v1/youtube_assets`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ script_id: Number(scriptId), storage_path: path, file_name: file.name }),
+        });
+        done++;
+      } catch (err) {
+        showMsg(`"${file.name}" 업로드 실패: ${err.message}`, false);
+      }
+    }
+
+    note.textContent = "";
+    btn.disabled = false;
+    if (done > 0) {
+      showMsg(`${done}개 업로드 완료.`, true);
+      document.getElementById("fileInput").value = "";
+      loadAssets(scriptId);
+    }
+  });
+
+  loadScripts();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>
