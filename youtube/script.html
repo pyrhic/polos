@@ -40,6 +40,11 @@
         <option>오래된 미스터리</option>
       </select>
 
+      <label for="topicHint">주제 (제미나이에게 알려줄 소재)</label>
+      <input id="topicHint" type="text" placeholder="예: 이병철과 구인회의 관계">
+      <button type="button" id="aiGenBtn" style="margin-top:10px;">제미나이로 초안 생성</button>
+      <div class="msg" id="aiMsg"></div>
+
       <label for="hook">후킹 (0~2초)</label>
       <textarea id="hook" style="min-height:60px;" required placeholder="충격적 반전/의외의 사실 한 줄"></textarea>
 
@@ -123,6 +128,46 @@ ${r.story}
 ${r.closing || ""}
 `;
   }
+
+  document.getElementById("aiGenBtn").addEventListener("click", async () => {
+    const category = document.getElementById("category").value;
+    const topic = document.getElementById("topicHint").value.trim();
+    const aiMsg = document.getElementById("aiMsg");
+    if (!category) { aiMsg.className = "msg err"; aiMsg.textContent = "카테고리를 먼저 고르세요."; return; }
+    if (!topic) { aiMsg.className = "msg err"; aiMsg.textContent = "주제를 입력하세요."; return; }
+
+    const btn = document.getElementById("aiGenBtn");
+    btn.disabled = true;
+    btn.textContent = "생성 중...";
+    aiMsg.className = "msg ok";
+    aiMsg.textContent = "제미나이가 대본을 쓰는 중입니다...";
+
+    try {
+      const res = await fetch("/api/gemini-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category,
+          topic,
+          isConspiracy: document.getElementById("isConspiracy").checked,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "생성 실패");
+
+      document.getElementById("hook").value = data.hook || "";
+      document.getElementById("story").value = data.story || "";
+      document.getElementById("closing").value = data.closing || "";
+      aiMsg.className = "msg ok";
+      aiMsg.textContent = "초안이 채워졌습니다. 내용을 검토하고, 사실 확인 후 출처를 채워주세요.";
+    } catch (err) {
+      aiMsg.className = "msg err";
+      aiMsg.textContent = "생성 실패: " + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "제미나이로 초안 생성";
+    }
+  });
 
   async function load() {
     const list = document.getElementById("list");
