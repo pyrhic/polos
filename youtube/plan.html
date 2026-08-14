@@ -67,14 +67,16 @@
         results.innerHTML = '<p class="empty">결과 없음</p>';
       } else {
         results.innerHTML = data.slice(0, 10).map((v) => `
-          <div class="card-box">
+          <a class="card-box" style="display:block;text-decoration:none;color:inherit;"
+             href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank" rel="noopener">
             <div class="title">${v.title}</div>
             <div class="meta">
               <span class="accent">${v.viewCount.toLocaleString()}회</span>
               · ${fmtDuration(v.durationSec)}
               · ${v.channelTitle}
+              · <span class="accent">유튜브에서 보기 ↗</span>
             </div>
-          </div>
+          </a>
         `).join("");
       }
     } catch (err) {
