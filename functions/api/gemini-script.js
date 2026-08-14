@@ -43,31 +43,39 @@ export async function onRequestPost(context) {
       });
     }
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-      {
+    const requestBody = JSON.stringify({
+      contents: [{ parts: [{ text: buildPrompt(category, topic, isConspiracy) }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            hook: { type: "STRING" },
+            story: { type: "STRING" },
+            closing: { type: "STRING" },
+          },
+          required: ["hook", "story", "closing"],
+        },
+      },
+    });
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+    let geminiRes;
+    let lastErrText = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      geminiRes = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: buildPrompt(category, topic, isConspiracy) }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                hook: { type: "STRING" },
-                story: { type: "STRING" },
-                closing: { type: "STRING" },
-              },
-              required: ["hook", "story", "closing"],
-            },
-          },
-        }),
-      }
-    );
+        body: requestBody,
+      });
+      if (geminiRes.ok) break;
+      lastErrText = await geminiRes.text();
+      if (geminiRes.status !== 503 && geminiRes.status !== 429) break;
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+    }
 
     if (!geminiRes.ok) {
-      return new Response(JSON.stringify({ error: "제미나이 호출 실패", detail: await geminiRes.text() }), {
+      return new Response(JSON.stringify({ error: "제미나이 호출 실패 (혼잡할 수 있음, 잠시 후 다시 시도해주세요)", detail: lastErrText }), {
         status: 502, headers: { "Content-Type": "application/json" },
       });
     }
