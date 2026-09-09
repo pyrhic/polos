@@ -27,9 +27,19 @@
         <option value="한달">한 달 이상</option>
       </select>
       <label id="eventStartLabel" for="event_start">행사(실행) 날짜</label>
-      <input type="date" id="event_start" required>
+      <div>
+        <span class="datepick">
+          <input type="date" id="event_start" class="datepick-input" required>
+          <span class="datepick-display">📅 <span class="datepick-text" id="event_start_text">날짜</span></span>
+        </span>
+      </div>
       <label for="event_end" id="eventEndLabel" style="display:none;">행사(실행) 종료일</label>
-      <input type="date" id="event_end" style="display:none;">
+      <div id="eventEndWrap" style="display:none;">
+        <span class="datepick">
+          <input type="date" id="event_end" class="datepick-input">
+          <span class="datepick-display">📅 <span class="datepick-text" id="event_end_text">날짜</span></span>
+        </span>
+      </div>
       <button type="submit" id="addBtn">새 프로젝트 만들기</button>
       <div class="msg" id="msg"></div>
     </form>
@@ -58,6 +68,18 @@
     if (parts.length !== 3) return dateStr;
     return `${Number(parts[1])}/${Number(parts[2])}`;
   }
+
+  // 달력 아이콘형 날짜칸 - 실제 <input type="date">에 값이 바뀌면 옆의 짧은 텍스트(M/D)를 갱신
+  function wireDatePicker(inputId, placeholder) {
+    const input = document.getElementById(inputId);
+    const textEl = document.getElementById(inputId + "_text");
+    if (!input || !textEl) return;
+    const refresh = () => { textEl.textContent = input.value ? fmtDate(input.value) : (placeholder || "날짜"); };
+    input.addEventListener("change", refresh);
+    refresh();
+  }
+  wireDatePicker("event_start", "날짜");
+  wireDatePicker("event_end", "날짜");
 
   function dDayLabel(dueDate) {
     if (!dueDate) return { text: "", overdue: false };
@@ -110,7 +132,7 @@
   document.getElementById("duration_type").addEventListener("change", (e) => {
     const isSingleDay = e.target.value === "1일";
     document.getElementById("eventEndLabel").style.display = isSingleDay ? "none" : "block";
-    document.getElementById("event_end").style.display = isSingleDay ? "none" : "block";
+    document.getElementById("eventEndWrap").style.display = isSingleDay ? "none" : "block";
     document.getElementById("eventStartLabel").textContent = isSingleDay ? "행사(실행) 날짜" : "행사(실행) 시작일";
   });
 

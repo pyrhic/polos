@@ -90,6 +90,40 @@ input, textarea, select {
   font-family: inherit;
 }
 
+/* 날짜 선택 전용 - 흰 입력칸 대신 작은 달력 아이콘 버튼처럼 보이게 함.
+   실제 <input type="date">는 투명하게 그 위에 얹어서 클릭/탭하면 브라우저 기본 달력이 뜨고,
+   선택된 값은 옆의 datepick-text에 연도 없이(M/D) 짧게 표시함 */
+.datepick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: auto;
+}
+.datepick-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+}
+.datepick-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #16324a;
+  border-radius: 3px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: #ffffff;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 textarea {
   min-height: 100px;
   resize: vertical;

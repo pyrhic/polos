@@ -45,6 +45,22 @@
     return `${Number(parts[1])}/${Number(parts[2])}`;
   }
 
+  // 달력 아이콘형 날짜칸 - 실제 <input type="date">에 값이 바뀌면 옆의 짧은 텍스트(M/D)를 갱신
+  function wireDatePicker(inputId, placeholder) {
+    const input = document.getElementById(inputId);
+    const textEl = document.getElementById(inputId + "_text");
+    if (!input || !textEl) return;
+    const refresh = () => { textEl.textContent = input.value ? fmtDate(input.value) : (placeholder || "날짜"); };
+    input.addEventListener("change", refresh);
+    refresh();
+  }
+  function datepickHtml(inputId, value) {
+    return `<span class="datepick">
+      <input type="date" id="${inputId}" class="datepick-input" value="${value || ""}">
+      <span class="datepick-display">📅 <span class="datepick-text" id="${inputId}_text"></span></span>
+    </span>`;
+  }
+
   if (!projectId) {
     content.innerHTML = '<div class="empty">프로젝트를 찾을 수 없습니다.</div>';
   } else {
@@ -102,27 +118,32 @@
         <span class="status-badge status-${escapeHtml(project.status)}">${escapeHtml(project.status)}</span>
         ${dday.text ? `<span class="due${dday.overdue ? " overdue" : ""}" style="margin-left:8px;">${dday.text}</span>` : ""}
       </div>
-      <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+
+      <div class="section-title" style="margin-top:0;">타임라인</div>
+      <button type="button" id="autoTimelineBtn" style="margin-bottom:12px;">기본 타임라인 자동 생성 (착수·기획완료·실행·결과보고)</button>
+      <div id="timelineBox">${renderTimeline()}</div>
+      <div id="wbsPanel">${renderWbsPanel()}</div>
+
+      <button type="button" id="showAddMilestoneBtn" style="width:auto;padding:6px 12px;font-size:0.8rem;background:none;color:#8fa3b8;">+ 마일스톤 추가</button>
+      <div id="addMilestoneBox" style="display:none;margin-top:10px;">
+        <div class="timeline-add-row">
+          <input type="text" id="newMilestoneTitle" placeholder="마일스톤 이름">
+          ${datepickHtml("newMilestoneDate")}
+          <button type="button" id="addMilestoneBtn" style="width:auto;">추가</button>
+        </div>
+      </div>
+
+      <div class="progress-outer" style="margin-top:22px;"><div class="progress-inner" style="width:${pct}%;"></div></div>
       <div class="progress-label">${done}/${total} 완료 · ${pct}%</div>
       ${project.description ? `<p class="role" style="text-align:left;margin-top:14px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
 
       <button type="button" id="editBtn" style="margin-top:10px;">프로젝트 정보 수정</button>
       <div id="editBox"></div>
 
-      <div class="section-title">타임라인</div>
-      <button type="button" id="autoTimelineBtn" style="margin-bottom:12px;">기본 타임라인 자동 생성 (착수·기획완료·실행·결과보고)</button>
-      <div class="timeline-add-row">
-        <input type="text" id="newMilestoneTitle" placeholder="마일스톤 이름">
-        <input type="date" id="newMilestoneDate" style="flex:0 0 150px;">
-        <button type="button" id="addMilestoneBtn" style="width:auto;">추가</button>
-      </div>
-      <div id="timelineBox">${renderTimeline()}</div>
-      <div id="wbsPanel">${renderWbsPanel()}</div>
-
       <div class="section-title">할 일 (일반)</div>
       <div class="todo-add-row">
         <input type="text" id="newTodo" placeholder="할 일 입력 후 Enter">
-        <input type="date" id="newTodoDue" style="flex:0 0 150px;" title="마감일(선택)">
+        ${datepickHtml("newTodoDue")}
         <button type="button" id="addTodoBtn" style="width:auto;">추가</button>
       </div>
       <div id="todoList">${renderTodoItems(generalTodos)}</div>
@@ -137,10 +158,18 @@
 
     document.getElementById("editBtn").addEventListener("click", () => showEditBox(project));
     document.getElementById("autoTimelineBtn").addEventListener("click", generateDefaultTimeline);
+    document.getElementById("showAddMilestoneBtn").addEventListener("click", () => {
+      const box = document.getElementById("addMilestoneBox");
+      const hidden = box.style.display === "none";
+      box.style.display = hidden ? "block" : "none";
+      if (hidden) document.getElementById("newMilestoneTitle").focus();
+    });
     document.getElementById("addMilestoneBtn").addEventListener("click", addMilestone);
     document.getElementById("newMilestoneTitle").addEventListener("keydown", (e) => { if (e.key === "Enter") addMilestone(); });
+    wireDatePicker("newMilestoneDate", "날짜");
     document.getElementById("addTodoBtn").addEventListener("click", () => addTodo(null, "newTodo", "newTodoDue"));
     document.getElementById("newTodo").addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(null, "newTodo", "newTodoDue"); });
+    wireDatePicker("newTodoDue", "마감일");
     document.getElementById("addNoteBtn").addEventListener("click", addNote);
     document.getElementById("newNote").addEventListener("keydown", (e) => { if (e.key === "Enter") addNote(); });
 
@@ -309,10 +338,8 @@
           <input type="text" id="newWbsTodo" placeholder="이 마일스톤의 할 일 입력 후 Enter">
         </div>
         <div class="todo-add-row">
-          <label style="margin:0;flex:0 0 auto;align-self:center;font-size:0.8rem;">시작</label>
-          <input type="date" id="newWbsTodoStart" style="flex:1;">
-          <label style="margin:0;flex:0 0 auto;align-self:center;font-size:0.8rem;">마감</label>
-          <input type="date" id="newWbsTodoDue" style="flex:1;">
+          ${datepickHtml("newWbsTodoStart")}
+          ${datepickHtml("newWbsTodoDue")}
           <button type="button" id="addWbsTodoBtn" style="width:auto;">추가</button>
         </div>
         <div id="wbsTodoList">${renderTodoItems(wbsTodos)}</div>
@@ -357,6 +384,8 @@
     document.getElementById("newWbsTodo").addEventListener("keydown", (e) => {
       if (e.key === "Enter") addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart");
     });
+    wireDatePicker("newWbsTodoStart", "시작일");
+    wireDatePicker("newWbsTodoDue", "마감일");
     wireTodoEvents(document.getElementById("wbsTodoList"));
     document.getElementById("closeWbsBtn").addEventListener("click", () => {
       selectedMilestoneId = null;
@@ -380,10 +409,11 @@
     box.innerHTML = `
       <div class="timeline-add-row">
         <input type="text" id="editMilestoneTitle" value="${escapeHtml(m.title)}">
-        <input type="date" id="editMilestoneDate" style="flex:0 0 150px;" value="${m.milestone_date}">
+        ${datepickHtml("editMilestoneDate", m.milestone_date)}
         <button type="button" id="saveMilestoneBtn" style="width:auto;">저장</button>
       </div>
     `;
+    wireDatePicker("editMilestoneDate", "날짜");
     document.getElementById("saveMilestoneBtn").addEventListener("click", async () => {
       const title = document.getElementById("editMilestoneTitle").value.trim();
       const date = document.getElementById("editMilestoneDate").value;
@@ -566,19 +596,21 @@
         <option value="한달" ${durationType === "한달" ? "selected" : ""}>한 달 이상</option>
       </select>
       <label id="editEventStartLabel">${isSingleDay ? "행사(실행) 날짜" : "행사(실행) 시작일"}</label>
-      <input type="date" id="editStart" value="${project.start_date || ""}">
+      <div>${datepickHtml("editStart", project.start_date)}</div>
       <label id="editEventEndLabel" style="${isSingleDay ? "display:none;" : ""}">행사(실행) 종료일</label>
-      <input type="date" id="editDue" value="${project.due_date || ""}" style="${isSingleDay ? "display:none;" : ""}">
+      <div id="editDueWrap" style="${isSingleDay ? "display:none;" : ""}">${datepickHtml("editDue", project.due_date)}</div>
       <div style="display:flex;gap:8px;margin-top:14px;">
         <button type="button" id="saveEditBtn" style="width:auto;padding:10px 16px;">저장</button>
         <button type="button" id="deleteProjectBtn" style="width:auto;padding:10px 16px;background:#5a1f1f;">프로젝트 삭제</button>
       </div>
       <div class="msg" id="editMsg"></div>
     `;
+    wireDatePicker("editStart", "날짜");
+    wireDatePicker("editDue", "날짜");
     document.getElementById("editDurationType").addEventListener("change", (e) => {
       const single = e.target.value === "1일";
       document.getElementById("editEventEndLabel").style.display = single ? "none" : "block";
-      document.getElementById("editDue").style.display = single ? "none" : "block";
+      document.getElementById("editDueWrap").style.display = single ? "none" : "block";
       document.getElementById("editEventStartLabel").textContent = single ? "행사(실행) 날짜" : "행사(실행) 시작일";
     });
     document.getElementById("saveEditBtn").addEventListener("click", async () => {
