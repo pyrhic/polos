@@ -27,6 +27,12 @@
   const projectId = new URLSearchParams(location.search).get("id");
   const content = document.getElementById("content");
 
+  let currentProject = null;
+  let currentTodos = [];
+  let currentNotes = [];
+  let currentMilestones = [];
+  let selectedMilestoneId = null;
+
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
@@ -39,20 +45,25 @@
 
   async function load() {
     try {
-      const [pRes, todosRes, notesRes] = await Promise.all([
+      const [pRes, todosRes, notesRes, milestonesRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/projects?select=*&id=eq.${projectId}`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/project_todos?select=*&project_id=eq.${projectId}&order=id.asc`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/project_notes?select=*&project_id=eq.${projectId}&order=id.desc`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/project_milestones?select=*&project_id=eq.${projectId}&order=milestone_date.asc`, { headers }),
       ]);
       const projects = await pRes.json();
       if (!projects.length) {
         content.innerHTML = '<div class="empty">프로젝트를 찾을 수 없습니다.</div>';
         return;
       }
-      const project = projects[0];
-      const todos = await todosRes.json();
-      const notes = await notesRes.json();
-      render(project, todos, notes);
+      currentProject = projects[0];
+      currentTodos = todosRes.ok ? await todosRes.json() : [];
+      currentNotes = notesRes.ok ? await notesRes.json() : [];
+      currentMilestones = milestonesRes.ok ? await milestonesRes.json() : [];
+      if (selectedMilestoneId && !currentMilestones.some((m) => m.id === selectedMilestoneId)) {
+        selectedMilestoneId = null;
+      }
+      render();
     } catch (err) {
       content.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
     }
@@ -69,11 +80,13 @@
     return { text: `기한 ${Math.abs(diffDays)}일 지남`, overdue: true };
   }
 
-  function render(project, todos, notes) {
-    const total = todos.length;
-    const done = todos.filter((t) => t.completed).length;
+  function render() {
+    const project = currentProject;
+    const total = currentTodos.length;
+    const done = currentTodos.filter((t) => t.completed).length;
     const pct = total ? Math.round((done / total) * 100) : 0;
     const dday = dDayLabel(project.due_date);
+    const generalTodos = currentTodos.filter((t) => !t.milestone_id);
 
     content.innerHTML = `
       <h1 style="font-size:1.4rem;margin-bottom:0.4rem;">${escapeHtml(project.name)}</h1>
@@ -88,33 +101,162 @@
       <button type="button" id="editBtn" style="margin-top:10px;">프로젝트 정보 수정</button>
       <div id="editBox"></div>
 
-      <div class="section-title">할 일</div>
+      <div class="section-title">타임라인</div>
+      <div class="timeline-add-row">
+        <input type="text" id="newMilestoneTitle" placeholder="마일스톤 이름">
+        <input type="date" id="newMilestoneDate" style="flex:0 0 150px;">
+        <button type="button" id="addMilestoneBtn" style="width:auto;">추가</button>
+      </div>
+      <div id="timelineBox">${renderTimeline()}</div>
+      <div id="wbsPanel">${renderWbsPanel()}</div>
+
+      <div class="section-title">할 일 (일반)</div>
       <div class="todo-add-row">
         <input type="text" id="newTodo" placeholder="할 일 입력 후 Enter">
         <input type="date" id="newTodoDue" style="flex:0 0 150px;" title="마감일(선택)">
         <button type="button" id="addTodoBtn" style="width:auto;">추가</button>
       </div>
-      <div id="todoList">${renderTodos(todos)}</div>
+      <div id="todoList">${renderTodoItems(generalTodos)}</div>
 
       <div class="section-title">메모 / 문서 링크</div>
       <div class="todo-add-row">
         <input type="text" id="newNote" placeholder="메모나 구글드라이브 등 링크 입력 후 Enter">
         <button type="button" id="addNoteBtn" style="width:auto;">추가</button>
       </div>
-      <div id="noteList">${renderNotes(notes)}</div>
+      <div id="noteList">${renderNotes()}</div>
     `;
 
     document.getElementById("editBtn").addEventListener("click", () => showEditBox(project));
-    document.getElementById("addTodoBtn").addEventListener("click", addTodo);
-    document.getElementById("newTodo").addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+    document.getElementById("addMilestoneBtn").addEventListener("click", addMilestone);
+    document.getElementById("newMilestoneTitle").addEventListener("keydown", (e) => { if (e.key === "Enter") addMilestone(); });
+    document.getElementById("addTodoBtn").addEventListener("click", () => addTodo(null, "newTodo", "newTodoDue"));
+    document.getElementById("newTodo").addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(null, "newTodo", "newTodoDue"); });
     document.getElementById("addNoteBtn").addEventListener("click", addNote);
     document.getElementById("newNote").addEventListener("keydown", (e) => { if (e.key === "Enter") addNote(); });
 
-    wireTodoEvents();
+    wireTimelineEvents();
+    wireTodoEvents(document.getElementById("todoList"));
+    wireWbsEvents();
     wireNoteEvents();
   }
 
-  function renderTodos(todos) {
+  // ---- 타임라인 ----
+  function computeTimelineData() {
+    const project = currentProject;
+    if (!project.start_date || !project.due_date) return null;
+    const start = new Date(project.start_date + "T00:00:00").getTime();
+    const end = new Date(project.due_date + "T00:00:00").getTime();
+    const span = end - start || 1;
+    const points = currentMilestones.map((m) => {
+      const t = new Date(m.milestone_date + "T00:00:00").getTime();
+      const pct = Math.min(100, Math.max(0, ((t - start) / span) * 100));
+      const wbsTodos = currentTodos.filter((td) => td.milestone_id === m.id);
+      const wbsDone = wbsTodos.length > 0 && wbsTodos.every((td) => td.completed);
+      return { ...m, pct, wbsDone };
+    });
+    return { start: project.start_date, end: project.due_date, points };
+  }
+
+  function renderTimeline() {
+    const data = computeTimelineData();
+    if (!data) {
+      return '<div class="empty">타임라인을 보려면 프로젝트 정보 수정에서 시작일과 마감일을 먼저 설정해주세요.</div>';
+    }
+    const trackWidth = Math.max(600, data.points.length * 110 + 220);
+    const markers = data.points
+      .map(
+        (p) => `<div class="timeline-marker${p.wbsDone ? " done" : ""}${p.id === selectedMilestoneId ? " selected" : ""}" style="left:${p.pct}%;" data-id="${p.id}">
+          <span class="timeline-marker-label">${escapeHtml(p.title)}<br>${p.milestone_date}</span>
+        </div>`
+      )
+      .join("");
+    return `
+      <div class="timeline-scroll">
+        <div class="timeline-track" style="width:${trackWidth}px;">
+          <div class="timeline-line"></div>
+          <div class="timeline-marker endpoint" style="left:0%;"><span class="timeline-marker-label">시작<br>${data.start}</span></div>
+          ${markers}
+          <div class="timeline-marker endpoint" style="left:100%;"><span class="timeline-marker-label">마감<br>${data.end}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireTimelineEvents() {
+    document.querySelectorAll(".timeline-marker[data-id]").forEach((el) => {
+      el.addEventListener("click", () => {
+        selectedMilestoneId = Number(el.dataset.id);
+        document.getElementById("timelineBox").innerHTML = renderTimeline();
+        wireTimelineEvents();
+        document.getElementById("wbsPanel").innerHTML = renderWbsPanel();
+        wireWbsEvents();
+      });
+    });
+  }
+
+  async function addMilestone() {
+    const titleInput = document.getElementById("newMilestoneTitle");
+    const dateInput = document.getElementById("newMilestoneDate");
+    const title = titleInput.value.trim();
+    const date = dateInput.value;
+    if (!title || !date) {
+      alert("마일스톤 이름과 날짜를 모두 입력해주세요.");
+      return;
+    }
+    await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ project_id: Number(projectId), title, milestone_date: date }),
+    });
+    titleInput.value = "";
+    dateInput.value = "";
+    load();
+  }
+
+  // ---- WBS 패널(선택된 마일스톤의 할일) ----
+  function renderWbsPanel() {
+    if (!selectedMilestoneId) return "";
+    const m = currentMilestones.find((x) => x.id === selectedMilestoneId);
+    if (!m) return "";
+    const wbsTodos = currentTodos.filter((t) => t.milestone_id === selectedMilestoneId);
+    return `
+      <div style="background:#0f2338;border-radius:3px;padding:14px 16px;margin-bottom:20px;">
+        <div style="font-weight:800;margin-bottom:10px;">📍 ${escapeHtml(m.title)} (${m.milestone_date}) — WBS</div>
+        <div class="todo-add-row">
+          <input type="text" id="newWbsTodo" placeholder="이 마일스톤의 할 일 입력 후 Enter">
+          <button type="button" id="addWbsTodoBtn" style="width:auto;">추가</button>
+        </div>
+        <div id="wbsTodoList">${renderTodoItems(wbsTodos)}</div>
+        <button type="button" id="closeWbsBtn" style="width:auto;padding:6px 12px;font-size:0.8rem;background:none;color:#8fa3b8;">닫기</button>
+        <button type="button" id="deleteMilestoneBtn" style="width:auto;padding:6px 12px;font-size:0.8rem;background:#5a1f1f;margin-left:8px;">마일스톤 삭제</button>
+      </div>
+    `;
+  }
+
+  function wireWbsEvents() {
+    const addBtn = document.getElementById("addWbsTodoBtn");
+    if (!addBtn) return;
+    addBtn.addEventListener("click", () => addTodo(selectedMilestoneId, "newWbsTodo", null));
+    document.getElementById("newWbsTodo").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addTodo(selectedMilestoneId, "newWbsTodo", null);
+    });
+    wireTodoEvents(document.getElementById("wbsTodoList"));
+    document.getElementById("closeWbsBtn").addEventListener("click", () => {
+      selectedMilestoneId = null;
+      document.getElementById("timelineBox").innerHTML = renderTimeline();
+      wireTimelineEvents();
+      document.getElementById("wbsPanel").innerHTML = "";
+    });
+    document.getElementById("deleteMilestoneBtn").addEventListener("click", async () => {
+      if (!confirm("이 마일스톤과 딸린 WBS 할일을 전부 삭제할까요?")) return;
+      await fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${selectedMilestoneId}`, { method: "DELETE", headers });
+      selectedMilestoneId = null;
+      load();
+    });
+  }
+
+  // ---- 공용 할일(일반 할일 + WBS 할일 공용) ----
+  function renderTodoItems(todos) {
     if (!todos.length) return '<div class="empty">할 일이 없습니다.</div>';
     return todos
       .map((t) => {
@@ -129,87 +271,29 @@
       .join("");
   }
 
-  function renderNotes(notes) {
-    if (!notes.length) return '<div class="empty">등록된 메모/링크가 없습니다.</div>';
-    return notes
-      .map((n) => {
-        const isUrl = /^https?:\/\//.test(n.content.trim());
-        const body = isUrl
-          ? `<a href="${escapeHtml(n.content)}" target="_blank">${escapeHtml(n.content)}</a>`
-          : escapeHtml(n.content).replace(/\n/g, "<br>");
-        return `<div class="note-item" data-id="${n.id}">
-          ${body}
-          <div><button type="button" class="note-del" style="width:auto;">삭제</button></div>
-        </div>`;
-      })
-      .join("");
-  }
-
-  function showEditBox(project) {
-    const box = document.getElementById("editBox");
-    box.innerHTML = `
-      <label>이름</label>
-      <input type="text" id="editName" value="${escapeHtml(project.name)}">
-      <label>설명</label>
-      <textarea id="editDesc">${escapeHtml(project.description || "")}</textarea>
-      <label>상태</label>
-      <select id="editStatus">
-        <option value="진행중" ${project.status === "진행중" ? "selected" : ""}>진행중</option>
-        <option value="완료" ${project.status === "완료" ? "selected" : ""}>완료</option>
-        <option value="보류" ${project.status === "보류" ? "selected" : ""}>보류</option>
-      </select>
-      <label>마감일</label>
-      <input type="date" id="editDue" value="${project.due_date || ""}">
-      <div style="display:flex;gap:8px;margin-top:14px;">
-        <button type="button" id="saveEditBtn" style="width:auto;padding:10px 16px;">저장</button>
-        <button type="button" id="deleteProjectBtn" style="width:auto;padding:10px 16px;background:#5a1f1f;">프로젝트 삭제</button>
-      </div>
-      <div class="msg" id="editMsg"></div>
-    `;
-    document.getElementById("saveEditBtn").addEventListener("click", async () => {
-      const msg = document.getElementById("editMsg");
-      try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({
-            name: document.getElementById("editName").value.trim(),
-            description: document.getElementById("editDesc").value.trim(),
-            status: document.getElementById("editStatus").value,
-            due_date: document.getElementById("editDue").value || null,
-          }),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        load();
-      } catch (err) {
-        msg.className = "msg err";
-        msg.textContent = "저장 실패: " + err.message;
-      }
-    });
-    document.getElementById("deleteProjectBtn").addEventListener("click", async () => {
-      if (!confirm("이 프로젝트와 할 일/메모를 전부 삭제할까요? 되돌릴 수 없습니다.")) return;
-      await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, { method: "DELETE", headers });
-      location.href = "/projects/list.html";
-    });
-  }
-
-  async function addTodo() {
-    const input = document.getElementById("newTodo");
-    const dueInput = document.getElementById("newTodoDue");
+  async function addTodo(milestoneId, inputId, dueInputId) {
+    const input = document.getElementById(inputId);
     const text = input.value.trim();
     if (!text) return;
+    const dueInput = dueInputId ? document.getElementById(dueInputId) : null;
     await fetch(`${SUPABASE_URL}/rest/v1/project_todos`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ project_id: Number(projectId), text, due_date: dueInput.value || null }),
+      body: JSON.stringify({
+        project_id: Number(projectId),
+        milestone_id: milestoneId,
+        text,
+        due_date: dueInput ? dueInput.value || null : null,
+      }),
     });
     input.value = "";
-    dueInput.value = "";
+    if (dueInput) dueInput.value = "";
     load();
   }
 
-  function wireTodoEvents() {
-    document.querySelectorAll(".todo-check").forEach((cb) => {
+  function wireTodoEvents(container) {
+    if (!container) return;
+    container.querySelectorAll(".todo-check").forEach((cb) => {
       cb.addEventListener("change", async (e) => {
         const item = e.target.closest(".todo-item");
         const id = item.dataset.id;
@@ -220,11 +304,13 @@
           headers,
           body: JSON.stringify({ completed }),
         });
+        const t = currentTodos.find((x) => x.id === Number(id));
+        if (t) t.completed = completed;
         refreshProgress();
       });
     });
 
-    document.querySelectorAll(".todo-text").forEach((span) => {
+    container.querySelectorAll(".todo-text").forEach((span) => {
       const originalText = span.textContent;
       span.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
@@ -249,7 +335,7 @@
       });
     });
 
-    document.querySelectorAll(".todo-del").forEach((btn) => {
+    container.querySelectorAll(".todo-del").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const item = e.target.closest(".todo-item");
         const id = item.dataset.id;
@@ -259,15 +345,34 @@
     });
   }
 
-  // 체크박스 토글 후 화면 새로고침 없이 진행률만 즉시 갱신
+  // 체크박스 토글 후 화면 전체 새로고침 없이 진행률/타임라인 점 상태만 즉시 갱신
   function refreshProgress() {
-    const total = document.querySelectorAll(".todo-item").length;
-    const done = document.querySelectorAll(".todo-item.completed").length;
+    const total = currentTodos.length;
+    const done = currentTodos.filter((t) => t.completed).length;
     const pct = total ? Math.round((done / total) * 100) : 0;
     const bar = document.querySelector(".progress-inner");
     const label = document.querySelector(".progress-label");
     if (bar) bar.style.width = pct + "%";
     if (label) label.textContent = `${done}/${total} 완료 · ${pct}%`;
+    document.getElementById("timelineBox").innerHTML = renderTimeline();
+    wireTimelineEvents();
+  }
+
+  // ---- 메모/문서 링크 ----
+  function renderNotes() {
+    if (!currentNotes.length) return '<div class="empty">등록된 메모/링크가 없습니다.</div>';
+    return currentNotes
+      .map((n) => {
+        const isUrl = /^https?:\/\//.test(n.content.trim());
+        const body = isUrl
+          ? `<a href="${escapeHtml(n.content)}" target="_blank">${escapeHtml(n.content)}</a>`
+          : escapeHtml(n.content).replace(/\n/g, "<br>");
+        return `<div class="note-item" data-id="${n.id}">
+          ${body}
+          <div><button type="button" class="note-del" style="width:auto;">삭제</button></div>
+        </div>`;
+      })
+      .join("");
   }
 
   function wireNoteEvents() {
@@ -291,6 +396,58 @@
     });
     input.value = "";
     load();
+  }
+
+  // ---- 프로젝트 정보 수정 ----
+  function showEditBox(project) {
+    const box = document.getElementById("editBox");
+    box.innerHTML = `
+      <label>이름</label>
+      <input type="text" id="editName" value="${escapeHtml(project.name)}">
+      <label>설명</label>
+      <textarea id="editDesc">${escapeHtml(project.description || "")}</textarea>
+      <label>상태</label>
+      <select id="editStatus">
+        <option value="진행중" ${project.status === "진행중" ? "selected" : ""}>진행중</option>
+        <option value="완료" ${project.status === "완료" ? "selected" : ""}>완료</option>
+        <option value="보류" ${project.status === "보류" ? "selected" : ""}>보류</option>
+      </select>
+      <label>시작일</label>
+      <input type="date" id="editStart" value="${project.start_date || ""}">
+      <label>마감일</label>
+      <input type="date" id="editDue" value="${project.due_date || ""}">
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button type="button" id="saveEditBtn" style="width:auto;padding:10px 16px;">저장</button>
+        <button type="button" id="deleteProjectBtn" style="width:auto;padding:10px 16px;background:#5a1f1f;">프로젝트 삭제</button>
+      </div>
+      <div class="msg" id="editMsg"></div>
+    `;
+    document.getElementById("saveEditBtn").addEventListener("click", async () => {
+      const msg = document.getElementById("editMsg");
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            name: document.getElementById("editName").value.trim(),
+            description: document.getElementById("editDesc").value.trim(),
+            status: document.getElementById("editStatus").value,
+            start_date: document.getElementById("editStart").value || null,
+            due_date: document.getElementById("editDue").value || null,
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        load();
+      } catch (err) {
+        msg.className = "msg err";
+        msg.textContent = "저장 실패: " + err.message;
+      }
+    });
+    document.getElementById("deleteProjectBtn").addEventListener("click", async () => {
+      if (!confirm("이 프로젝트와 할 일/메모/타임라인을 전부 삭제할까요? 되돌릴 수 없습니다.")) return;
+      await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, { method: "DELETE", headers });
+      location.href = "/projects/list.html";
+    });
   }
 
   if ("serviceWorker" in navigator) {

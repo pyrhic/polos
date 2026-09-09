@@ -194,6 +194,67 @@ a.back {
   text-align: right;
 }
 
+/* 프로젝트 상세 - 타임라인 */
+.timeline-add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.timeline-add-row input { flex: 1; }
+.timeline-add-row button { width: auto; margin-top: 0; padding: 10px 16px; }
+
+.timeline-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 34px 20px 60px;
+  margin: 0 -20px 6px;
+}
+.timeline-track {
+  position: relative;
+  height: 4px;
+}
+.timeline-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #16324a;
+  border-radius: 2px;
+}
+.timeline-marker {
+  position: absolute;
+  top: -8px;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #8b7ff0;
+  cursor: pointer;
+  border: 3px solid #0d1b2a;
+  box-sizing: content-box;
+}
+.timeline-marker.done { background: #3ecf8e; }
+.timeline-marker.selected { box-shadow: 0 0 0 4px rgba(139, 127, 240, 0.45); }
+.timeline-marker.endpoint {
+  background: #8fa3b8;
+  cursor: default;
+  width: 12px;
+  height: 12px;
+  top: -4px;
+}
+.timeline-marker-label {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #8fa3b8;
+  white-space: nowrap;
+  text-align: center;
+}
+
 /* 프로젝트 상세 - 할일 */
 .todo-item {
   display: flex;
