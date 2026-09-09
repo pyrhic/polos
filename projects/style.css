@@ -265,24 +265,68 @@ a.back {
 }
 .timeline-marker {
   position: absolute;
-  top: -8px;
+  top: -11px;
   transform: translateX(-50%);
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: #8b7ff0;
+  /* 배경(파이차트)은 JS에서 완료율에 따라 conic-gradient로 매번 계산해서 넣음 */
   cursor: pointer;
   border: 3px solid #0d1b2a;
   box-sizing: content-box;
 }
-.timeline-marker.done { background: #3ecf8e; }
 .timeline-marker.selected { box-shadow: 0 0 0 4px rgba(139, 127, 240, 0.45); }
-.timeline-marker.endpoint {
-  background: #8fa3b8;
-  cursor: default;
-  width: 12px;
-  height: 12px;
-  top: -4px;
+
+/* 마일스톤 아코디언 목록 - 원(파이차트)+제목/날짜를 누르면 아래로 할일 목록이 펼쳐짐 */
+.milestone-row {
+  background: #16324a;
+  border-radius: 3px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.milestone-row-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.milestone-pie {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+.milestone-row-info { flex: 1; min-width: 0; }
+.milestone-row-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.milestone-row-date {
+  font-size: 0.75rem;
+  color: #8fa3b8;
+  margin-top: 2px;
+}
+.milestone-row-chevron {
+  color: #8fa3b8;
+  font-size: 0.7rem;
+  flex: 0 0 auto;
+}
+.milestone-row-body {
+  padding: 0 14px 14px;
+}
+
+/* 마일스톤 추가/할일 추가/메모 추가 - 작은 텍스트 버튼, 누르면 아래로 입력창이 펼쳐짐 */
+.add-trigger-btn {
+  width: auto;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  background: none;
+  color: #8fa3b8;
 }
 .timeline-marker-label {
   position: absolute;

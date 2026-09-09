@@ -110,7 +110,6 @@
     const done = currentTodos.filter((t) => t.completed).length;
     const pct = total ? Math.round((done / total) * 100) : 0;
     const dday = dDayLabel(project.due_date);
-    const generalTodos = currentTodos.filter((t) => !t.milestone_id);
 
     content.innerHTML = `
       <h1 style="font-size:1.4rem;margin-bottom:0.4rem;">${escapeHtml(project.name)}</h1>
@@ -122,9 +121,9 @@
       <div class="section-title" style="margin-top:0;">타임라인</div>
       <button type="button" id="autoTimelineBtn" style="margin-bottom:12px;">기본 타임라인 자동 생성 (착수·기획완료·실행·결과보고)</button>
       <div id="timelineBox">${renderTimeline()}</div>
-      <div id="wbsPanel">${renderWbsPanel()}</div>
+      <div id="milestoneListBox">${renderMilestoneList()}</div>
 
-      <button type="button" id="showAddMilestoneBtn" style="width:auto;padding:6px 12px;font-size:0.8rem;background:none;color:#8fa3b8;">+ 마일스톤 추가</button>
+      <button type="button" id="showAddMilestoneBtn" class="add-trigger-btn">+ 마일스톤 추가</button>
       <div id="addMilestoneBox" style="display:none;margin-top:10px;">
         <div class="timeline-add-row">
           <input type="text" id="newMilestoneTitle" placeholder="마일스톤 이름">
@@ -133,27 +132,24 @@
         </div>
       </div>
 
+      ${renderUnassignedTodos()}
+
       <div class="progress-outer" style="margin-top:22px;"><div class="progress-inner" style="width:${pct}%;"></div></div>
-      <div class="progress-label">${done}/${total} 완료 · ${pct}%</div>
+      <div class="progress-label">전체 ${done}/${total} 완료 · ${pct}%</div>
       ${project.description ? `<p class="role" style="text-align:left;margin-top:14px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
 
-      <button type="button" id="editBtn" style="margin-top:10px;">프로젝트 정보 수정</button>
-      <div id="editBox"></div>
-
-      <div class="section-title">할 일 (일반)</div>
-      <div class="todo-add-row">
-        <input type="text" id="newTodo" placeholder="할 일 입력 후 Enter">
-        ${datepickHtml("newTodoDue")}
-        <button type="button" id="addTodoBtn" style="width:auto;">추가</button>
-      </div>
-      <div id="todoList">${renderTodoItems(generalTodos)}</div>
-
       <div class="section-title">메모 / 문서 링크</div>
-      <div class="todo-add-row">
-        <input type="text" id="newNote" placeholder="메모나 구글드라이브 등 링크 입력 후 Enter">
-        <button type="button" id="addNoteBtn" style="width:auto;">추가</button>
+      <button type="button" id="showAddNoteBtn" class="add-trigger-btn">+ 메모 추가</button>
+      <div id="addNoteBox" style="display:none;margin:10px 0;">
+        <div class="todo-add-row">
+          <input type="text" id="newNote" placeholder="메모나 구글드라이브 등 링크 입력 후 Enter">
+          <button type="button" id="addNoteBtn" style="width:auto;">추가</button>
+        </div>
       </div>
       <div id="noteList">${renderNotes()}</div>
+
+      <button type="button" id="editBtn" style="margin-top:26px;">프로젝트 정보 수정</button>
+      <div id="editBox"></div>
     `;
 
     document.getElementById("editBtn").addEventListener("click", () => showEditBox(project));
@@ -167,19 +163,45 @@
     document.getElementById("addMilestoneBtn").addEventListener("click", addMilestone);
     document.getElementById("newMilestoneTitle").addEventListener("keydown", (e) => { if (e.key === "Enter") addMilestone(); });
     wireDatePicker("newMilestoneDate", "날짜");
-    document.getElementById("addTodoBtn").addEventListener("click", () => addTodo(null, "newTodo", "newTodoDue"));
-    document.getElementById("newTodo").addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(null, "newTodo", "newTodoDue"); });
-    wireDatePicker("newTodoDue", "마감일");
+    document.getElementById("showAddNoteBtn").addEventListener("click", () => {
+      const box = document.getElementById("addNoteBox");
+      const hidden = box.style.display === "none";
+      box.style.display = hidden ? "block" : "none";
+      if (hidden) document.getElementById("newNote").focus();
+    });
     document.getElementById("addNoteBtn").addEventListener("click", addNote);
     document.getElementById("newNote").addEventListener("keydown", (e) => { if (e.key === "Enter") addNote(); });
 
     wireTimelineEvents();
-    wireTodoEvents(document.getElementById("todoList"));
-    wireWbsEvents();
+    wireMilestoneListEvents();
+    wireTodoEvents(document.getElementById("unassignedTodoList"));
     wireNoteEvents();
   }
 
+  // 마일스톤이 생기기 전에 만들어졌던 할일(milestone_id가 없는 것) - 안 보이게 사라지면 안 되니
+  // 마일스톤 목록 아래에 최소한으로 계속 보여줌 (새 할일은 이제 항상 마일스톤 아래로 추가됨)
+  function renderUnassignedTodos() {
+    const unassigned = currentTodos.filter((t) => !t.milestone_id);
+    if (!unassigned.length) return "";
+    return `
+      <div class="section-title">마일스톤 미지정 할 일</div>
+      <div id="unassignedTodoList">${renderTodoItems(unassigned)}</div>
+    `;
+  }
+
   // ---- 타임라인 ----
+  // 마일스톤에 딸린 할일의 완료율 계산 - 타임라인의 파이차트 원, 마일스톤 목록 양쪽에서 공용으로 씀
+  function milestoneProgress(milestoneId) {
+    const todos = currentTodos.filter((t) => t.milestone_id === milestoneId);
+    const total = todos.length;
+    const done = todos.filter((t) => t.completed).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    return { todos, total, done, pct };
+  }
+  function pieGradient(pct) {
+    return `conic-gradient(#3ecf8e ${pct}%, #16324a ${pct}% 100%)`;
+  }
+
   // 타임라인 표시 범위는 "행사 시작~종료"뿐 아니라, 그보다 앞뒤로 나가는 마일스톤(기획 착수,
   // 결과보고 등)까지 전부 포함하도록 넓혀서 계산 - 안 그러면 행사 전/후 마일스톤이 양끝에 뭉개져 보임
   function computeTimelineData() {
@@ -191,12 +213,11 @@
     const rangeStart = Math.min(eventStart, ...milestoneTimes);
     const rangeEnd = Math.max(eventEnd, ...milestoneTimes);
     const span = rangeEnd - rangeStart || 1;
-    const pctOf = (t) => Math.min(100, Math.max(0, ((t - rangeStart) / span) * 100));
+    const posPctOf = (t) => Math.min(100, Math.max(0, ((t - rangeStart) / span) * 100));
     const points = currentMilestones.map((m) => {
       const t = new Date(m.milestone_date + "T00:00:00").getTime();
-      const wbsTodos = currentTodos.filter((td) => td.milestone_id === m.id);
-      const wbsDone = wbsTodos.length > 0 && wbsTodos.every((td) => td.completed);
-      return { ...m, pct: pctOf(t), wbsDone };
+      const { pct: donePct } = milestoneProgress(m.id);
+      return { ...m, pct: posPctOf(t), donePct };
     });
     return {
       start: project.start_date,
@@ -223,11 +244,10 @@
       .map((p, i) => {
         const cls = [
           "timeline-marker",
-          p.wbsDone ? "done" : "",
           p.id === selectedMilestoneId ? "selected" : "",
           i % 2 === 1 ? "stagger" : "",
         ].filter(Boolean).join(" ");
-        return `<div class="${cls}" style="left:${p.pct}%;" data-id="${p.id}">
+        return `<div class="${cls}" style="left:${p.pct}%;background:${pieGradient(p.donePct)};" data-id="${p.id}">
           <span class="timeline-marker-label">${escapeHtml(p.title)}<br>${fmtDate(p.milestone_date)}</span>
         </div>`;
       })
@@ -244,15 +264,19 @@
     `;
   }
 
+  // 타임라인의 점을 누르든, 아래 마일스톤 목록의 행을 누르든 같은 상태(selectedMilestoneId)를
+  // 같이 바꿔서 항상 서로 맞물려 보이게 함. 이미 열려있는 걸 다시 누르면 접힘
+  function toggleMilestone(id) {
+    selectedMilestoneId = selectedMilestoneId === id ? null : id;
+    document.getElementById("timelineBox").innerHTML = renderTimeline();
+    wireTimelineEvents();
+    document.getElementById("milestoneListBox").innerHTML = renderMilestoneList();
+    wireMilestoneListEvents();
+  }
+
   function wireTimelineEvents() {
     document.querySelectorAll(".timeline-marker[data-id]").forEach((el) => {
-      el.addEventListener("click", () => {
-        selectedMilestoneId = Number(el.dataset.id);
-        document.getElementById("timelineBox").innerHTML = renderTimeline();
-        wireTimelineEvents();
-        document.getElementById("wbsPanel").innerHTML = renderWbsPanel();
-        wireWbsEvents();
-      });
+      el.addEventListener("click", () => toggleMilestone(Number(el.dataset.id)));
     });
   }
 
@@ -324,20 +348,46 @@
     load();
   }
 
-  // ---- WBS 패널(선택된 마일스톤의 할일) ----
-  function renderWbsPanel() {
-    if (!selectedMilestoneId) return "";
-    const m = currentMilestones.find((x) => x.id === selectedMilestoneId);
-    if (!m) return "";
-    const wbsTodos = currentTodos.filter((t) => t.milestone_id === selectedMilestoneId);
+  // ---- 마일스톤 아코디언 목록 (각 마일스톤 = 파이차트 원 + 제목/날짜, 누르면 할일 목록이 드롭다운) ----
+  function renderMilestoneList() {
+    if (!currentMilestones.length) {
+      return '<div class="empty">아직 마일스톤이 없습니다. 위 버튼으로 기본 타임라인을 만들거나 직접 추가해보세요.</div>';
+    }
+    const sorted = [...currentMilestones].sort((a, b) => (a.milestone_date < b.milestone_date ? -1 : 1));
+    return sorted
+      .map((m) => {
+        const { total, done, pct } = milestoneProgress(m.id);
+        const isOpen = m.id === selectedMilestoneId;
+        return `
+          <div class="milestone-row" data-id="${m.id}">
+            <div class="milestone-row-head">
+              <div class="milestone-pie" style="background:${pieGradient(pct)};"></div>
+              <div class="milestone-row-info">
+                <div class="milestone-row-title">${escapeHtml(m.title)}</div>
+                <div class="milestone-row-date">${fmtDate(m.milestone_date)} · ${done}/${total} 완료 · ${pct}%</div>
+              </div>
+              <span class="milestone-row-chevron">${isOpen ? "▲" : "▼"}</span>
+            </div>
+            <div class="milestone-row-body" style="${isOpen ? "" : "display:none;"}">
+              ${isOpen ? renderMilestoneBody(m) : ""}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function renderMilestoneBody(m) {
+    const wbsTodos = currentTodos.filter((t) => t.milestone_id === m.id);
     return `
-      <div style="background:#0f2338;border-radius:3px;padding:14px 16px;margin-bottom:20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
-          <div style="font-weight:800;">📍 ${escapeHtml(m.title)} (${fmtDate(m.milestone_date)}) — WBS</div>
-          <button type="button" id="editMilestoneBtn" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;">수정</button>
-        </div>
-        <div id="milestoneEditBox"></div>
-        ${renderWbsGantt(wbsTodos)}
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px;">
+        <button type="button" id="editMilestoneBtn" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;">수정</button>
+        <button type="button" id="deleteMilestoneBtn" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;background:#5a1f1f;">삭제</button>
+      </div>
+      <div id="milestoneEditBox"></div>
+      ${renderWbsGantt(wbsTodos)}
+      <button type="button" id="showAddWbsTodoBtn" class="add-trigger-btn">+ 할 일 추가</button>
+      <div id="addWbsTodoBox" style="display:none;margin-top:10px;">
         <div class="todo-add-row">
           <input type="text" id="newWbsTodo" placeholder="이 마일스톤의 할 일 입력 후 Enter">
         </div>
@@ -346,10 +396,8 @@
           ${datepickHtml("newWbsTodoDue")}
           <button type="button" id="addWbsTodoBtn" style="width:auto;">추가</button>
         </div>
-        <div id="wbsTodoList">${renderTodoItems(wbsTodos)}</div>
-        <button type="button" id="closeWbsBtn" style="width:auto;padding:6px 12px;font-size:0.8rem;background:none;color:#8fa3b8;">닫기</button>
-        <button type="button" id="deleteMilestoneBtn" style="width:auto;padding:6px 12px;font-size:0.8rem;background:#5a1f1f;margin-left:8px;">마일스톤 삭제</button>
       </div>
+      <div id="wbsTodoList" style="margin-top:10px;">${renderTodoItems(wbsTodos)}</div>
     `;
   }
 
@@ -380,10 +428,24 @@
     </div>`;
   }
 
-  function wireWbsEvents() {
+  function wireMilestoneListEvents() {
+    document.querySelectorAll(".milestone-row-head").forEach((head) => {
+      head.addEventListener("click", () => {
+        const id = Number(head.closest(".milestone-row").dataset.id);
+        toggleMilestone(id);
+      });
+    });
+
+    // 펼쳐진 행이 있을 때만 그 안의 컨트롤들을 연결(한 번에 하나만 열려 있음)
     const addBtn = document.getElementById("addWbsTodoBtn");
     if (!addBtn) return;
     document.getElementById("editMilestoneBtn").addEventListener("click", showMilestoneEditBox);
+    document.getElementById("showAddWbsTodoBtn").addEventListener("click", () => {
+      const box = document.getElementById("addWbsTodoBox");
+      const hidden = box.style.display === "none";
+      box.style.display = hidden ? "block" : "none";
+      if (hidden) document.getElementById("newWbsTodo").focus();
+    });
     addBtn.addEventListener("click", () => addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart"));
     document.getElementById("newWbsTodo").addEventListener("keydown", (e) => {
       if (e.key === "Enter") addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart");
@@ -391,12 +453,6 @@
     wireDatePicker("newWbsTodoStart", "시작일");
     wireDatePicker("newWbsTodoDue", "마감일");
     wireTodoEvents(document.getElementById("wbsTodoList"));
-    document.getElementById("closeWbsBtn").addEventListener("click", () => {
-      selectedMilestoneId = null;
-      document.getElementById("timelineBox").innerHTML = renderTimeline();
-      wireTimelineEvents();
-      document.getElementById("wbsPanel").innerHTML = "";
-    });
     document.getElementById("deleteMilestoneBtn").addEventListener("click", async () => {
       if (!confirm("이 마일스톤과 딸린 WBS 할일을 전부 삭제할까요?")) return;
       await fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${selectedMilestoneId}`, { method: "DELETE", headers });
@@ -493,7 +549,7 @@
         });
         const t = currentTodos.find((x) => x.id === Number(id));
         if (t) t.completed = completed;
-        refreshProgress();
+        refreshProgress(t ? t.milestone_id : null);
       });
     });
 
@@ -533,16 +589,29 @@
   }
 
   // 체크박스 토글 후 화면 전체 새로고침 없이 진행률/타임라인 점 상태만 즉시 갱신
-  function refreshProgress() {
+  function refreshProgress(milestoneId) {
     const total = currentTodos.length;
     const done = currentTodos.filter((t) => t.completed).length;
     const pct = total ? Math.round((done / total) * 100) : 0;
     const bar = document.querySelector(".progress-inner");
     const label = document.querySelector(".progress-label");
     if (bar) bar.style.width = pct + "%";
-    if (label) label.textContent = `${done}/${total} 완료 · ${pct}%`;
+    if (label) label.textContent = `전체 ${done}/${total} 완료 · ${pct}%`;
     document.getElementById("timelineBox").innerHTML = renderTimeline();
     wireTimelineEvents();
+    // 마일스톤 목록 전체를 다시 그리면 방금 열어둔 "+ 할 일 추가" 같은 임시 상태가 접혀버리니,
+    // 체크한 항목이 속한 행의 파이차트/진행률 글자만 콕 집어서 갱신
+    if (milestoneId) {
+      const row = document.querySelector(`.milestone-row[data-id="${milestoneId}"]`);
+      const m = currentMilestones.find((x) => x.id === milestoneId);
+      if (row && m) {
+        const { total: mt, done: md, pct: mp } = milestoneProgress(milestoneId);
+        const pie = row.querySelector(".milestone-pie");
+        const dateEl = row.querySelector(".milestone-row-date");
+        if (pie) pie.style.background = pieGradient(mp);
+        if (dateEl) dateEl.textContent = `${fmtDate(m.milestone_date)} · ${md}/${mt} 완료 · ${mp}%`;
+      }
+    }
   }
 
   // ---- 메모/문서 링크 ----
