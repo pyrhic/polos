@@ -49,8 +49,9 @@ async function getAccessToken(serviceAccount) {
 }
 
 // 이번 주(월~금) 날짜 정보를 한국시간(KST, UTC+9) 기준으로 계산
-function getThisWeekdays() {
-  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+// refMs를 주면 그 시각이 속한 주를 계산 - 지나간 주를 나중에 다시 생성할 때 씀
+function getThisWeekdays(refMs) {
+  const kst = new Date((refMs ?? Date.now()) + 9 * 60 * 60 * 1000);
   const day = kst.getUTCDay();
   const diffToMonday = day === 0 ? -6 : 1 - day;
   const monday = new Date(kst);
@@ -119,8 +120,13 @@ async function inferTasks(env, w, knownTasksText) {
 }
 
 export async function onRequestPost(context) {
-  const { env } = context;
+  const { env, request } = context;
   try {
+    // ?date=YYYY-MM-DD 로 특정 주(그 날짜가 속한 주)를 지정해서 다시 생성할 수 있음 - 지나간 주 백필용
+    const url = new URL(request.url);
+    const dateParam = url.searchParams.get("date");
+    const refMs = dateParam ? new Date(`${dateParam}T12:00:00Z`).getTime() : undefined;
+
     const serviceAccount = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY);
     const accessToken = await getAccessToken(serviceAccount);
 
@@ -137,7 +143,7 @@ export async function onRequestPost(context) {
     }
     const sheetData = await sheetRes.json();
     const allRows = sheetData.values || [];
-    const weekdays = getThisWeekdays();
+    const weekdays = getThisWeekdays(refMs);
 
     const rawByDay = weekdays.map((w) => {
       const row = allRows.find((r) => (r[0] || "").trim() === w.label);
