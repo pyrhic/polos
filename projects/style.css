@@ -213,7 +213,7 @@ a.back {
      지그재그로 내려간 2줄짜리 라벨이 짤려서 세로 스크롤이 생겼음 - 위아래 여백을 넉넉히 줘서
      세로 스크롤이 아예 필요 없게(내용이 항상 다 들어가게) 만듦 */
   overflow-x: auto;
-  padding: 24px 20px 110px;
+  padding: 24px 70px 110px;
   margin: 0 -20px 6px;
 }
 .timeline-track {
