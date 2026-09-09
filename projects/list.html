@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 목록 — 뽈로</title>
+<link rel="stylesheet" href="/projects/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d1b2a">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/projects/index.html">← 프로젝트 관리</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">프로젝트 목록</h1>
+
+    <form id="addForm">
+      <label for="name">프로젝트 이름</label>
+      <input type="text" id="name" required>
+      <label for="description">설명 (선택)</label>
+      <textarea id="description" style="min-height:60px;"></textarea>
+      <label for="due_date">마감일 (선택)</label>
+      <input type="date" id="due_date">
+      <button type="submit" id="addBtn">새 프로젝트 만들기</button>
+      <div class="msg" id="msg"></div>
+    </form>
+
+    <div class="section-title">진행 중 · 보류 · 완료</div>
+    <div id="list"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  function dDayLabel(dueDate) {
+    if (!dueDate) return { text: "", overdue: false };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate + "T00:00:00");
+    const diffDays = Math.round((due - today) / 86400000);
+    if (diffDays === 0) return { text: "마감일: 오늘", overdue: false };
+    if (diffDays > 0) return { text: `마감일: ${dueDate} (D-${diffDays})`, overdue: false };
+    return { text: `마감일: ${dueDate} (기한 ${Math.abs(diffDays)}일 지남)`, overdue: true };
+  }
+
+  async function loadProjects() {
+    const list = document.getElementById("list");
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/projects?select=*,project_todos(completed)&order=created_at.desc`,
+        { headers }
+      );
+      const rows = await res.json();
+
+      if (!rows.length) {
+        list.innerHTML = '<div class="empty">아직 등록된 프로젝트가 없습니다.</div>';
+        return;
+      }
+
+      list.innerHTML = rows
+        .map((p) => {
+          const todos = p.project_todos || [];
+          const total = todos.length;
+          const done = todos.filter((t) => t.completed).length;
+          const pct = total ? Math.round((done / total) * 100) : 0;
+          const dday = dDayLabel(p.due_date);
+          return `<a class="project-card" href="/projects/detail.html?id=${p.id}">
+            <div class="row">
+              <div class="name">${escapeHtml(p.name)}</div>
+              <span class="status-badge status-${escapeHtml(p.status)}">${escapeHtml(p.status)}</span>
+            </div>
+            ${dday.text ? `<div class="due${dday.overdue ? " overdue" : ""}">${dday.text}</div>` : ""}
+            <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+            <div class="progress-label">${done}/${total} 완료 · ${pct}%</div>
+          </a>`;
+        })
+        .join("");
+    } catch (err) {
+      list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("addBtn");
+    const msg = document.getElementById("msg");
+    msg.className = "msg";
+    btn.disabled = true;
+    btn.textContent = "만드는 중...";
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/projects`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          name: document.getElementById("name").value.trim(),
+          description: document.getElementById("description").value.trim(),
+          due_date: document.getElementById("due_date").value || null,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      document.getElementById("addForm").reset();
+      msg.className = "msg ok";
+      msg.textContent = "프로젝트가 만들어졌습니다.";
+      loadProjects();
+    } catch (err) {
+      msg.className = "msg err";
+      msg.textContent = "실패: " + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "새 프로젝트 만들기";
+    }
+  });
+
+  loadProjects();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>

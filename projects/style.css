@@ -1,0 +1,290 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, "Malgun Gothic", sans-serif;
+  background: #0d1b2a;
+  color: #ffffff;
+  margin: 0;
+  padding: 20px;
+}
+
+.wrap, .card {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.card h1 {
+  font-size: 2.2rem;
+  margin-bottom: 0.3rem;
+  text-align: center;
+}
+
+p.role {
+  color: #8fa3b8;
+  margin-top: 0;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+a.link-btn, button, input[type="submit"] {
+  display: block;
+  width: 100%;
+  padding: 14px 20px;
+  background: #16324a;
+  border: none;
+  border-radius: 3px;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+a.link-btn:hover, button:hover {
+  background: #8b7ff0;
+  color: #0d1b2a;
+}
+
+.accent {
+  color: #8b7ff0;
+}
+
+label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  color: #8fa3b8;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+input, textarea, select {
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: none;
+  border-radius: 3px;
+  color: #0d1b2a;
+  padding: 10px 12px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+button[type="submit"] {
+  margin-top: 24px;
+}
+
+button:disabled {
+  background: #ccc;
+  border-color: #ccc;
+  color: #666;
+}
+
+.msg {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 3px;
+  font-size: 0.9rem;
+  display: none;
+}
+.msg.ok { background: #e6f6ea; color: #1a7a34; display: block; }
+.msg.err { background: #fdeceb; color: #b3251a; display: block; }
+
+a.back {
+  display: inline-block;
+  margin-top: 10px;
+  margin-bottom: 20px;
+  color: #8fa3b8;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.empty {
+  color: #8fa3b8;
+  text-align: center;
+  margin-top: 40px;
+}
+
+/* 프로젝트 카드(목록) */
+.project-card {
+  display: block;
+  background: #16324a;
+  border: none;
+  border-radius: 3px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+.project-card .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.project-card .name {
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+.project-card .due {
+  font-size: 0.8rem;
+  color: #8fa3b8;
+  margin-bottom: 10px;
+}
+.project-card .due.overdue { color: #e8362a; font-weight: 700; }
+
+.status-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.status-badge.status-진행중 { background: #8b7ff0; color: #0d1b2a; }
+.status-badge.status-완료 { background: #3ecf8e; color: #0d1b2a; }
+.status-badge.status-보류 { background: #6b7d8f; color: #ffffff; }
+
+.progress-outer {
+  width: 100%;
+  height: 10px;
+  background: #0d1b2a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.progress-inner {
+  height: 100%;
+  background: #8b7ff0;
+  transition: width 0.3s;
+}
+.progress-label {
+  font-size: 0.75rem;
+  color: #8fa3b8;
+  margin-top: 6px;
+  text-align: right;
+}
+
+/* 프로젝트 상세 - 할일 */
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #16324a;
+  border: none;
+  border-radius: 3px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.todo-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  accent-color: #8b7ff0;
+  cursor: pointer;
+}
+.todo-item .todo-text {
+  flex: 1;
+  font-size: 1rem;
+  word-break: break-word;
+  cursor: text;
+  outline: none;
+  border-radius: 2px;
+}
+.todo-item .todo-text:focus {
+  background: #1e3a52;
+}
+.todo-item.completed .todo-text {
+  text-decoration: line-through;
+  color: #6b7d8f;
+}
+.todo-item .todo-due {
+  font-size: 0.75rem;
+  color: #8fa3b8;
+  white-space: nowrap;
+}
+.todo-item .todo-del {
+  width: auto;
+  margin-top: 0;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+.todo-add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.todo-add-row input {
+  flex: 1;
+}
+.todo-add-row button {
+  width: auto;
+  margin-top: 0;
+  padding: 10px 16px;
+}
+
+/* 메모/문서 첨부 */
+.note-item {
+  background: #16324a;
+  border: none;
+  border-radius: 3px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+.note-item a { color: #8b7ff0; }
+.note-item .note-del {
+  width: auto;
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+}
+
+.section-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #8fa3b8;
+  margin: 26px 0 12px;
+}
+
+a.hwp-btn {
+  text-transform: none;
+  background: #cfe9f5;
+  color: #0d1b2a;
+}
+a.hwp-btn:hover {
+  background: #a9d7ec;
+  color: #0d1b2a;
+}

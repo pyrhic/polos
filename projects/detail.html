@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 — 뽈로</title>
+<link rel="stylesheet" href="/projects/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d1b2a">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/projects/list.html">← 프로젝트 목록</a>
+    <div id="content"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+  const projectId = new URLSearchParams(location.search).get("id");
+  const content = document.getElementById("content");
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  if (!projectId) {
+    content.innerHTML = '<div class="empty">프로젝트를 찾을 수 없습니다.</div>';
+  } else {
+    load();
+  }
+
+  async function load() {
+    try {
+      const [pRes, todosRes, notesRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/projects?select=*&id=eq.${projectId}`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/project_todos?select=*&project_id=eq.${projectId}&order=id.asc`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/project_notes?select=*&project_id=eq.${projectId}&order=id.desc`, { headers }),
+      ]);
+      const projects = await pRes.json();
+      if (!projects.length) {
+        content.innerHTML = '<div class="empty">프로젝트를 찾을 수 없습니다.</div>';
+        return;
+      }
+      const project = projects[0];
+      const todos = await todosRes.json();
+      const notes = await notesRes.json();
+      render(project, todos, notes);
+    } catch (err) {
+      content.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  function dDayLabel(dueDate) {
+    if (!dueDate) return { text: "", overdue: false };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate + "T00:00:00");
+    const diffDays = Math.round((due - today) / 86400000);
+    if (diffDays === 0) return { text: "오늘 마감", overdue: false };
+    if (diffDays > 0) return { text: `D-${diffDays}`, overdue: false };
+    return { text: `기한 ${Math.abs(diffDays)}일 지남`, overdue: true };
+  }
+
+  function render(project, todos, notes) {
+    const total = todos.length;
+    const done = todos.filter((t) => t.completed).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const dday = dDayLabel(project.due_date);
+
+    content.innerHTML = `
+      <h1 style="font-size:1.4rem;margin-bottom:0.4rem;">${escapeHtml(project.name)}</h1>
+      <div style="margin-bottom:14px;">
+        <span class="status-badge status-${escapeHtml(project.status)}">${escapeHtml(project.status)}</span>
+        ${dday.text ? `<span class="due${dday.overdue ? " overdue" : ""}" style="margin-left:8px;">${dday.text}</span>` : ""}
+      </div>
+      <div class="progress-outer"><div class="progress-inner" style="width:${pct}%;"></div></div>
+      <div class="progress-label">${done}/${total} 완료 · ${pct}%</div>
+      ${project.description ? `<p class="role" style="text-align:left;margin-top:14px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
+
+      <button type="button" id="editBtn" style="margin-top:10px;">프로젝트 정보 수정</button>
+      <div id="editBox"></div>
+
+      <div class="section-title">할 일</div>
+      <div class="todo-add-row">
+        <input type="text" id="newTodo" placeholder="할 일 입력 후 Enter">
+        <input type="date" id="newTodoDue" style="flex:0 0 150px;" title="마감일(선택)">
+        <button type="button" id="addTodoBtn" style="width:auto;">추가</button>
+      </div>
+      <div id="todoList">${renderTodos(todos)}</div>
+
+      <div class="section-title">메모 / 문서 링크</div>
+      <div class="todo-add-row">
+        <input type="text" id="newNote" placeholder="메모나 구글드라이브 등 링크 입력 후 Enter">
+        <button type="button" id="addNoteBtn" style="width:auto;">추가</button>
+      </div>
+      <div id="noteList">${renderNotes(notes)}</div>
+    `;
+
+    document.getElementById("editBtn").addEventListener("click", () => showEditBox(project));
+    document.getElementById("addTodoBtn").addEventListener("click", addTodo);
+    document.getElementById("newTodo").addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+    document.getElementById("addNoteBtn").addEventListener("click", addNote);
+    document.getElementById("newNote").addEventListener("keydown", (e) => { if (e.key === "Enter") addNote(); });
+
+    wireTodoEvents();
+    wireNoteEvents();
+  }
+
+  function renderTodos(todos) {
+    if (!todos.length) return '<div class="empty">할 일이 없습니다.</div>';
+    return todos
+      .map((t) => {
+        const dday = dDayLabel(t.due_date);
+        return `<div class="todo-item ${t.completed ? "completed" : ""}" data-id="${t.id}">
+          <input type="checkbox" ${t.completed ? "checked" : ""} class="todo-check">
+          <span class="todo-text" contenteditable="true" spellcheck="false">${escapeHtml(t.text)}</span>
+          ${dday.text ? `<span class="todo-due${dday.overdue ? " overdue" : ""}">${dday.text}</span>` : ""}
+          <button type="button" class="todo-del">삭제</button>
+        </div>`;
+      })
+      .join("");
+  }
+
+  function renderNotes(notes) {
+    if (!notes.length) return '<div class="empty">등록된 메모/링크가 없습니다.</div>';
+    return notes
+      .map((n) => {
+        const isUrl = /^https?:\/\//.test(n.content.trim());
+        const body = isUrl
+          ? `<a href="${escapeHtml(n.content)}" target="_blank">${escapeHtml(n.content)}</a>`
+          : escapeHtml(n.content).replace(/\n/g, "<br>");
+        return `<div class="note-item" data-id="${n.id}">
+          ${body}
+          <div><button type="button" class="note-del" style="width:auto;">삭제</button></div>
+        </div>`;
+      })
+      .join("");
+  }
+
+  function showEditBox(project) {
+    const box = document.getElementById("editBox");
+    box.innerHTML = `
+      <label>이름</label>
+      <input type="text" id="editName" value="${escapeHtml(project.name)}">
+      <label>설명</label>
+      <textarea id="editDesc">${escapeHtml(project.description || "")}</textarea>
+      <label>상태</label>
+      <select id="editStatus">
+        <option value="진행중" ${project.status === "진행중" ? "selected" : ""}>진행중</option>
+        <option value="완료" ${project.status === "완료" ? "selected" : ""}>완료</option>
+        <option value="보류" ${project.status === "보류" ? "selected" : ""}>보류</option>
+      </select>
+      <label>마감일</label>
+      <input type="date" id="editDue" value="${project.due_date || ""}">
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button type="button" id="saveEditBtn" style="width:auto;padding:10px 16px;">저장</button>
+        <button type="button" id="deleteProjectBtn" style="width:auto;padding:10px 16px;background:#5a1f1f;">프로젝트 삭제</button>
+      </div>
+      <div class="msg" id="editMsg"></div>
+    `;
+    document.getElementById("saveEditBtn").addEventListener("click", async () => {
+      const msg = document.getElementById("editMsg");
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            name: document.getElementById("editName").value.trim(),
+            description: document.getElementById("editDesc").value.trim(),
+            status: document.getElementById("editStatus").value,
+            due_date: document.getElementById("editDue").value || null,
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        load();
+      } catch (err) {
+        msg.className = "msg err";
+        msg.textContent = "저장 실패: " + err.message;
+      }
+    });
+    document.getElementById("deleteProjectBtn").addEventListener("click", async () => {
+      if (!confirm("이 프로젝트와 할 일/메모를 전부 삭제할까요? 되돌릴 수 없습니다.")) return;
+      await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, { method: "DELETE", headers });
+      location.href = "/projects/list.html";
+    });
+  }
+
+  async function addTodo() {
+    const input = document.getElementById("newTodo");
+    const dueInput = document.getElementById("newTodoDue");
+    const text = input.value.trim();
+    if (!text) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/project_todos`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ project_id: Number(projectId), text, due_date: dueInput.value || null }),
+    });
+    input.value = "";
+    dueInput.value = "";
+    load();
+  }
+
+  function wireTodoEvents() {
+    document.querySelectorAll(".todo-check").forEach((cb) => {
+      cb.addEventListener("change", async (e) => {
+        const item = e.target.closest(".todo-item");
+        const id = item.dataset.id;
+        const completed = e.target.checked;
+        item.classList.toggle("completed", completed);
+        await fetch(`${SUPABASE_URL}/rest/v1/project_todos?id=eq.${id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ completed }),
+        });
+        refreshProgress();
+      });
+    });
+
+    document.querySelectorAll(".todo-text").forEach((span) => {
+      const originalText = span.textContent;
+      span.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          span.blur();
+        }
+      });
+      span.addEventListener("blur", async () => {
+        const item = span.closest(".todo-item");
+        const id = item.dataset.id;
+        const newText = span.textContent.trim();
+        if (!newText) {
+          span.textContent = originalText;
+          return;
+        }
+        if (newText === originalText) return;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_todos?id=eq.${id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ text: newText }),
+        });
+      });
+    });
+
+    document.querySelectorAll(".todo-del").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        const item = e.target.closest(".todo-item");
+        const id = item.dataset.id;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_todos?id=eq.${id}`, { method: "DELETE", headers });
+        load();
+      });
+    });
+  }
+
+  // 체크박스 토글 후 화면 새로고침 없이 진행률만 즉시 갱신
+  function refreshProgress() {
+    const total = document.querySelectorAll(".todo-item").length;
+    const done = document.querySelectorAll(".todo-item.completed").length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const bar = document.querySelector(".progress-inner");
+    const label = document.querySelector(".progress-label");
+    if (bar) bar.style.width = pct + "%";
+    if (label) label.textContent = `${done}/${total} 완료 · ${pct}%`;
+  }
+
+  function wireNoteEvents() {
+    document.querySelectorAll(".note-del").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.closest(".note-item").dataset.id;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_notes?id=eq.${id}`, { method: "DELETE", headers });
+        load();
+      });
+    });
+  }
+
+  async function addNote() {
+    const input = document.getElementById("newNote");
+    const content = input.value.trim();
+    if (!content) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/project_notes`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ project_id: Number(projectId), content }),
+    });
+    input.value = "";
+    load();
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+</body>
+</html>
