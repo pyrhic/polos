@@ -360,6 +360,34 @@
     }, 400);
   }
 
+  // 프로젝트 항목만은 고정 메뉴 대신 지금 "진행중"인 프로젝트를 직접 불러와서 바로 누를 수 있게 보여줌
+  const PROJECTS_SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const PROJECTS_SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+
+  async function buildProjectsLinks() {
+    try {
+      const res = await fetch(
+        `${PROJECTS_SUPABASE_URL}/rest/v1/projects?select=id,name,status&status=eq.진행중&order=created_at.desc`,
+        { headers: { apikey: PROJECTS_SUPABASE_ANON_KEY, Authorization: `Bearer ${PROJECTS_SUPABASE_ANON_KEY}` } }
+      );
+      const rows = res.ok ? await res.json() : [];
+      const links = rows.map((p) => ({ label: `${p.name} (${p.status})`, href: `/projects/detail.html?id=${p.id}` }));
+      links.push({ label: "+ 새 프로젝트", href: "/projects/list.html" });
+      return links;
+    } catch {
+      return [{ label: "+ 새 프로젝트", href: "/projects/list.html" }];
+    }
+  }
+
+  function renderMenuLinks(links) {
+    menuLinks.innerHTML = links
+      .map(
+        (l, i) =>
+          `<a class="menu-link" style="--i:${i}" href="${l.href}"${l.external ? ' target="_blank"' : ""}>${l.label}</a>`
+      )
+      .join("");
+  }
+
   // 로고가 위쪽 고정 위치로 올라가 자리잡은 다음(450ms), 그 아래로 메뉴 버튼들이 이어서 페이드인됨
   function expandMenu(id) {
     const data = IDENTITIES[id];
@@ -370,14 +398,13 @@
     logoScroll.classList.add("docked");
     menuLinks.classList.add("docked");
     setDimmed(true);
-    setTimeout(() => {
+    // 애니메이션(450ms)과 동시에 미리 데이터를 가져와서, 둘 중 더 오래 걸리는 쪽만 기다리게 함
+    const linksPromise = id === "projects" ? buildProjectsLinks() : Promise.resolve(data.links);
+    setTimeout(async () => {
       if (selectedId !== id) return; // 그 사이 접혔으면 무시
-      menuLinks.innerHTML = data.links
-        .map(
-          (l, i) =>
-            `<a class="menu-link" style="--i:${i}" href="${l.href}"${l.external ? ' target="_blank"' : ""}>${l.label}</a>`
-        )
-        .join("");
+      const links = await linksPromise;
+      if (selectedId !== id) return; // 기다리는 동안 접혔을 수도 있으니 한번 더 확인
+      renderMenuLinks(links);
     }, 450);
   }
 
