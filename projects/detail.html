@@ -143,26 +143,37 @@
   }
 
   // ---- 타임라인 ----
+  // 타임라인 표시 범위는 "행사 시작~종료"뿐 아니라, 그보다 앞뒤로 나가는 마일스톤(기획 착수,
+  // 결과보고 등)까지 전부 포함하도록 넓혀서 계산 - 안 그러면 행사 전/후 마일스톤이 양끝에 뭉개져 보임
   function computeTimelineData() {
     const project = currentProject;
     if (!project.start_date || !project.due_date) return null;
-    const start = new Date(project.start_date + "T00:00:00").getTime();
-    const end = new Date(project.due_date + "T00:00:00").getTime();
-    const span = end - start || 1;
+    const eventStart = new Date(project.start_date + "T00:00:00").getTime();
+    const eventEnd = new Date(project.due_date + "T00:00:00").getTime();
+    const milestoneTimes = currentMilestones.map((m) => new Date(m.milestone_date + "T00:00:00").getTime());
+    const rangeStart = Math.min(eventStart, ...milestoneTimes);
+    const rangeEnd = Math.max(eventEnd, ...milestoneTimes);
+    const span = rangeEnd - rangeStart || 1;
+    const pctOf = (t) => Math.min(100, Math.max(0, ((t - rangeStart) / span) * 100));
     const points = currentMilestones.map((m) => {
       const t = new Date(m.milestone_date + "T00:00:00").getTime();
-      const pct = Math.min(100, Math.max(0, ((t - start) / span) * 100));
       const wbsTodos = currentTodos.filter((td) => td.milestone_id === m.id);
       const wbsDone = wbsTodos.length > 0 && wbsTodos.every((td) => td.completed);
-      return { ...m, pct, wbsDone };
+      return { ...m, pct: pctOf(t), wbsDone };
     });
-    return { start: project.start_date, end: project.due_date, points };
+    return {
+      startPct: pctOf(eventStart),
+      endPct: pctOf(eventEnd),
+      start: project.start_date,
+      end: project.due_date,
+      points,
+    };
   }
 
   function renderTimeline() {
     const data = computeTimelineData();
     if (!data) {
-      return '<div class="empty">타임라인을 보려면 프로젝트 정보 수정에서 시작일과 마감일을 먼저 설정해주세요.</div>';
+      return '<div class="empty">타임라인을 보려면 프로젝트 정보 수정에서 행사(실행) 날짜를 먼저 설정해주세요.</div>';
     }
     const trackWidth = Math.max(600, data.points.length * 110 + 220);
     const markers = data.points
@@ -172,13 +183,16 @@
         </div>`
       )
       .join("");
+    const endpoints = data.start === data.end
+      ? `<div class="timeline-marker endpoint" style="left:${data.startPct}%;"><span class="timeline-marker-label">행사일<br>${data.start}</span></div>`
+      : `<div class="timeline-marker endpoint" style="left:${data.startPct}%;"><span class="timeline-marker-label">행사 시작<br>${data.start}</span></div>
+         <div class="timeline-marker endpoint" style="left:${data.endPct}%;"><span class="timeline-marker-label">행사 종료<br>${data.end}</span></div>`;
     return `
       <div class="timeline-scroll">
         <div class="timeline-track" style="width:${trackWidth}px;">
           <div class="timeline-line"></div>
-          <div class="timeline-marker endpoint" style="left:0%;"><span class="timeline-marker-label">시작<br>${data.start}</span></div>
+          ${endpoints}
           ${markers}
-          <div class="timeline-marker endpoint" style="left:100%;"><span class="timeline-marker-label">마감<br>${data.end}</span></div>
         </div>
       </div>
     `;
@@ -215,34 +229,46 @@
     load();
   }
 
-  // 프로젝트관리론 기본 5단계(착수-기획-중간점검-실행완료-종료)를 시작일~마감일 사이에
-  // 비율로 합리적으로 배분해서 자동으로 마일스톤을 채워줌 - 이후 개별 수정/삭제로 상황에 맞게 조정 가능
-  const DEFAULT_PHASES = [
-    { pct: 0.05, title: "착수" },
-    { pct: 0.2, title: "기획 완료" },
-    { pct: 0.6, title: "중간 점검" },
-    { pct: 0.9, title: "실행 완료" },
-    { pct: 1.0, title: "종료 · 결과보고" },
-  ];
+  // 프로젝트관리론 기본 단계(착수-기획완료-실행-결과보고)를 "행사(실행) 날짜" 하나를 기준으로
+  // 앞뒤로 역산해서 자동으로 채워줌 - 비율이 아니라 실제 필요한 최소 기간(주 단위) 기준
+  // 기간 유형별 기획 착수 시점(행사 시작일로부터 몇 주 전) - 프로젝트 규모가 클수록 기획 기간도 넉넉하게
+  const PLANNING_LEAD_WEEKS = { "1일": 2, "여러날": 3, "한달": 4 };
+
+  function addDays(dateStr, days) {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
 
   async function generateDefaultTimeline() {
     const project = currentProject;
     if (!project.start_date || !project.due_date) {
-      alert("먼저 위쪽 '프로젝트 정보 수정'에서 시작일과 마감일을 설정해주세요.");
+      alert("먼저 위쪽 '프로젝트 정보 수정'에서 행사(실행) 날짜를 설정해주세요.");
       return;
     }
     if (currentMilestones.length > 0) {
-      if (!confirm("이미 마일스톤이 있어요. 기본 타임라인(5개)을 추가로 더 만들까요?")) return;
+      if (!confirm("이미 마일스톤이 있어요. 기본 타임라인을 추가로 더 만들까요?")) return;
     }
-    const start = new Date(project.start_date + "T00:00:00").getTime();
-    const end = new Date(project.due_date + "T00:00:00").getTime();
-    const span = end - start;
-    for (const phase of DEFAULT_PHASES) {
-      const dateStr = new Date(start + span * phase.pct).toISOString().slice(0, 10);
+    const eventStart = project.start_date;
+    const eventEnd = project.due_date;
+    const leadWeeks = PLANNING_LEAD_WEEKS[project.duration_type] || PLANNING_LEAD_WEEKS["1일"];
+    const isSingleDay = eventStart === eventEnd;
+
+    const phases = [
+      { title: "착수 (기획 시작)", date: addDays(eventStart, -leadWeeks * 7) },
+      { title: "기획 완료", date: addDays(eventStart, -3) },
+      isSingleDay
+        ? { title: "실행 (행사 당일)", date: eventStart }
+        : { title: "실행 시작 (행사 시작)", date: eventStart },
+      ...(isSingleDay ? [] : [{ title: "실행 종료 (행사 종료)", date: eventEnd }]),
+      { title: "종료 · 결과보고", date: addDays(eventEnd, 7) },
+    ];
+
+    for (const phase of phases) {
       await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ project_id: Number(projectId), title: phase.title, milestone_date: dateStr }),
+        body: JSON.stringify({ project_id: Number(projectId), title: phase.title, milestone_date: phase.date }),
       });
     }
     load();
@@ -503,6 +529,8 @@
   // ---- 프로젝트 정보 수정 ----
   function showEditBox(project) {
     const box = document.getElementById("editBox");
+    const durationType = project.duration_type || "1일";
+    const isSingleDay = durationType === "1일";
     box.innerHTML = `
       <label>이름</label>
       <input type="text" id="editName" value="${escapeHtml(project.name)}">
@@ -514,19 +542,34 @@
         <option value="완료" ${project.status === "완료" ? "selected" : ""}>완료</option>
         <option value="보류" ${project.status === "보류" ? "selected" : ""}>보류</option>
       </select>
-      <label>시작일</label>
+      <label>프로젝트 기간 유형</label>
+      <select id="editDurationType">
+        <option value="1일" ${durationType === "1일" ? "selected" : ""}>하루(1일)</option>
+        <option value="여러날" ${durationType === "여러날" ? "selected" : ""}>여러 날 (2일~1주)</option>
+        <option value="한달" ${durationType === "한달" ? "selected" : ""}>한 달 이상</option>
+      </select>
+      <label id="editEventStartLabel">${isSingleDay ? "행사(실행) 날짜" : "행사(실행) 시작일"}</label>
       <input type="date" id="editStart" value="${project.start_date || ""}">
-      <label>마감일</label>
-      <input type="date" id="editDue" value="${project.due_date || ""}">
+      <label id="editEventEndLabel" style="${isSingleDay ? "display:none;" : ""}">행사(실행) 종료일</label>
+      <input type="date" id="editDue" value="${project.due_date || ""}" style="${isSingleDay ? "display:none;" : ""}">
       <div style="display:flex;gap:8px;margin-top:14px;">
         <button type="button" id="saveEditBtn" style="width:auto;padding:10px 16px;">저장</button>
         <button type="button" id="deleteProjectBtn" style="width:auto;padding:10px 16px;background:#5a1f1f;">프로젝트 삭제</button>
       </div>
       <div class="msg" id="editMsg"></div>
     `;
+    document.getElementById("editDurationType").addEventListener("change", (e) => {
+      const single = e.target.value === "1일";
+      document.getElementById("editEventEndLabel").style.display = single ? "none" : "block";
+      document.getElementById("editDue").style.display = single ? "none" : "block";
+      document.getElementById("editEventStartLabel").textContent = single ? "행사(실행) 날짜" : "행사(실행) 시작일";
+    });
     document.getElementById("saveEditBtn").addEventListener("click", async () => {
       const msg = document.getElementById("editMsg");
       try {
+        const newDurationType = document.getElementById("editDurationType").value;
+        const newStart = document.getElementById("editStart").value || null;
+        const newDue = newDurationType === "1일" ? newStart : document.getElementById("editDue").value || newStart;
         const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
           method: "PATCH",
           headers,
@@ -534,8 +577,9 @@
             name: document.getElementById("editName").value.trim(),
             description: document.getElementById("editDesc").value.trim(),
             status: document.getElementById("editStatus").value,
-            start_date: document.getElementById("editStart").value || null,
-            due_date: document.getElementById("editDue").value || null,
+            duration_type: newDurationType,
+            start_date: newStart,
+            due_date: newDue,
           }),
         });
         if (!res.ok) throw new Error(await res.text());

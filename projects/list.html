@@ -20,8 +20,16 @@
       <input type="text" id="name" required>
       <label for="description">설명 (선택)</label>
       <textarea id="description" style="min-height:60px;"></textarea>
-      <label for="due_date">마감일 (선택)</label>
-      <input type="date" id="due_date">
+      <label for="duration_type">프로젝트 기간 유형</label>
+      <select id="duration_type">
+        <option value="1일">하루(1일)</option>
+        <option value="여러날">여러 날 (2일~1주)</option>
+        <option value="한달">한 달 이상</option>
+      </select>
+      <label id="eventStartLabel" for="event_start">행사(실행) 날짜</label>
+      <input type="date" id="event_start" required>
+      <label for="event_end" id="eventEndLabel" style="display:none;">행사(실행) 종료일</label>
+      <input type="date" id="event_end" style="display:none;">
       <button type="submit" id="addBtn">새 프로젝트 만들기</button>
       <div class="msg" id="msg"></div>
     </form>
@@ -91,6 +99,13 @@
     }
   }
 
+  document.getElementById("duration_type").addEventListener("change", (e) => {
+    const isSingleDay = e.target.value === "1일";
+    document.getElementById("eventEndLabel").style.display = isSingleDay ? "none" : "block";
+    document.getElementById("event_end").style.display = isSingleDay ? "none" : "block";
+    document.getElementById("eventStartLabel").textContent = isSingleDay ? "행사(실행) 날짜" : "행사(실행) 시작일";
+  });
+
   document.getElementById("addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = document.getElementById("addBtn");
@@ -99,13 +114,18 @@
     btn.disabled = true;
     btn.textContent = "만드는 중...";
     try {
+      const durationType = document.getElementById("duration_type").value;
+      const eventStart = document.getElementById("event_start").value;
+      const eventEnd = durationType === "1일" ? eventStart : document.getElementById("event_end").value || eventStart;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/projects`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           name: document.getElementById("name").value.trim(),
           description: document.getElementById("description").value.trim(),
-          due_date: document.getElementById("due_date").value || null,
+          duration_type: durationType,
+          start_date: eventStart || null,
+          due_date: eventEnd || null,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
