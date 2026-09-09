@@ -255,6 +255,55 @@ a.back {
   text-align: center;
 }
 
+/* WBS 간트뷰 - 막대 대신 얇은 선으로 기간 표시 */
+.gantt-view {
+  overflow-x: auto;
+  margin-bottom: 14px;
+  padding-bottom: 4px;
+}
+.gantt-range {
+  font-size: 0.7rem;
+  color: #8fa3b8;
+  margin-bottom: 8px;
+  min-width: 420px;
+}
+.gantt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 420px;
+  margin-bottom: 8px;
+}
+.gantt-label {
+  flex: 0 0 110px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gantt-label.done {
+  color: #6b7d8f;
+  text-decoration: line-through;
+}
+.gantt-track {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  background: #16324a;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.gantt-line {
+  position: absolute;
+  top: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: #8b7ff0;
+}
+.gantt-line.done {
+  background: #3ecf8e;
+}
+
 /* 프로젝트 상세 - 할일 */
 .todo-item {
   display: flex;

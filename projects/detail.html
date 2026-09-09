@@ -222,8 +222,15 @@
     return `
       <div style="background:#0f2338;border-radius:3px;padding:14px 16px;margin-bottom:20px;">
         <div style="font-weight:800;margin-bottom:10px;">📍 ${escapeHtml(m.title)} (${m.milestone_date}) — WBS</div>
+        ${renderWbsGantt(wbsTodos)}
         <div class="todo-add-row">
           <input type="text" id="newWbsTodo" placeholder="이 마일스톤의 할 일 입력 후 Enter">
+        </div>
+        <div class="todo-add-row">
+          <label style="margin:0;flex:0 0 auto;align-self:center;font-size:0.8rem;">시작</label>
+          <input type="date" id="newWbsTodoStart" style="flex:1;">
+          <label style="margin:0;flex:0 0 auto;align-self:center;font-size:0.8rem;">마감</label>
+          <input type="date" id="newWbsTodoDue" style="flex:1;">
           <button type="button" id="addWbsTodoBtn" style="width:auto;">추가</button>
         </div>
         <div id="wbsTodoList">${renderTodoItems(wbsTodos)}</div>
@@ -233,12 +240,39 @@
     `;
   }
 
+  // 시작일~마감일이 있는 WBS 항목들을 막대 대신 얇은 선(기간)으로 겹쳐 그려서
+  // 간트차트처럼 "어떤 일이 언제부터 언제까지, 어떤 순서로" 진행되는지 한눈에 보이게 함
+  function renderWbsGantt(wbsTodos) {
+    const withDates = wbsTodos.filter((t) => t.due_date);
+    if (!withDates.length) return "";
+    const spanOf = (t) => [new Date((t.start_date || t.due_date) + "T00:00:00").getTime(), new Date(t.due_date + "T00:00:00").getTime()];
+    const allTimes = withDates.flatMap(spanOf);
+    const rangeStart = Math.min(...allTimes);
+    const rangeEnd = Math.max(...allTimes);
+    const span = rangeEnd - rangeStart || 86400000;
+    const rows = withDates
+      .map((t) => {
+        const [s, e] = spanOf(t);
+        const leftPct = ((s - rangeStart) / span) * 100;
+        const widthPct = Math.max(2, ((e - s) / span) * 100);
+        return `<div class="gantt-row">
+          <div class="gantt-label${t.completed ? " done" : ""}">${escapeHtml(t.text)}</div>
+          <div class="gantt-track"><div class="gantt-line${t.completed ? " done" : ""}" style="left:${leftPct}%;width:${widthPct}%;"></div></div>
+        </div>`;
+      })
+      .join("");
+    return `<div class="gantt-view">
+      <div class="gantt-range">${new Date(rangeStart).toISOString().slice(0, 10)} ~ ${new Date(rangeEnd).toISOString().slice(0, 10)}</div>
+      ${rows}
+    </div>`;
+  }
+
   function wireWbsEvents() {
     const addBtn = document.getElementById("addWbsTodoBtn");
     if (!addBtn) return;
-    addBtn.addEventListener("click", () => addTodo(selectedMilestoneId, "newWbsTodo", null));
+    addBtn.addEventListener("click", () => addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart"));
     document.getElementById("newWbsTodo").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") addTodo(selectedMilestoneId, "newWbsTodo", null);
+      if (e.key === "Enter") addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart");
     });
     wireTodoEvents(document.getElementById("wbsTodoList"));
     document.getElementById("closeWbsBtn").addEventListener("click", () => {
@@ -271,11 +305,12 @@
       .join("");
   }
 
-  async function addTodo(milestoneId, inputId, dueInputId) {
+  async function addTodo(milestoneId, inputId, dueInputId, startInputId) {
     const input = document.getElementById(inputId);
     const text = input.value.trim();
     if (!text) return;
     const dueInput = dueInputId ? document.getElementById(dueInputId) : null;
+    const startInput = startInputId ? document.getElementById(startInputId) : null;
     await fetch(`${SUPABASE_URL}/rest/v1/project_todos`, {
       method: "POST",
       headers,
@@ -283,11 +318,13 @@
         project_id: Number(projectId),
         milestone_id: milestoneId,
         text,
+        start_date: startInput ? startInput.value || null : null,
         due_date: dueInput ? dueInput.value || null : null,
       }),
     });
     input.value = "";
     if (dueInput) dueInput.value = "";
+    if (startInput) startInput.value = "";
     load();
   }
 
