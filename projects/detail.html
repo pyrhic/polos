@@ -102,6 +102,7 @@
       <div id="editBox"></div>
 
       <div class="section-title">타임라인</div>
+      <button type="button" id="autoTimelineBtn" style="margin-bottom:12px;">기본 타임라인 자동 생성 (착수·기획·중간점검·실행완료·종료)</button>
       <div class="timeline-add-row">
         <input type="text" id="newMilestoneTitle" placeholder="마일스톤 이름">
         <input type="date" id="newMilestoneDate" style="flex:0 0 150px;">
@@ -127,6 +128,7 @@
     `;
 
     document.getElementById("editBtn").addEventListener("click", () => showEditBox(project));
+    document.getElementById("autoTimelineBtn").addEventListener("click", generateDefaultTimeline);
     document.getElementById("addMilestoneBtn").addEventListener("click", addMilestone);
     document.getElementById("newMilestoneTitle").addEventListener("keydown", (e) => { if (e.key === "Enter") addMilestone(); });
     document.getElementById("addTodoBtn").addEventListener("click", () => addTodo(null, "newTodo", "newTodoDue"));
@@ -213,6 +215,39 @@
     load();
   }
 
+  // 프로젝트관리론 기본 5단계(착수-기획-중간점검-실행완료-종료)를 시작일~마감일 사이에
+  // 비율로 합리적으로 배분해서 자동으로 마일스톤을 채워줌 - 이후 개별 수정/삭제로 상황에 맞게 조정 가능
+  const DEFAULT_PHASES = [
+    { pct: 0.05, title: "착수" },
+    { pct: 0.2, title: "기획 완료" },
+    { pct: 0.6, title: "중간 점검" },
+    { pct: 0.9, title: "실행 완료" },
+    { pct: 1.0, title: "종료 · 결과보고" },
+  ];
+
+  async function generateDefaultTimeline() {
+    const project = currentProject;
+    if (!project.start_date || !project.due_date) {
+      alert("먼저 위쪽 '프로젝트 정보 수정'에서 시작일과 마감일을 설정해주세요.");
+      return;
+    }
+    if (currentMilestones.length > 0) {
+      if (!confirm("이미 마일스톤이 있어요. 기본 타임라인(5개)을 추가로 더 만들까요?")) return;
+    }
+    const start = new Date(project.start_date + "T00:00:00").getTime();
+    const end = new Date(project.due_date + "T00:00:00").getTime();
+    const span = end - start;
+    for (const phase of DEFAULT_PHASES) {
+      const dateStr = new Date(start + span * phase.pct).toISOString().slice(0, 10);
+      await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ project_id: Number(projectId), title: phase.title, milestone_date: dateStr }),
+      });
+    }
+    load();
+  }
+
   // ---- WBS 패널(선택된 마일스톤의 할일) ----
   function renderWbsPanel() {
     if (!selectedMilestoneId) return "";
@@ -221,7 +256,11 @@
     const wbsTodos = currentTodos.filter((t) => t.milestone_id === selectedMilestoneId);
     return `
       <div style="background:#0f2338;border-radius:3px;padding:14px 16px;margin-bottom:20px;">
-        <div style="font-weight:800;margin-bottom:10px;">📍 ${escapeHtml(m.title)} (${m.milestone_date}) — WBS</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+          <div style="font-weight:800;">📍 ${escapeHtml(m.title)} (${m.milestone_date}) — WBS</div>
+          <button type="button" id="editMilestoneBtn" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;">수정</button>
+        </div>
+        <div id="milestoneEditBox"></div>
         ${renderWbsGantt(wbsTodos)}
         <div class="todo-add-row">
           <input type="text" id="newWbsTodo" placeholder="이 마일스톤의 할 일 입력 후 Enter">
@@ -270,6 +309,7 @@
   function wireWbsEvents() {
     const addBtn = document.getElementById("addWbsTodoBtn");
     if (!addBtn) return;
+    document.getElementById("editMilestoneBtn").addEventListener("click", showMilestoneEditBox);
     addBtn.addEventListener("click", () => addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart"));
     document.getElementById("newWbsTodo").addEventListener("keydown", (e) => {
       if (e.key === "Enter") addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart");
@@ -285,6 +325,31 @@
       if (!confirm("이 마일스톤과 딸린 WBS 할일을 전부 삭제할까요?")) return;
       await fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${selectedMilestoneId}`, { method: "DELETE", headers });
       selectedMilestoneId = null;
+      load();
+    });
+  }
+
+  // 마일스톤 이름/날짜 수정 - 자동 생성된 기본 타임라인을 프로젝트 상황에 맞게 조정할 때 씀
+  function showMilestoneEditBox() {
+    const m = currentMilestones.find((x) => x.id === selectedMilestoneId);
+    if (!m) return;
+    const box = document.getElementById("milestoneEditBox");
+    box.innerHTML = `
+      <div class="timeline-add-row">
+        <input type="text" id="editMilestoneTitle" value="${escapeHtml(m.title)}">
+        <input type="date" id="editMilestoneDate" style="flex:0 0 150px;" value="${m.milestone_date}">
+        <button type="button" id="saveMilestoneBtn" style="width:auto;">저장</button>
+      </div>
+    `;
+    document.getElementById("saveMilestoneBtn").addEventListener("click", async () => {
+      const title = document.getElementById("editMilestoneTitle").value.trim();
+      const date = document.getElementById("editMilestoneDate").value;
+      if (!title || !date) return;
+      await fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${selectedMilestoneId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ title, milestone_date: date }),
+      });
       load();
     });
   }
