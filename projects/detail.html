@@ -265,11 +265,15 @@
       alert("마일스톤 이름과 날짜를 모두 입력해주세요.");
       return;
     }
-    await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
       method: "POST",
       headers,
       body: JSON.stringify({ project_id: Number(projectId), title, milestone_date: date }),
     });
+    if (!res.ok) {
+      alert("마일스톤 추가 실패: " + (await res.text()));
+      return;
+    }
     titleInput.value = "";
     dateInput.value = "";
     load();
@@ -418,11 +422,15 @@
       const title = document.getElementById("editMilestoneTitle").value.trim();
       const date = document.getElementById("editMilestoneDate").value;
       if (!title || !date) return;
-      await fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${selectedMilestoneId}`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${selectedMilestoneId}`, {
         method: "PATCH",
         headers,
         body: JSON.stringify({ title, milestone_date: date }),
       });
+      if (!res.ok) {
+        alert("마일스톤 수정 실패: " + (await res.text()));
+        return;
+      }
       load();
     });
   }
@@ -449,7 +457,7 @@
     if (!text) return;
     const dueInput = dueInputId ? document.getElementById(dueInputId) : null;
     const startInput = startInputId ? document.getElementById(startInputId) : null;
-    await fetch(`${SUPABASE_URL}/rest/v1/project_todos`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_todos`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -460,6 +468,10 @@
         due_date: dueInput ? dueInput.value || null : null,
       }),
     });
+    if (!res.ok) {
+      alert("할 일 추가 실패: " + (await res.text()));
+      return;
+    }
     input.value = "";
     if (dueInput) dueInput.value = "";
     if (startInput) startInput.value = "";
@@ -564,11 +576,15 @@
     const input = document.getElementById("newNote");
     const content = input.value.trim();
     if (!content) return;
-    await fetch(`${SUPABASE_URL}/rest/v1/project_notes`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_notes`, {
       method: "POST",
       headers,
       body: JSON.stringify({ project_id: Number(projectId), content }),
     });
+    if (!res.ok) {
+      alert("메모 추가 실패: " + (await res.text()));
+      return;
+    }
     input.value = "";
     load();
   }
