@@ -209,9 +209,11 @@ a.back {
   margin-bottom: 6px;
 }
 .timeline-scroll {
+  /* overflow-x:auto를 주면 overflow-y:visible이 무시되고 auto로 강제 전환되는 CSS 특성 때문에
+     지그재그로 내려간 2줄짜리 라벨이 짤려서 세로 스크롤이 생겼음 - 위아래 여백을 넉넉히 줘서
+     세로 스크롤이 아예 필요 없게(내용이 항상 다 들어가게) 만듦 */
   overflow-x: auto;
-  overflow-y: visible;
-  padding: 34px 20px 60px;
+  padding: 24px 20px 110px;
   margin: 0 -20px 6px;
 }
 .timeline-track {
