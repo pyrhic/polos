@@ -149,37 +149,39 @@ export async function onRequestPost(context) {
       .map((d) => `${d.w.label}(${d.w.dow}): ${d.rawTasks}`)
       .join("\n");
 
-    if (!knownTasksText) {
-      return new Response(JSON.stringify({ error: "이번 주에 입력된 업무 기록이 아직 없습니다." }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
     const days = [];
     const remarks = [];
 
-    for (const { w, row, rawTasks } of rawByDay) {
-      if (rawTasks) {
-        const polished = await polish(env, rawTasks);
-        days.push({
-          date: w.label,
-          dow: w.dow,
-          tasks: polished.split("\n").map((t) => t.trim()).filter(Boolean),
-          leave: toLeaveLabel(row?.[7]),
-        });
-      } else {
-        const inferred = await inferTasks(env, w, knownTasksText);
-        days.push({
-          date: w.label,
-          dow: w.dow,
-          tasks: inferred,
-          leave: "",
-          inferred: true,
-        });
-        remarks.push(
-          `${w.label}(${w.dow})은 기록이 없어 AI가 그 주 업무 흐름을 바탕으로 추정 작성함 — 확인 후 필요시 직접 수정 필요`
-        );
+    if (!knownTasksText) {
+      // 이번 주 기록이 하나도 없어도 보고서 틀은 생성 - AI가 지어낼 근거가 전혀 없으므로
+      // 추정하지 않고 빈 채로 만들어서, 화면에서 직접 채워 넣을 수 있게 해둠
+      for (const { w } of rawByDay) {
+        days.push({ date: w.label, dow: w.dow, tasks: [], leave: "" });
+      }
+      remarks.push("이번 주는 입력된 업무 기록이 없어 빈 틀로 생성됨 — 화면에서 직접 채워 넣어야 함");
+    } else {
+      for (const { w, row, rawTasks } of rawByDay) {
+        if (rawTasks) {
+          const polished = await polish(env, rawTasks);
+          days.push({
+            date: w.label,
+            dow: w.dow,
+            tasks: polished.split("\n").map((t) => t.trim()).filter(Boolean),
+            leave: toLeaveLabel(row?.[7]),
+          });
+        } else {
+          const inferred = await inferTasks(env, w, knownTasksText);
+          days.push({
+            date: w.label,
+            dow: w.dow,
+            tasks: inferred,
+            leave: "",
+            inferred: true,
+          });
+          remarks.push(
+            `${w.label}(${w.dow})은 기록이 없어 AI가 그 주 업무 흐름을 바탕으로 추정 작성함 — 확인 후 필요시 직접 수정 필요`
+          );
+        }
       }
     }
 

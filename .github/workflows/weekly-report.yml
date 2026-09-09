@@ -1,0 +1,16 @@
+name: 주간보고서 자동 생성
+
+on:
+  schedule:
+    # 매주 목요일 22:00 KST (UTC 13:00) - 사이트를 안 열어도 GitHub 서버에서 자동 실행됨
+    - cron: "0 13 * * 4"
+  workflow_dispatch: {}
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 주간보고서 생성 API 호출
+        run: |
+          res=$(curl -sf -w "\n%{http_code}" -X POST https://polos-cxn.pages.dev/api/generate-weekly-report)
+          echo "$res"
