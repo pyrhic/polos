@@ -37,6 +37,14 @@
     return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
 
+  // 화면 표시용 - YYYY-MM-DD를 M/D로 간단히 (연도 생략). 저장/입력값은 그대로 YYYY-MM-DD 유지
+  function fmtDate(dateStr) {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    return `${Number(parts[1])}/${Number(parts[2])}`;
+  }
+
   if (!projectId) {
     content.innerHTML = '<div class="empty">프로젝트를 찾을 수 없습니다.</div>';
   } else {
@@ -173,7 +181,7 @@
     if (!data) {
       return '<div class="empty">타임라인을 보려면 프로젝트 정보 수정에서 행사(실행) 날짜를 먼저 설정해주세요.</div>';
     }
-    const eventLabel = data.start === data.end ? `행사일 ${data.start}` : `행사 ${data.start} ~ ${data.end}`;
+    const eventLabel = data.start === data.end ? `행사일 ${fmtDate(data.start)}` : `행사 ${fmtDate(data.start)} ~ ${fmtDate(data.end)}`;
     if (!data.points.length) {
       return `<div class="empty">${escapeHtml(eventLabel)} · 아직 마일스톤이 없습니다. 위 버튼으로 기본 타임라인을 만들거나 직접 추가해보세요.</div>`;
     }
@@ -191,7 +199,7 @@
           i % 2 === 1 ? "stagger" : "",
         ].filter(Boolean).join(" ");
         return `<div class="${cls}" style="left:${p.pct}%;" data-id="${p.id}">
-          <span class="timeline-marker-label">${escapeHtml(p.title)}<br>${p.milestone_date}</span>
+          <span class="timeline-marker-label">${escapeHtml(p.title)}<br>${fmtDate(p.milestone_date)}</span>
         </div>`;
       })
       .join("");
@@ -292,7 +300,7 @@
     return `
       <div style="background:#0f2338;border-radius:3px;padding:14px 16px;margin-bottom:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
-          <div style="font-weight:800;">📍 ${escapeHtml(m.title)} (${m.milestone_date}) — WBS</div>
+          <div style="font-weight:800;">📍 ${escapeHtml(m.title)} (${fmtDate(m.milestone_date)}) — WBS</div>
           <button type="button" id="editMilestoneBtn" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;">수정</button>
         </div>
         <div id="milestoneEditBox"></div>
@@ -336,7 +344,7 @@
       })
       .join("");
     return `<div class="gantt-view">
-      <div class="gantt-range">${new Date(rangeStart).toISOString().slice(0, 10)} ~ ${new Date(rangeEnd).toISOString().slice(0, 10)}</div>
+      <div class="gantt-range">${fmtDate(new Date(rangeStart).toISOString().slice(0, 10))} ~ ${fmtDate(new Date(rangeEnd).toISOString().slice(0, 10))}</div>
       ${rows}
     </div>`;
   }
@@ -579,6 +587,7 @@
         const newDurationType = document.getElementById("editDurationType").value;
         const newStart = document.getElementById("editStart").value || null;
         const newDue = newDurationType === "1일" ? newStart : document.getElementById("editDue").value || newStart;
+        const datesChanged = newStart !== project.start_date || newDue !== project.due_date;
         const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
           method: "PATCH",
           headers,
@@ -592,6 +601,19 @@
           }),
         });
         if (!res.ok) throw new Error(await res.text());
+        // 행사 날짜가 바뀌면 이미 만들어둔 마일스톤은 예전 날짜에 그대로 남아있으므로
+        // 새 날짜 기준으로 기본 타임라인을 다시 만들지 물어봄(개별 커스텀했을 수도 있어 확인 후 진행)
+        if (datesChanged && currentMilestones.length > 0) {
+          const regen = confirm("행사 날짜가 바뀌었어요. 기존 마일스톤을 지우고 새 날짜 기준으로 기본 타임라인을 다시 만들까요?\n(취소하면 기존 마일스톤은 그대로 남아있어요)");
+          if (regen) {
+            await Promise.all(
+              currentMilestones.map((m) => fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${m.id}`, { method: "DELETE", headers }))
+            );
+            await load();
+            await generateDefaultTimeline();
+            return;
+          }
+        }
         load();
       } catch (err) {
         msg.className = "msg err";
