@@ -102,7 +102,7 @@
       <div id="editBox"></div>
 
       <div class="section-title">타임라인</div>
-      <button type="button" id="autoTimelineBtn" style="margin-bottom:12px;">기본 타임라인 자동 생성 (착수·기획·중간점검·실행완료·종료)</button>
+      <button type="button" id="autoTimelineBtn" style="margin-bottom:12px;">기본 타임라인 자동 생성 (착수·기획완료·실행·결과보고)</button>
       <div class="timeline-add-row">
         <input type="text" id="newMilestoneTitle" placeholder="마일스톤 이름">
         <input type="date" id="newMilestoneDate" style="flex:0 0 150px;">
@@ -162,8 +162,6 @@
       return { ...m, pct: pctOf(t), wbsDone };
     });
     return {
-      startPct: pctOf(eventStart),
-      endPct: pctOf(eventEnd),
       start: project.start_date,
       end: project.due_date,
       points,
@@ -175,24 +173,35 @@
     if (!data) {
       return '<div class="empty">타임라인을 보려면 프로젝트 정보 수정에서 행사(실행) 날짜를 먼저 설정해주세요.</div>';
     }
+    const eventLabel = data.start === data.end ? `행사일 ${data.start}` : `행사 ${data.start} ~ ${data.end}`;
+    if (!data.points.length) {
+      return `<div class="empty">${escapeHtml(eventLabel)} · 아직 마일스톤이 없습니다. 위 버튼으로 기본 타임라인을 만들거나 직접 추가해보세요.</div>`;
+    }
     const trackWidth = Math.max(600, data.points.length * 110 + 220);
-    const markers = data.points
-      .map(
-        (p) => `<div class="timeline-marker${p.wbsDone ? " done" : ""}${p.id === selectedMilestoneId ? " selected" : ""}" style="left:${p.pct}%;" data-id="${p.id}">
+
+    // 마일스톤을 위치순으로 정렬한 뒤 한 칸씩 지그재그로 배치해서
+    // 날짜가 가까운 것끼리 라벨 글자가 겹치지 않게 함
+    const sorted = [...data.points].sort((a, b) => a.pct - b.pct);
+    const markersHtml = sorted
+      .map((p, i) => {
+        const cls = [
+          "timeline-marker",
+          p.wbsDone ? "done" : "",
+          p.id === selectedMilestoneId ? "selected" : "",
+          i % 2 === 1 ? "stagger" : "",
+        ].filter(Boolean).join(" ");
+        return `<div class="${cls}" style="left:${p.pct}%;" data-id="${p.id}">
           <span class="timeline-marker-label">${escapeHtml(p.title)}<br>${p.milestone_date}</span>
-        </div>`
-      )
+        </div>`;
+      })
       .join("");
-    const endpoints = data.start === data.end
-      ? `<div class="timeline-marker endpoint" style="left:${data.startPct}%;"><span class="timeline-marker-label">행사일<br>${data.start}</span></div>`
-      : `<div class="timeline-marker endpoint" style="left:${data.startPct}%;"><span class="timeline-marker-label">행사 시작<br>${data.start}</span></div>
-         <div class="timeline-marker endpoint" style="left:${data.endPct}%;"><span class="timeline-marker-label">행사 종료<br>${data.end}</span></div>`;
+
     return `
+      <div class="timeline-event-label">${escapeHtml(eventLabel)}</div>
       <div class="timeline-scroll">
         <div class="timeline-track" style="width:${trackWidth}px;">
           <div class="timeline-line"></div>
-          ${endpoints}
-          ${markers}
+          ${markersHtml}
         </div>
       </div>
     `;

@@ -203,6 +203,11 @@ a.back {
 .timeline-add-row input { flex: 1; }
 .timeline-add-row button { width: auto; margin-top: 0; padding: 10px 16px; }
 
+.timeline-event-label {
+  font-size: 0.75rem;
+  color: #8fa3b8;
+  margin-bottom: 6px;
+}
 .timeline-scroll {
   overflow-x: auto;
   overflow-y: visible;
@@ -254,6 +259,8 @@ a.back {
   white-space: nowrap;
   text-align: center;
 }
+/* 날짜가 가까운 마일스톤끼리 라벨이 겹치지 않도록 한 칸씩 아래로 지그재그 배치 */
+.timeline-marker.stagger .timeline-marker-label { top: 50px; }
 
 /* WBS 간트뷰 - 막대 대신 얇은 선으로 기간 표시 */
 .gantt-view {
