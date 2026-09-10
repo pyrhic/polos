@@ -274,9 +274,15 @@ a.back {
      지그재그로 내려간 2줄짜리 라벨이 짤려서 세로 스크롤이 생겼음 - 위아래 여백을 넉넉히 줘서
      세로 스크롤이 아예 필요 없게(내용이 항상 다 들어가게) 만듦 */
   overflow-x: auto;
-  padding: 24px 70px 110px;
+  padding: 40px 70px 60px;
   margin: 0 -20px 6px;
+  cursor: grab;
+  /* 스크롤바를 안 보이게 숨기고(PC에서도 폰처럼) 대신 JS로 마우스 드래그를 지원함 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.timeline-scroll::-webkit-scrollbar { display: none; }
+.timeline-scroll.dragging { cursor: grabbing; }
 .timeline-track {
   position: relative;
   height: 4px;
@@ -289,6 +295,34 @@ a.back {
   height: 4px;
   background: #16324a;
   border-radius: 2px;
+}
+/* 오늘까지 지나간 시간만큼 채워지는 선 - 마일스톤 완료색(초록)과 구분되는 회색조라
+   "시간은 이만큼 지났는데 초록(완료)이 여기까지 안 왔다"는 걸 한눈에 비교할 수 있음 */
+.timeline-line-elapsed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 4px;
+  background: #56708a;
+  border-radius: 2px;
+}
+.timeline-today-tick {
+  position: absolute;
+  top: -6px;
+  width: 2px;
+  height: 16px;
+  background: #e8362a;
+  transform: translateX(-50%);
+}
+.timeline-today-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #e8362a;
+  white-space: nowrap;
 }
 .timeline-marker {
   position: absolute;
@@ -377,19 +411,35 @@ a.back {
   background: none;
   color: #8fa3b8;
 }
-.timeline-marker-label {
+/* 날짜는 동그라미 위, 마일스톤 이름은 동그라미 아래 - 요청대로 분리 배치 */
+.timeline-marker-date {
   position: absolute;
-  top: 24px;
+  bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
+  margin-bottom: 6px;
   font-size: 0.7rem;
-  line-height: 1.4;
+  color: #8fa3b8;
+  white-space: nowrap;
+}
+.timeline-marker-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  font-size: 0.7rem;
+  line-height: 1.3;
   color: #8fa3b8;
   white-space: nowrap;
   text-align: center;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-/* 날짜가 가까운 마일스톤끼리 라벨이 겹치지 않도록 한 칸씩 아래로 지그재그 배치 */
-.timeline-marker.stagger .timeline-marker-label { top: 50px; }
+/* 날짜가 가까운 마일스톤끼리 라벨이 겹치지 않도록 한 칸씩 지그재그 배치(위/아래 둘 다) */
+.timeline-marker.stagger .timeline-marker-date { margin-bottom: 22px; }
+.timeline-marker.stagger .timeline-marker-label { margin-top: 24px; }
 
 /* WBS 간트뷰 - 막대 대신 얇은 선으로 기간 표시 */
 .gantt-view {
@@ -438,6 +488,42 @@ a.back {
 }
 .gantt-line.done {
   background: #3ecf8e;
+}
+.gantt-group {
+  margin-bottom: 14px;
+}
+.gantt-group-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #8b7ff0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+  min-width: 420px;
+}
+
+/* 팀 구성 */
+.team-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #16324a;
+  border-radius: 3px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.team-name {
+  font-weight: 700;
+}
+.team-role {
+  font-size: 0.8rem;
+  color: #8fa3b8;
+}
+.team-item .team-del {
+  margin-left: auto;
+  width: auto;
+  padding: 4px 10px;
+  font-size: 0.75rem;
 }
 
 /* 프로젝트 상세 - 할일 */

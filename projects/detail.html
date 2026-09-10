@@ -30,6 +30,7 @@
   let currentProject = null;
   let currentWbsTasks = []; // project_wbs_tasks 전체(마일스톤=level0 parent_id null + 하위 업무들) - 트리는 여기서 파생
   let currentNotes = [];
+  let currentTeam = [];
   let selectedMilestoneId = null;
 
   function escapeHtml(s) {
@@ -53,6 +54,11 @@
   }
   function utcToDateStr(ms) {
     return new Date(ms).toISOString().slice(0, 10);
+  }
+  // "오늘"은 사용자가 보는 로컬 달력 날짜 그대로 - 다른 날짜들과 같은 UTC 앵커 계산에 태워서 위치 비교
+  function todayDateStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
 
   // 달력 아이콘형 날짜칸 - 실제 <input type="date">에 값이 바뀌면 옆의 짧은 텍스트(M/D)를 갱신
@@ -83,10 +89,11 @@
 
   async function load() {
     try {
-      const [pRes, tasksRes, notesRes] = await Promise.all([
+      const [pRes, tasksRes, notesRes, teamRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/projects?select=*&id=eq.${projectId}`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?select=*&project_id=eq.${projectId}&order=sort_order.asc,id.asc`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/project_notes?select=*&project_id=eq.${projectId}&order=id.desc`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/project_team_members?select=*&project_id=eq.${projectId}&order=sort_order.asc,id.asc`, { headers }),
       ]);
       const projects = await pRes.json();
       if (!projects.length) {
@@ -96,6 +103,7 @@
       currentProject = projects[0];
       currentWbsTasks = tasksRes.ok ? await tasksRes.json() : [];
       currentNotes = notesRes.ok ? await notesRes.json() : [];
+      currentTeam = teamRes.ok ? await teamRes.json() : [];
       if (selectedMilestoneId && !milestones().some((m) => m.id === selectedMilestoneId)) {
         selectedMilestoneId = null;
       }
@@ -154,10 +162,6 @@
 
   function render() {
     const project = currentProject;
-    const leaves = countableLeaves(currentWbsTasks);
-    const total = leaves.length;
-    const done = leaves.filter((t) => t.status === "완료").length;
-    const pct = total ? Math.round((done / total) * 100) : 0;
     const dday = dDayLabel(project.due_date);
 
     content.innerHTML = `
@@ -180,9 +184,19 @@
         </div>
       </div>
 
-      <div class="progress-outer" style="margin-top:22px;"><div class="progress-inner" style="width:${pct}%;"></div></div>
-      <div class="progress-label">전체 ${done}/${total} 완료 · ${pct}%</div>
-      ${project.description ? `<p class="role" style="text-align:left;margin-top:14px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
+      ${project.description ? `<p class="role" style="text-align:left;margin-top:22px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
+
+      <div class="section-title">팀 구성</div>
+      <button type="button" id="showAddTeamBtn" class="add-trigger-btn">+ 팀원 추가</button>
+      <div id="addTeamBox" style="display:none;margin:10px 0;">
+        <div class="todo-add-row">
+          <input type="text" id="newTeamName" placeholder="이름">
+          <input type="text" id="newTeamRole" placeholder="역할(선택)">
+          <button type="button" id="addTeamBtn" style="width:auto;">추가</button>
+        </div>
+      </div>
+      <div id="teamList">${renderTeam()}</div>
+      <datalist id="teamNamesList">${currentTeam.map((m) => `<option value="${escapeHtml(m.name)}">`).join("")}</datalist>
 
       <div class="section-title">메모 / 문서 링크</div>
       <button type="button" id="showAddNoteBtn" class="add-trigger-btn">+ 메모 추가</button>
@@ -216,6 +230,15 @@
     });
     document.getElementById("addNoteBtn").addEventListener("click", addNote);
     document.getElementById("newNote").addEventListener("keydown", (e) => { if (e.key === "Enter") addNote(); });
+    document.getElementById("showAddTeamBtn").addEventListener("click", () => {
+      const box = document.getElementById("addTeamBox");
+      const hidden = box.style.display === "none";
+      box.style.display = hidden ? "block" : "none";
+      if (hidden) document.getElementById("newTeamName").focus();
+    });
+    document.getElementById("addTeamBtn").addEventListener("click", addTeamMember);
+    document.getElementById("newTeamRole").addEventListener("keydown", (e) => { if (e.key === "Enter") addTeamMember(); });
+    wireTeamEvents();
 
     wireTimelineEvents();
     wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
@@ -245,6 +268,7 @@
       start: project.start_date,
       end: project.due_date,
       points,
+      todayPct: posPctOf(dateStrToUTC(todayDateStr())),
     };
   }
 
@@ -270,7 +294,8 @@
           i % 2 === 1 ? "stagger" : "",
         ].filter(Boolean).join(" ");
         return `<div class="${cls}" style="left:${p.pct}%;background:${pieGradient(p.donePct)};" data-id="${p.id}">
-          <span class="timeline-marker-label">${escapeHtml(p.name)}<br>${fmtDate(p.due_date)}</span>
+          <span class="timeline-marker-date">${fmtDate(p.due_date)}</span>
+          <span class="timeline-marker-label">${escapeHtml(p.name)}</span>
         </div>`;
       })
       .join("");
@@ -280,6 +305,8 @@
       <div class="timeline-scroll">
         <div class="timeline-track" style="width:${trackWidth}px;">
           <div class="timeline-line"></div>
+          <div class="timeline-line-elapsed" style="width:${data.todayPct}%;"></div>
+          <div class="timeline-today-tick" style="left:${data.todayPct}%;"><span class="timeline-today-label">오늘</span></div>
           ${markersHtml}
         </div>
       </div>
@@ -321,6 +348,25 @@
     document.querySelectorAll(".timeline-marker[data-id]").forEach((el) => {
       el.addEventListener("click", () => toggleMilestone(Number(el.dataset.id)));
     });
+    // 스크롤바를 안 보이게 숨긴 대신(스타일시트 처리) 마우스로도 폰처럼 드래그해서 넘길 수 있게 함
+    const scroller = document.querySelector(".timeline-scroll");
+    if (!scroller) return;
+    let dragging = false;
+    let startX = 0;
+    let startScrollLeft = 0;
+    scroller.addEventListener("mousedown", (e) => {
+      dragging = true;
+      scroller.classList.add("dragging");
+      startX = e.pageX;
+      startScrollLeft = scroller.scrollLeft;
+    });
+    scroller.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      scroller.scrollLeft = startScrollLeft - (e.pageX - startX);
+    });
+    scroller.addEventListener("mouseup", () => { dragging = false; scroller.classList.remove("dragging"); });
+    scroller.addEventListener("mouseleave", () => { dragging = false; scroller.classList.remove("dragging"); });
   }
 
   async function addMilestone() {
@@ -502,7 +548,9 @@
   }
 
   // 시작일~마감일이 있는 하위 업무들을 막대 대신 얇은 선(기간)으로 겹쳐 그려서
-  // 간트차트처럼 "어떤 일이 언제부터 언제까지, 어떤 순서로" 진행되는지 한눈에 보이게 함
+  // 간트차트처럼 "어떤 일이 언제부터 언제까지, 어떤 순서로" 진행되는지 한눈에 보이게 함.
+  // 담당자별로 줄을 나눠서, 한 사람 일정에 업무가 몰려있는지 한눈에 비교할 수 있게 함
+  // (시간축 범위는 전체 업무 기준으로 통일해서 담당자끼리도 위치가 같은 눈금으로 비교됨)
   function renderWbsGantt(tasks) {
     if (!tasks.length) return "";
     const spanOf = (t) => [dateStrToUTC(t.start_date || t.due_date), dateStrToUTC(t.due_date)];
@@ -510,21 +558,38 @@
     const rangeStart = Math.min(...allTimes);
     const rangeEnd = Math.max(...allTimes);
     const span = rangeEnd - rangeStart || 86400000;
-    const rows = tasks
-      .map((t) => {
-        const [s, e] = spanOf(t);
-        const leftPct = ((s - rangeStart) / span) * 100;
-        const widthPct = Math.max(2, ((e - s) / span) * 100);
-        const done = t.status === "완료";
-        return `<div class="gantt-row">
-          <div class="gantt-label${done ? " done" : ""}">${escapeHtml(t.name)}</div>
-          <div class="gantt-track"><div class="gantt-line${done ? " done" : ""}" style="left:${leftPct}%;width:${widthPct}%;"></div></div>
+
+    const groups = new Map();
+    tasks.forEach((t) => {
+      const key = t.assignee || "담당자 미지정";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(t);
+    });
+
+    const groupsHtml = [...groups.entries()]
+      .map(([assignee, group]) => {
+        const rows = group
+          .map((t) => {
+            const [s, e] = spanOf(t);
+            const leftPct = ((s - rangeStart) / span) * 100;
+            const widthPct = Math.max(2, ((e - s) / span) * 100);
+            const done = t.status === "완료";
+            return `<div class="gantt-row">
+              <div class="gantt-label${done ? " done" : ""}">${escapeHtml(t.name)}</div>
+              <div class="gantt-track"><div class="gantt-line${done ? " done" : ""}" style="left:${leftPct}%;width:${widthPct}%;"></div></div>
+            </div>`;
+          })
+          .join("");
+        return `<div class="gantt-group">
+          <div class="gantt-group-label">${escapeHtml(assignee)}</div>
+          ${rows}
         </div>`;
       })
       .join("");
+
     return `<div class="gantt-view">
       <div class="gantt-range">${fmtDate(utcToDateStr(rangeStart))} ~ ${fmtDate(utcToDateStr(rangeEnd))}</div>
-      ${rows}
+      ${groupsHtml}
     </div>`;
   }
 
@@ -664,7 +729,7 @@
       box.innerHTML = `
         <input type="text" id="editTaskName_${taskId}" value="${escapeHtml(t.name)}" placeholder="업무 이름">
         <div class="task-edit-grid">
-          <label>담당자</label><input type="text" id="editTaskAssignee_${taskId}" value="${escapeHtml(t.assignee || "")}">
+          <label>담당자</label><input type="text" id="editTaskAssignee_${taskId}" list="teamNamesList" value="${escapeHtml(t.assignee || "")}">
           <label>상태</label>
           <select id="editTaskStatus_${taskId}">
             <option value="예정" ${t.status === "예정" ? "selected" : ""}>예정</option>
@@ -733,14 +798,49 @@
     wireTimelineEvents();
     document.getElementById("timelineDetailBox").innerHTML = renderTimelineDetail();
     wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
-    const leaves = countableLeaves(currentWbsTasks);
-    const total = leaves.length;
-    const done = leaves.filter((t) => t.status === "완료").length;
-    const pct = total ? Math.round((done / total) * 100) : 0;
-    const bar = document.querySelector(".progress-inner");
-    const label = document.querySelector(".progress-label");
-    if (bar) bar.style.width = pct + "%";
-    if (label) label.textContent = `전체 ${done}/${total} 완료 · ${pct}%`;
+  }
+
+  // ---- 팀 구성 (담당자 자동완성용 명단) ----
+  function renderTeam() {
+    if (!currentTeam.length) return '<div class="empty">아직 팀원이 없습니다.</div>';
+    return currentTeam
+      .map((m) => `
+        <div class="team-item" data-id="${m.id}">
+          <span class="team-name">${escapeHtml(m.name)}</span>
+          ${m.role ? `<span class="team-role">${escapeHtml(m.role)}</span>` : ""}
+          <button type="button" class="team-del" style="width:auto;">삭제</button>
+        </div>
+      `)
+      .join("");
+  }
+
+  function wireTeamEvents() {
+    document.querySelectorAll(".team-del").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.closest(".team-item").dataset.id;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_team_members?id=eq.${id}`, { method: "DELETE", headers });
+        load();
+      });
+    });
+  }
+
+  async function addTeamMember() {
+    const nameInput = document.getElementById("newTeamName");
+    const roleInput = document.getElementById("newTeamRole");
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_team_members`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ project_id: Number(projectId), name, role: roleInput.value.trim() || null }),
+    });
+    if (!res.ok) {
+      alert("팀원 추가 실패: " + (await res.text()));
+      return;
+    }
+    nameInput.value = "";
+    roleInput.value = "";
+    load();
   }
 
   // ---- 메모/문서 링크 ----
