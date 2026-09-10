@@ -348,39 +348,15 @@ a.back {
   height: 14px;
   background: #8b7ff0;
 }
-/* 타임라인 마일스톤을 누르면 그 위치 아래로 뜨는 카드 - 최대 2개까지 동시에, 타임라인과
-   같은 트랙(가로 스크롤/줌)에 얹혀서 드래그·확대할 때 마일스톤을 그대로 따라 움직임 */
-.timeline-boxes-viewport {
-  position: relative;
-  overflow-x: auto;
-  overflow-y: hidden;
-  height: 0;
-  margin: 0 -20px 14px;
-  /* 카드가 마일스톤 위치에 가운데 정렬(translateX(-50%))되므로 카드 폭의 절반만큼은
-     양옆 여백을 줘야 맨 처음/마지막 마일스톤의 카드가 화면 밖으로 안 잘림 */
-  padding: 0 130px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.timeline-boxes-viewport::-webkit-scrollbar { display: none; }
-.timeline-boxes-track {
-  position: relative;
-  min-height: 1px;
-}
-.timeline-anchor-box {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  width: 260px;
-  max-height: 360px;
-  overflow-y: auto;
+/* 타임라인 점을 눌렀을 때 바로 아래 뜨는 단일 마일스톤 카드 */
+.timeline-detail-card {
   background: #16324a;
   border-radius: 3px;
-  padding: 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  padding: 14px;
+  margin-bottom: 14px;
 }
-.timeline-anchor-box .milestone-row-head {
-  padding: 0 0 10px;
+.timeline-detail-card .milestone-row-head {
+  padding: 0 0 12px;
   cursor: default;
 }
 
