@@ -358,10 +358,12 @@
     `;
   }
 
-  // 마일스톤을 누르면 그 체크리스트가 바로 아래(timelineDetailBox)에 펼쳐짐. 이미 열려있으면 닫힘
+  // 마일스톤을 누르면 그 체크리스트가 바로 아래(timelineDetailBox)에 펼쳐짐. 이미 열려있으면 닫힘.
+  // 타임라인을 다시 그리면 스크롤 위치가 맨 앞으로 리셋되므로, 누르기 전 보던 위치를 그대로 유지시킴
+  // (안 그러면 어느 점 아래에 붙은 리스트인지 알 수 없게 타임라인이 훽 움직여 보임)
   function toggleMilestone(id) {
     selectedMilestoneId = selectedMilestoneId === id ? null : id;
-    renderTimelineArea();
+    renderTimelineAreaKeepScroll();
   }
 
   // 타임라인(점+라벨)과 그 아래 열린 카드를 함께 다시 그리는 공용 함수 -
@@ -371,6 +373,17 @@
     document.getElementById("timelineDetailBox").innerHTML = renderTimelineDetail();
     wireTimelineEvents();
     wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
+  }
+
+  // renderTimelineArea()는 timelineBox를 통째로 다시 그려서 스크롤이 0으로 리셋되므로,
+  // 트랙 폭이 안 바뀌는 상황(마일스톤 클릭, 체크박스 토글)에서는 이 함수로 감싸서 스크롤을 그대로 유지함
+  // (트랙 폭이 바뀌는 줌은 applyZoom이 비율 기반으로 따로 처리)
+  function renderTimelineAreaKeepScroll() {
+    const scroller = document.querySelector(".timeline-scroll");
+    const savedScrollLeft = scroller ? scroller.scrollLeft : 0;
+    renderTimelineArea();
+    const newScroller = document.querySelector(".timeline-scroll");
+    if (newScroller) newScroller.scrollLeft = savedScrollLeft;
   }
 
   function touchDist(touches) {
@@ -915,7 +928,7 @@
 
   // 체크박스 토글처럼 잦은 변화는 서버 재조회 없이 로컬 상태만 갱신해서 화면을 다시 그림
   function refreshAfterLocalChange() {
-    renderTimelineArea();
+    renderTimelineAreaKeepScroll();
   }
 
   // ---- 팀 구성 (담당자 자동완성용 명단) ----

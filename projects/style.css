@@ -280,6 +280,9 @@ a.back {
   /* 스크롤바를 안 보이게 숨기고(PC에서도 폰처럼) 대신 JS로 마우스 드래그를 지원함 */
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* 브라우저의 "스크롤 앵커링"이 내용 재생성 후 JS가 복원한 스크롤 위치를 제멋대로 다시
+     조정해버리는 걸 막음 - 안 그러면 마일스톤을 눌러도 스크롤이 살짝 있다가 튐 */
+  overflow-anchor: none;
 }
 .timeline-scroll::-webkit-scrollbar { display: none; }
 .timeline-scroll.dragging { cursor: grabbing; }
