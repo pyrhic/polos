@@ -379,6 +379,8 @@ a.back {
   width: 34px;
   height: 34px;
   border-radius: 50%;
+  border: 2px solid #0d1b2a;
+  box-sizing: border-box;
 }
 .milestone-row-info { flex: 1; min-width: 0; }
 .milestone-row-title {

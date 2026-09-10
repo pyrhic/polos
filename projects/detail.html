@@ -156,8 +156,9 @@
     const pct = total ? Math.round((done / total) * 100) : 0;
     return { total, done, pct };
   }
+  // 완료(초록) 아닌 나머지 부분은 카드 배경(#16324a)과 겹치면 안 보이므로 확실히 다른 색을 씀
   function pieGradient(pct) {
-    return `conic-gradient(#3ecf8e ${pct}%, #16324a ${pct}% 100%)`;
+    return `conic-gradient(#3ecf8e ${pct}%, #3a4f66 ${pct}% 100%)`;
   }
 
   function render() {
