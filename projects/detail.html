@@ -31,6 +31,7 @@
   let currentWbsTasks = []; // project_wbs_tasks 전체(마일스톤=level0 parent_id null + 하위 업무들) - 트리는 여기서 파생
   let currentNotes = [];
   let selectedMilestoneId = null;
+  let showAllWbs = false; // 기본은 타임라인만 - 이걸 켜면 전체 마일스톤 아코디언 목록이 아래에 나옴
 
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -169,7 +170,10 @@
 
       <div class="section-title" style="margin-top:0;">타임라인</div>
       <div id="timelineBox">${renderTimeline()}</div>
-      <div id="milestoneListBox">${renderMilestoneList()}</div>
+      <div id="timelineDetailBox">${renderTimelineDetail()}</div>
+
+      <button type="button" id="toggleAllWbsBtn" class="add-trigger-btn">${showAllWbs ? "간단히 보기" : "전체 WBS 보기"}</button>
+      <div id="milestoneListBox" style="${showAllWbs ? "" : "display:none;"}">${showAllWbs ? renderMilestoneList() : ""}</div>
 
       <button type="button" id="showAddMilestoneBtn" class="add-trigger-btn">+ 마일스톤 추가</button>
       <div id="addMilestoneBox" style="display:none;margin-top:10px;">
@@ -199,6 +203,14 @@
     `;
 
     document.getElementById("editBtn").addEventListener("click", () => showEditBox(project));
+    document.getElementById("toggleAllWbsBtn").addEventListener("click", () => {
+      showAllWbs = !showAllWbs;
+      const box = document.getElementById("milestoneListBox");
+      box.style.display = showAllWbs ? "block" : "none";
+      box.innerHTML = showAllWbs ? renderMilestoneList() : "";
+      document.getElementById("toggleAllWbsBtn").textContent = showAllWbs ? "간단히 보기" : "전체 WBS 보기";
+      if (showAllWbs) wireMilestoneListEvents();
+    });
     document.getElementById("showAddMilestoneBtn").addEventListener("click", () => {
       const box = document.getElementById("addMilestoneBox");
       const hidden = box.style.display === "none";
@@ -218,7 +230,8 @@
     document.getElementById("newNote").addEventListener("keydown", (e) => { if (e.key === "Enter") addNote(); });
 
     wireTimelineEvents();
-    wireMilestoneListEvents();
+    wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
+    if (showAllWbs) wireMilestoneListEvents();
     wireNoteEvents();
   }
 
@@ -286,14 +299,40 @@
     `;
   }
 
-  // 타임라인의 점을 누르든, 아래 마일스톤 목록의 행을 누르든 같은 상태(selectedMilestoneId)를
+  // 타임라인 점을 눌렀을 때 그 아래에 바로 뜨는 단일 마일스톤 카드 - 처음 화면엔 이것만 보이고
+  // "전체 WBS 보기"를 눌러야 모든 마일스톤이 아코디언으로 쭉 나열됨
+  function renderTimelineDetail() {
+    if (!selectedMilestoneId) return "";
+    const m = milestones().find((x) => x.id === selectedMilestoneId);
+    if (!m) return "";
+    const { total, done, pct } = subtreeProgress(m.id);
+    return `
+      <div class="timeline-detail-card">
+        <div class="milestone-row-head" style="cursor:default;">
+          <div class="milestone-pie" style="background:${pieGradient(pct)};"></div>
+          <div class="milestone-row-info">
+            <div class="milestone-row-title">${escapeHtml(m.name)}</div>
+            <div class="milestone-row-date">${fmtDate(m.due_date)} · ${done}/${total} 완료 · ${pct}%</div>
+          </div>
+        </div>
+        ${renderMilestoneBody(m)}
+      </div>
+    `;
+  }
+
+  // 타임라인의 점을 누르든, "전체 WBS 보기"로 펼친 목록의 행을 누르든 같은 상태(selectedMilestoneId)를
   // 같이 바꿔서 항상 서로 맞물려 보이게 함. 이미 열려있는 걸 다시 누르면 접힘
   function toggleMilestone(id) {
     selectedMilestoneId = selectedMilestoneId === id ? null : id;
     document.getElementById("timelineBox").innerHTML = renderTimeline();
     wireTimelineEvents();
-    document.getElementById("milestoneListBox").innerHTML = renderMilestoneList();
-    wireMilestoneListEvents();
+    document.getElementById("timelineDetailBox").innerHTML = renderTimelineDetail();
+    wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
+    const listBox = document.getElementById("milestoneListBox");
+    if (showAllWbs && listBox) {
+      listBox.innerHTML = renderMilestoneList();
+      wireMilestoneListEvents();
+    }
   }
 
   function wireTimelineEvents() {
@@ -475,12 +514,12 @@
     }
     const leftControl = leaf
       ? `<input type="checkbox" ${t.status === "완료" ? "checked" : ""} class="todo-check wbs-check" data-id="${t.id}">`
-      : `<span class="wbs-node-placeholder"></span>`;
+      : `<span class="wbs-node-group-mark" title="하위 업무가 있는 상위 업무"></span>`;
     return `
       <div class="wbs-node" data-id="${t.id}" style="margin-left:${depth * 18}px;">
         <div class="todo-item ${t.status === "완료" ? "completed" : ""}">
           ${leftControl}
-          <span class="todo-text wbs-name" contenteditable="true" spellcheck="false" data-id="${t.id}">${escapeHtml(t.name)}</span>
+          <span class="todo-text wbs-name${leaf ? "" : " wbs-name-group"}" contenteditable="true" spellcheck="false" data-id="${t.id}">${escapeHtml(t.name)}</span>
           ${dday.text ? `<span class="todo-due${dday.overdue ? " overdue" : ""}">${dday.text}</span>` : ""}
           <button type="button" class="wbs-edit-toggle" data-id="${t.id}">수정</button>
           <button type="button" class="todo-del wbs-del" data-id="${t.id}">삭제</button>
@@ -544,7 +583,14 @@
         toggleMilestone(id);
       });
     });
-    document.querySelectorAll(".deleteMilestoneBtn").forEach((btn) => {
+    wireMilestoneBodyEvents(document.getElementById("milestoneListBox"));
+  }
+
+  // 마일스톤 본문(수정/삭제/트리) 배선 - "전체 WBS 보기" 목록의 각 행에도, 타임라인 아래
+  // 단일 카드(timelineDetailBox)에도 구조가 같아서 같은 함수로 처리
+  function wireMilestoneBodyEvents(root) {
+    if (!root) return;
+    root.querySelectorAll(".deleteMilestoneBtn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const id = Number(btn.dataset.id);
         if (!confirm("이 마일스톤과 딸린 하위 업무를 전부 삭제할까요?")) return;
@@ -553,7 +599,7 @@
         load();
       });
     });
-    wireWbsTreeEvents(document.getElementById("milestoneListBox"));
+    wireWbsTreeEvents(root);
   }
 
   // 트리 안의 모든 상호작용(체크박스/이름수정/수정폼 토글/삭제/하위업무 추가) 공용 배선.
@@ -744,8 +790,12 @@
   function refreshAfterLocalChange() {
     document.getElementById("timelineBox").innerHTML = renderTimeline();
     wireTimelineEvents();
-    document.getElementById("milestoneListBox").innerHTML = renderMilestoneList();
-    wireMilestoneListEvents();
+    document.getElementById("timelineDetailBox").innerHTML = renderTimelineDetail();
+    wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
+    if (showAllWbs) {
+      document.getElementById("milestoneListBox").innerHTML = renderMilestoneList();
+      wireMilestoneListEvents();
+    }
     const leaves = countableLeaves(currentWbsTasks);
     const total = leaves.length;
     const done = leaves.filter((t) => t.status === "완료").length;

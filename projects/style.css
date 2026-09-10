@@ -303,6 +303,28 @@ a.back {
   box-sizing: content-box;
 }
 .timeline-marker.selected { box-shadow: 0 0 0 4px rgba(139, 127, 240, 0.45); }
+/* 마일스톤을 누르면 점 아래로 짧은 선이 내려와서 "여기서 아래로 이어진다"는 걸 보여줌 */
+.timeline-marker.selected::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 14px;
+  background: #8b7ff0;
+}
+/* 타임라인 점을 눌렀을 때 바로 아래 뜨는 단일 마일스톤 카드 (전체 목록 펼치기 전 기본 화면) */
+.timeline-detail-card {
+  background: #16324a;
+  border-radius: 3px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.timeline-detail-card .milestone-row-head {
+  padding: 0 0 12px;
+  cursor: default;
+}
 
 /* 마일스톤 아코디언 목록 - 원(파이차트)+제목/날짜를 누르면 아래로 할일 목록이 펼쳐짐 */
 .milestone-row {
@@ -469,11 +491,20 @@ a.back {
   font-size: 0.8rem;
   background: #0d1b2a;
 }
-.wbs-node-placeholder {
+/* 하위 업무가 있는(=완료 체크 대상이 아닌) 상위 업무 표시 - 체크박스 자리에 짙은 색으로
+   채워진 사각형을 대신 넣고, 이름도 굵게 해서 말단 업무와 한눈에 구분되게 함 */
+.wbs-node-group-mark {
   display: inline-block;
   width: 20px;
   height: 20px;
   min-width: 20px;
+  border-radius: 4px;
+  background: #0d1b2a;
+  border: 2px solid #3ecf8e;
+  box-sizing: border-box;
+}
+.wbs-name-group {
+  font-weight: 800;
 }
 /* WBS 트리 - 하위 업무 메타(담당/산출물/진행률)는 체크박스 폭만큼 들여써서 이름과 줄을 맞춤 */
 .wbs-node-meta {
