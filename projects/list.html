@@ -40,6 +40,21 @@
           <span class="datepick-display">📅 <span class="datepick-text" id="event_end_text">날짜</span></span>
         </span>
       </div>
+
+      <label>프로젝트 유형 (해당되는 것 모두 선택, 없으면 비워두기)</label>
+      <div class="check-row" id="typeChecks">
+        <label><input type="checkbox" value="교육"> 교육</label>
+        <label><input type="checkbox" value="연구조사"> 연구/조사</label>
+      </div>
+
+      <label>프로젝트 조건</label>
+      <div class="check-row">
+        <label><input type="checkbox" id="requires_onsite"> 행사/현장 운영 필요</label>
+        <label><input type="checkbox" id="requires_recruitment"> 참가자 모집 필요</label>
+        <label><input type="checkbox" id="is_public_fund"> 공공기관/지원기관 관련</label>
+        <label><input type="checkbox" id="requires_accommodation"> 숙박 필요</label>
+      </div>
+
       <button type="submit" id="addBtn">새 프로젝트 만들기</button>
       <div class="msg" id="msg"></div>
     </form>
@@ -147,6 +162,7 @@
       const durationType = document.getElementById("duration_type").value;
       const eventStart = document.getElementById("event_start").value;
       const eventEnd = durationType === "1일" ? eventStart : document.getElementById("event_end").value || eventStart;
+      const projectTypes = [...document.querySelectorAll("#typeChecks input:checked")].map((el) => el.value);
       const res = await fetch(`${SUPABASE_URL}/rest/v1/projects`, {
         method: "POST",
         headers: { ...headers, Prefer: "return=representation" },
@@ -156,6 +172,11 @@
           duration_type: durationType,
           start_date: eventStart || null,
           due_date: eventEnd || null,
+          project_types: projectTypes,
+          requires_onsite: document.getElementById("requires_onsite").checked,
+          requires_recruitment: document.getElementById("requires_recruitment").checked,
+          is_public_fund: document.getElementById("is_public_fund").checked,
+          requires_accommodation: document.getElementById("requires_accommodation").checked,
         }),
       });
       if (!res.ok) throw new Error(await res.text());

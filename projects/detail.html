@@ -45,6 +45,17 @@
     return `${Number(parts[1])}/${Number(parts[2])}`;
   }
 
+  // 날짜 계산은 항상 UTC 기준 ms로 - new Date(str+"T00:00:00")는 "로컬시간 자정"으로 해석되는데
+  // 여기서 toISOString()(항상 UTC)으로 되돌리면 한국(UTC+9) 등 양수 시간대에서는 하루가 앞으로
+  // 밀려버림(예: 12/1 자정 KST = UTC로는 11/30 15시) - UTC로만 계산해서 이 문제를 원천 차단
+  function dateStrToUTC(dateStr) {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  }
+  function utcToDateStr(ms) {
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+
   // 달력 아이콘형 날짜칸 - 실제 <input type="date">에 값이 바뀌면 옆의 짧은 텍스트(M/D)를 갱신
   function wireDatePicker(inputId, placeholder) {
     const input = document.getElementById(inputId);
@@ -214,15 +225,15 @@
   function computeTimelineData() {
     const project = currentProject;
     if (!project.start_date || !project.due_date) return null;
-    const eventStart = new Date(project.start_date + "T00:00:00").getTime();
-    const eventEnd = new Date(project.due_date + "T00:00:00").getTime();
-    const milestoneTimes = currentMilestones.map((m) => new Date(m.milestone_date + "T00:00:00").getTime());
+    const eventStart = dateStrToUTC(project.start_date);
+    const eventEnd = dateStrToUTC(project.due_date);
+    const milestoneTimes = currentMilestones.map((m) => dateStrToUTC(m.milestone_date));
     const rangeStart = Math.min(eventStart, ...milestoneTimes);
     const rangeEnd = Math.max(eventEnd, ...milestoneTimes);
     const span = rangeEnd - rangeStart || 1;
     const posPctOf = (t) => Math.min(100, Math.max(0, ((t - rangeStart) / span) * 100));
     const points = currentMilestones.map((m) => {
-      const t = new Date(m.milestone_date + "T00:00:00").getTime();
+      const t = dateStrToUTC(m.milestone_date);
       const { pct: donePct } = milestoneProgress(m.id);
       return { ...m, pct: posPctOf(t), donePct };
     });
@@ -310,17 +321,28 @@
     load();
   }
 
-  // 프로젝트관리론 기본 단계(착수-기획완료-실행-결과보고)를 "행사(실행) 날짜" 하나를 기준으로
-  // 앞뒤로 역산해서 자동으로 채워줌 - 비율이 아니라 실제 필요한 최소 기간(주 단위) 기준
-  // 기간 유형별 기획 착수 시점(행사 시작일로부터 몇 주 전) - 프로젝트 규모가 클수록 기획 기간도 넉넉하게
-  const PLANNING_LEAD_WEEKS = { "1일": 2, "여러날": 3, "한달": 4 };
-
   function addDays(dateStr, days) {
-    const d = new Date(dateStr + "T00:00:00");
-    d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
+    return utcToDateStr(dateStrToUTC(dateStr) + days * 86400000);
   }
 
+  // 프로젝트의 유형/조건 플래그 → 활성화할 WBS 모듈 목록. 'base'는 항상 포함.
+  // 지금은 wbs_master_tasks에 'base' 모듈만 시드돼 있어서 사실상 항상 base만 나오지만,
+  // 나중에 event/education/public_fund/... 모듈을 마스터 테이블에 추가하면 이 함수만으로 자동 반영됨
+  function computeSelectedModules(project) {
+    const modules = new Set(["base"]);
+    const types = project.project_types || [];
+    if (project.requires_onsite) modules.add("event");
+    if (project.requires_recruitment) modules.add("promotion");
+    if (project.is_public_fund) modules.add("public_fund");
+    if (project.requires_accommodation) modules.add("accommodation");
+    if (types.includes("교육")) modules.add("education");
+    if (types.includes("연구조사")) modules.add("research");
+    return [...modules];
+  }
+
+  // wbs_master_tasks(마스터 템플릿)에서 이 프로젝트의 모듈에 해당하는 행을 가져와
+  // 마일스톤(level 0)+할일(level 1)로 복제 - id 오름차순으로 가져오면 부모(단계)가
+  // 항상 자식(세부업무)보다 먼저 나오는 순서가 보장됨 (마스터 시드가 그렇게 만들어져 있음)
   async function generateDefaultTimeline() {
     const project = currentProject;
     if (!project.start_date || !project.due_date) {
@@ -332,25 +354,46 @@
     }
     const eventStart = project.start_date;
     const eventEnd = project.due_date;
-    const leadWeeks = PLANNING_LEAD_WEEKS[project.duration_type] || PLANNING_LEAD_WEEKS["1일"];
-    const isSingleDay = eventStart === eventEnd;
+    const modules = computeSelectedModules(project);
 
-    const phases = [
-      { title: "착수 (기획 시작)", date: addDays(eventStart, -leadWeeks * 7) },
-      { title: "기획 완료", date: addDays(eventStart, -3) },
-      isSingleDay
-        ? { title: "실행 (행사 당일)", date: eventStart }
-        : { title: "실행 시작 (행사 시작)", date: eventStart },
-      ...(isSingleDay ? [] : [{ title: "실행 종료 (행사 종료)", date: eventEnd }]),
-      { title: "종료 · 결과보고", date: addDays(eventEnd, 7) },
-    ];
+    const mtRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/wbs_master_tasks?select=*&module=in.(${modules.join(",")})&order=id.asc`,
+      { headers }
+    );
+    if (!mtRes.ok) {
+      alert("WBS 마스터 템플릿 불러오기 실패: " + (await mtRes.text()));
+      return;
+    }
+    const masterTasks = await mtRes.json();
+    const milestoneIdByMaster = new Map();
 
-    for (const phase of phases) {
-      await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ project_id: Number(projectId), title: phase.title, milestone_date: phase.date }),
-      });
+    for (const mt of masterTasks) {
+      if (mt.level === 0) {
+        const base = mt.anchor === "end" ? eventEnd : eventStart;
+        const date = addDays(base, mt.offset_days);
+        const mRes = await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
+          method: "POST",
+          headers: { ...headers, Prefer: "return=representation" },
+          body: JSON.stringify({ project_id: Number(projectId), title: mt.name, milestone_date: date }),
+        });
+        if (!mRes.ok) {
+          alert("타임라인 생성 실패(" + mt.name + "): " + (await mRes.text()));
+          return;
+        }
+        const [milestone] = await mRes.json();
+        milestoneIdByMaster.set(mt.id, milestone.id);
+      } else {
+        const milestoneId = milestoneIdByMaster.get(mt.parent_id);
+        if (!milestoneId) continue;
+        const text = mt.deliverables_template
+          ? `${mt.name} — ${mt.deliverables_template}${mt.default_assignee ? ` (${mt.default_assignee})` : ""}`
+          : mt.name;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_todos`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ project_id: Number(projectId), milestone_id: milestoneId, text }),
+        });
+      }
     }
     load();
   }
@@ -413,7 +456,7 @@
   function renderWbsGantt(wbsTodos) {
     const withDates = wbsTodos.filter((t) => t.due_date);
     if (!withDates.length) return "";
-    const spanOf = (t) => [new Date((t.start_date || t.due_date) + "T00:00:00").getTime(), new Date(t.due_date + "T00:00:00").getTime()];
+    const spanOf = (t) => [dateStrToUTC(t.start_date || t.due_date), dateStrToUTC(t.due_date)];
     const allTimes = withDates.flatMap(spanOf);
     const rangeStart = Math.min(...allTimes);
     const rangeEnd = Math.max(...allTimes);
@@ -430,7 +473,7 @@
       })
       .join("");
     return `<div class="gantt-view">
-      <div class="gantt-range">${fmtDate(new Date(rangeStart).toISOString().slice(0, 10))} ~ ${fmtDate(new Date(rangeEnd).toISOString().slice(0, 10))}</div>
+      <div class="gantt-range">${fmtDate(utcToDateStr(rangeStart))} ~ ${fmtDate(utcToDateStr(rangeEnd))}</div>
       ${rows}
     </div>`;
   }
