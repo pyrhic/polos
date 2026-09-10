@@ -28,9 +28,8 @@
   const content = document.getElementById("content");
 
   let currentProject = null;
-  let currentTodos = [];
+  let currentWbsTasks = []; // project_wbs_tasks 전체(마일스톤=level0 parent_id null + 하위 업무들) - 트리는 여기서 파생
   let currentNotes = [];
-  let currentMilestones = [];
   let selectedMilestoneId = null;
 
   function escapeHtml(s) {
@@ -84,11 +83,10 @@
 
   async function load() {
     try {
-      const [pRes, todosRes, notesRes, milestonesRes] = await Promise.all([
+      const [pRes, tasksRes, notesRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/projects?select=*&id=eq.${projectId}`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/project_todos?select=*&project_id=eq.${projectId}&order=id.asc`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?select=*&project_id=eq.${projectId}&order=sort_order.asc,id.asc`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/project_notes?select=*&project_id=eq.${projectId}&order=id.desc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/project_milestones?select=*&project_id=eq.${projectId}&order=milestone_date.asc`, { headers }),
       ]);
       const projects = await pRes.json();
       if (!projects.length) {
@@ -96,13 +94,12 @@
         return;
       }
       currentProject = projects[0];
-      currentTodos = todosRes.ok ? await todosRes.json() : [];
+      currentWbsTasks = tasksRes.ok ? await tasksRes.json() : [];
       currentNotes = notesRes.ok ? await notesRes.json() : [];
-      currentMilestones = milestonesRes.ok ? await milestonesRes.json() : [];
-      if (selectedMilestoneId && !currentMilestones.some((m) => m.id === selectedMilestoneId)) {
+      if (selectedMilestoneId && !milestones().some((m) => m.id === selectedMilestoneId)) {
         selectedMilestoneId = null;
       }
-      if (isInit && !initHandled && !currentMilestones.length && currentProject.start_date && currentProject.due_date) {
+      if (isInit && !initHandled && !milestones().length && currentProject.start_date && currentProject.due_date) {
         initHandled = true;
         await generateDefaultTimeline();
         return; // generateDefaultTimeline이 끝나면서 load()를 다시 불러 화면을 그림
@@ -124,10 +121,42 @@
     return { text: `D+${Math.abs(diffDays)}`, overdue: true };
   }
 
+  // ---- WBS 트리 헬퍼 (project_wbs_tasks 하나로 마일스톤+하위업무 전체를 트리로 취급) ----
+  function childrenOf(parentId) {
+    return currentWbsTasks
+      .filter((t) => t.parent_id === parentId)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id);
+  }
+  function milestones() {
+    return childrenOf(null);
+  }
+  function descendantsFlat(id) {
+    const kids = childrenOf(id);
+    return kids.flatMap((k) => [k, ...descendantsFlat(k.id)]);
+  }
+  function isLeaf(t) {
+    return !currentWbsTasks.some((x) => x.parent_id === t.id);
+  }
+  // 마일스톤 자신은 완료 대상 업무로 안 세고, 실제 말단 업무(leaf)만 진행률 계산에 넣음
+  function countableLeaves(list) {
+    return list.filter((t) => isLeaf(t) && !t.is_milestone);
+  }
+  function subtreeProgress(id) {
+    const leaves = countableLeaves(descendantsFlat(id));
+    const total = leaves.length;
+    const done = leaves.filter((t) => t.status === "완료").length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    return { total, done, pct };
+  }
+  function pieGradient(pct) {
+    return `conic-gradient(#3ecf8e ${pct}%, #16324a ${pct}% 100%)`;
+  }
+
   function render() {
     const project = currentProject;
-    const total = currentTodos.length;
-    const done = currentTodos.filter((t) => t.completed).length;
+    const leaves = countableLeaves(currentWbsTasks);
+    const total = leaves.length;
+    const done = leaves.filter((t) => t.status === "완료").length;
     const pct = total ? Math.round((done / total) * 100) : 0;
     const dday = dDayLabel(project.due_date);
 
@@ -150,8 +179,6 @@
           <button type="button" id="addMilestoneBtn" style="width:auto;">추가</button>
         </div>
       </div>
-
-      ${renderUnassignedTodos()}
 
       <div class="progress-outer" style="margin-top:22px;"><div class="progress-inner" style="width:${pct}%;"></div></div>
       <div class="progress-label">전체 ${done}/${total} 완료 · ${pct}%</div>
@@ -192,34 +219,10 @@
 
     wireTimelineEvents();
     wireMilestoneListEvents();
-    wireTodoEvents(document.getElementById("unassignedTodoList"));
     wireNoteEvents();
   }
 
-  // 마일스톤이 생기기 전에 만들어졌던 할일(milestone_id가 없는 것) - 안 보이게 사라지면 안 되니
-  // 마일스톤 목록 아래에 최소한으로 계속 보여줌 (새 할일은 이제 항상 마일스톤 아래로 추가됨)
-  function renderUnassignedTodos() {
-    const unassigned = currentTodos.filter((t) => !t.milestone_id);
-    if (!unassigned.length) return "";
-    return `
-      <div class="section-title">마일스톤 미지정 할 일</div>
-      <div id="unassignedTodoList">${renderTodoItems(unassigned)}</div>
-    `;
-  }
-
   // ---- 타임라인 ----
-  // 마일스톤에 딸린 할일의 완료율 계산 - 타임라인의 파이차트 원, 마일스톤 목록 양쪽에서 공용으로 씀
-  function milestoneProgress(milestoneId) {
-    const todos = currentTodos.filter((t) => t.milestone_id === milestoneId);
-    const total = todos.length;
-    const done = todos.filter((t) => t.completed).length;
-    const pct = total ? Math.round((done / total) * 100) : 0;
-    return { todos, total, done, pct };
-  }
-  function pieGradient(pct) {
-    return `conic-gradient(#3ecf8e ${pct}%, #16324a ${pct}% 100%)`;
-  }
-
   // 타임라인 표시 범위는 "행사 시작~종료"뿐 아니라, 그보다 앞뒤로 나가는 마일스톤(기획 착수,
   // 결과보고 등)까지 전부 포함하도록 넓혀서 계산 - 안 그러면 행사 전/후 마일스톤이 양끝에 뭉개져 보임
   function computeTimelineData() {
@@ -227,14 +230,15 @@
     if (!project.start_date || !project.due_date) return null;
     const eventStart = dateStrToUTC(project.start_date);
     const eventEnd = dateStrToUTC(project.due_date);
-    const milestoneTimes = currentMilestones.map((m) => dateStrToUTC(m.milestone_date));
+    const ms = milestones();
+    const milestoneTimes = ms.map((m) => dateStrToUTC(m.due_date));
     const rangeStart = Math.min(eventStart, ...milestoneTimes);
     const rangeEnd = Math.max(eventEnd, ...milestoneTimes);
     const span = rangeEnd - rangeStart || 1;
     const posPctOf = (t) => Math.min(100, Math.max(0, ((t - rangeStart) / span) * 100));
-    const points = currentMilestones.map((m) => {
-      const t = dateStrToUTC(m.milestone_date);
-      const { pct: donePct } = milestoneProgress(m.id);
+    const points = ms.map((m) => {
+      const t = dateStrToUTC(m.due_date);
+      const { pct: donePct } = subtreeProgress(m.id);
       return { ...m, pct: posPctOf(t), donePct };
     });
     return {
@@ -251,7 +255,7 @@
     }
     const eventLabel = data.start === data.end ? `행사일 ${fmtDate(data.start)}` : `행사 ${fmtDate(data.start)} ~ ${fmtDate(data.end)}`;
     if (!data.points.length) {
-      return `<div class="empty">${escapeHtml(eventLabel)} · 아직 마일스톤이 없습니다. 위 버튼으로 기본 타임라인을 만들거나 직접 추가해보세요.</div>`;
+      return `<div class="empty">${escapeHtml(eventLabel)} · 아직 마일스톤이 없습니다. 아래에서 직접 추가해보세요.</div>`;
     }
     const trackWidth = Math.max(600, data.points.length * 110 + 220);
 
@@ -266,7 +270,7 @@
           i % 2 === 1 ? "stagger" : "",
         ].filter(Boolean).join(" ");
         return `<div class="${cls}" style="left:${p.pct}%;background:${pieGradient(p.donePct)};" data-id="${p.id}">
-          <span class="timeline-marker-label">${escapeHtml(p.title)}<br>${fmtDate(p.milestone_date)}</span>
+          <span class="timeline-marker-label">${escapeHtml(p.name)}<br>${fmtDate(p.due_date)}</span>
         </div>`;
       })
       .join("");
@@ -307,10 +311,13 @@
       alert("마일스톤 이름과 날짜를 모두 입력해주세요.");
       return;
     }
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ project_id: Number(projectId), title, milestone_date: date }),
+      body: JSON.stringify({
+        project_id: Number(projectId), parent_id: null, level: 0,
+        name: title, status: "예정", progress: 0, is_milestone: true, due_date: date,
+      }),
     });
     if (!res.ok) {
       alert("마일스톤 추가 실패: " + (await res.text()));
@@ -326,8 +333,7 @@
   }
 
   // 프로젝트의 유형/조건 플래그 → 활성화할 WBS 모듈 목록. 'base'는 항상 포함.
-  // 지금은 wbs_master_tasks에 'base' 모듈만 시드돼 있어서 사실상 항상 base만 나오지만,
-  // 나중에 event/education/public_fund/... 모듈을 마스터 테이블에 추가하면 이 함수만으로 자동 반영됨
+  // wbs_master_tasks에 새 모듈을 시드하면 이 함수만으로 자동 반영됨 (코드 추가 모듈 제외)
   function computeSelectedModules(project) {
     const modules = new Set(["base"]);
     const types = project.project_types || [];
@@ -342,15 +348,15 @@
   }
 
   // wbs_master_tasks(마스터 템플릿)에서 이 프로젝트의 모듈에 해당하는 행을 가져와
-  // 마일스톤(level 0)+할일(level 1)로 복제 - id 오름차순으로 가져오면 부모(단계)가
-  // 항상 자식(세부업무)보다 먼저 나오는 순서가 보장됨 (마스터 시드가 그렇게 만들어져 있음)
+  // project_wbs_tasks로 복제 - id 오름차순으로 가져오면 부모(단계)가 항상 자식(세부업무)보다
+  // 먼저 나오는 순서가 보장됨 (마스터 시드가 그렇게 만들어져 있음)
   async function generateDefaultTimeline() {
     const project = currentProject;
     if (!project.start_date || !project.due_date) {
       alert("먼저 위쪽 '프로젝트 정보 수정'에서 행사(실행) 날짜를 설정해주세요.");
       return;
     }
-    if (currentMilestones.length > 0) {
+    if (milestones().length > 0) {
       if (!confirm("이미 마일스톤이 있어요. 기본 타임라인을 추가로 더 만들까요?")) return;
     }
     const eventStart = project.start_date;
@@ -366,56 +372,64 @@
       return;
     }
     const masterTasks = await mtRes.json();
-    const milestoneIdByMaster = new Map();
+    const idByMaster = new Map();
+    let sortCounter = 1;
 
     for (const mt of masterTasks) {
       if (mt.level === 0) {
         const base = mt.anchor === "end" ? eventEnd : eventStart;
         const date = addDays(base, mt.offset_days);
-        const mRes = await fetch(`${SUPABASE_URL}/rest/v1/project_milestones`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks`, {
           method: "POST",
           headers: { ...headers, Prefer: "return=representation" },
-          body: JSON.stringify({ project_id: Number(projectId), title: mt.name, milestone_date: date }),
+          body: JSON.stringify({
+            project_id: Number(projectId), master_task_id: mt.id, parent_id: null, level: 0,
+            name: mt.name, status: "예정", progress: 0, is_milestone: true,
+            due_date: date, sort_order: sortCounter++,
+          }),
         });
-        if (!mRes.ok) {
-          alert("타임라인 생성 실패(" + mt.name + "): " + (await mRes.text()));
+        if (!res.ok) {
+          alert("타임라인 생성 실패(" + mt.name + "): " + (await res.text()));
           return;
         }
-        const [milestone] = await mRes.json();
-        milestoneIdByMaster.set(mt.id, milestone.id);
+        const [row] = await res.json();
+        idByMaster.set(mt.id, row.id);
       } else {
-        const milestoneId = milestoneIdByMaster.get(mt.parent_id);
-        if (!milestoneId) continue;
-        const text = mt.deliverables_template
-          ? `${mt.name} — ${mt.deliverables_template}${mt.default_assignee ? ` (${mt.default_assignee})` : ""}`
-          : mt.name;
-        await fetch(`${SUPABASE_URL}/rest/v1/project_todos`, {
+        const parentId = idByMaster.get(mt.parent_id);
+        if (!parentId) continue;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks`, {
           method: "POST",
           headers,
-          body: JSON.stringify({ project_id: Number(projectId), milestone_id: milestoneId, text }),
+          body: JSON.stringify({
+            project_id: Number(projectId), master_task_id: mt.id, parent_id: parentId, level: 1,
+            name: mt.name, status: "예정", progress: 0, is_milestone: false,
+            assignee: mt.default_assignee || null, deliverables: mt.deliverables_template || null,
+            evidence_required: mt.evidence_required || false, sort_order: sortCounter++,
+          }),
         });
       }
     }
     load();
   }
 
-  // ---- 마일스톤 아코디언 목록 (각 마일스톤 = 파이차트 원 + 제목/날짜, 누르면 할일 목록이 드롭다운) ----
+  // ---- 마일스톤 아코디언 목록 (각 마일스톤 = 파이차트 원 + 제목/날짜, 누르면 하위 트리가 드롭다운) ----
   function renderMilestoneList() {
-    if (!currentMilestones.length) {
-      return '<div class="empty">아직 마일스톤이 없습니다. 위 버튼으로 기본 타임라인을 만들거나 직접 추가해보세요.</div>';
+    const ms = milestones();
+    if (!ms.length) {
+      return '<div class="empty">아직 마일스톤이 없습니다. 아래에서 직접 추가해보세요.</div>';
     }
-    const sorted = [...currentMilestones].sort((a, b) => (a.milestone_date < b.milestone_date ? -1 : 1));
+    const sorted = [...ms].sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
     return sorted
       .map((m) => {
-        const { total, done, pct } = milestoneProgress(m.id);
+        const { total, done, pct } = subtreeProgress(m.id);
         const isOpen = m.id === selectedMilestoneId;
         return `
           <div class="milestone-row" data-id="${m.id}">
             <div class="milestone-row-head">
               <div class="milestone-pie" style="background:${pieGradient(pct)};"></div>
               <div class="milestone-row-info">
-                <div class="milestone-row-title">${escapeHtml(m.title)}</div>
-                <div class="milestone-row-date">${fmtDate(m.milestone_date)} · ${done}/${total} 완료 · ${pct}%</div>
+                <div class="milestone-row-title">${escapeHtml(m.name)}</div>
+                <div class="milestone-row-date">${fmtDate(m.due_date)} · ${done}/${total} 완료 · ${pct}%</div>
               </div>
               <span class="milestone-row-chevron">${isOpen ? "▲" : "▼"}</span>
             </div>
@@ -429,47 +443,91 @@
   }
 
   function renderMilestoneBody(m) {
-    const wbsTodos = currentTodos.filter((t) => t.milestone_id === m.id);
+    const desc = descendantsFlat(m.id).filter((t) => t.due_date);
+    const kids = childrenOf(m.id);
     return `
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px;">
-        <button type="button" id="editMilestoneBtn" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;">수정</button>
-        <button type="button" id="deleteMilestoneBtn" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;background:#5a1f1f;">삭제</button>
+        <button type="button" class="wbs-edit-toggle" data-id="${m.id}" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;">수정</button>
+        <button type="button" class="deleteMilestoneBtn" data-id="${m.id}" style="width:auto;padding:4px 10px;font-size:0.75rem;margin:0;background:#5a1f1f;">삭제</button>
       </div>
-      <div id="milestoneEditBox"></div>
-      ${renderWbsGantt(wbsTodos)}
-      <button type="button" id="showAddWbsTodoBtn" class="add-trigger-btn">+ 할 일 추가</button>
-      <div id="addWbsTodoBox" style="display:none;margin-top:10px;">
-        <div class="todo-add-row">
-          <input type="text" id="newWbsTodo" placeholder="이 마일스톤의 할 일 입력 후 Enter">
-        </div>
-        <div class="todo-add-row">
-          ${datepickHtml("newWbsTodoStart")}
-          ${datepickHtml("newWbsTodoDue")}
-          <button type="button" id="addWbsTodoBtn" style="width:auto;">추가</button>
-        </div>
+      <div class="task-edit-box" id="taskEditBox_${m.id}" style="display:none;"></div>
+      ${renderWbsGantt(desc)}
+      <div class="wbs-tree">
+        ${kids.length ? kids.map((t) => renderTaskNode(t, 0)).join("") : '<div class="empty">아직 하위 업무가 없습니다.</div>'}
       </div>
-      <div id="wbsTodoList" style="margin-top:10px;">${renderTodoItems(wbsTodos)}</div>
+      ${addTaskBoxHtml(m.id)}
     `;
   }
 
-  // 시작일~마감일이 있는 WBS 항목들을 막대 대신 얇은 선(기간)으로 겹쳐 그려서
+  // 트리 노드 하나(마일스톤의 하위 업무, 또는 그 하위의 하위 업무) - 재귀적으로 자기 자식도 그려서
+  // 사용자가 "하위 업무 추가"를 누른 만큼 깊이 들어갈 수 있는 진짜 트리 뷰
+  function renderTaskNode(t, depth) {
+    const kids = childrenOf(t.id);
+    const leaf = kids.length === 0;
+    const dday = dDayLabel(t.due_date);
+    const metaBits = [];
+    if (t.assignee) metaBits.push(`담당 ${escapeHtml(t.assignee)}`);
+    if (t.deliverables) metaBits.push(`산출물 ${escapeHtml(t.deliverables)}`);
+    if (t.priority) metaBits.push(`우선순위 ${escapeHtml(t.priority)}`);
+    if (!leaf) {
+      const { done, total } = subtreeProgress(t.id);
+      metaBits.push(`${done}/${total} 완료`);
+    }
+    const leftControl = leaf
+      ? `<input type="checkbox" ${t.status === "완료" ? "checked" : ""} class="todo-check wbs-check" data-id="${t.id}">`
+      : `<span class="wbs-node-placeholder"></span>`;
+    return `
+      <div class="wbs-node" data-id="${t.id}" style="margin-left:${depth * 18}px;">
+        <div class="todo-item ${t.status === "완료" ? "completed" : ""}">
+          ${leftControl}
+          <span class="todo-text wbs-name" contenteditable="true" spellcheck="false" data-id="${t.id}">${escapeHtml(t.name)}</span>
+          ${dday.text ? `<span class="todo-due${dday.overdue ? " overdue" : ""}">${dday.text}</span>` : ""}
+          <button type="button" class="wbs-edit-toggle" data-id="${t.id}">수정</button>
+          <button type="button" class="todo-del wbs-del" data-id="${t.id}">삭제</button>
+        </div>
+        ${metaBits.length ? `<div class="wbs-node-meta">${metaBits.join(" · ")}</div>` : ""}
+        <div class="task-edit-box" id="taskEditBox_${t.id}" style="display:none;"></div>
+        ${addTaskBoxHtml(t.id)}
+        ${kids.length ? `<div class="wbs-children">${kids.map((k) => renderTaskNode(k, depth + 1)).join("")}</div>` : ""}
+      </div>
+    `;
+  }
+
+  // 마일스톤 바로 아래에 업무 추가할 때도, 어떤 업무 아래에 하위 업무를 추가할 때도 똑같이 씀
+  function addTaskBoxHtml(parentId) {
+    return `
+      <button type="button" class="showAddSubtaskBtn add-trigger-btn" data-id="${parentId}">+ 하위 업무 추가</button>
+      <div class="addSubtaskBox" data-id="${parentId}" style="display:none;margin:6px 0 10px;">
+        <div class="todo-add-row">
+          <input type="text" class="newSubtaskName" data-id="${parentId}" placeholder="업무 이름 입력 후 Enter">
+        </div>
+        <div class="todo-add-row">
+          ${datepickHtml(`newSubtaskStart_${parentId}`)}
+          ${datepickHtml(`newSubtaskDue_${parentId}`)}
+          <button type="button" class="addSubtaskBtn" data-id="${parentId}" style="width:auto;">추가</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // 시작일~마감일이 있는 하위 업무들을 막대 대신 얇은 선(기간)으로 겹쳐 그려서
   // 간트차트처럼 "어떤 일이 언제부터 언제까지, 어떤 순서로" 진행되는지 한눈에 보이게 함
-  function renderWbsGantt(wbsTodos) {
-    const withDates = wbsTodos.filter((t) => t.due_date);
-    if (!withDates.length) return "";
+  function renderWbsGantt(tasks) {
+    if (!tasks.length) return "";
     const spanOf = (t) => [dateStrToUTC(t.start_date || t.due_date), dateStrToUTC(t.due_date)];
-    const allTimes = withDates.flatMap(spanOf);
+    const allTimes = tasks.flatMap(spanOf);
     const rangeStart = Math.min(...allTimes);
     const rangeEnd = Math.max(...allTimes);
     const span = rangeEnd - rangeStart || 86400000;
-    const rows = withDates
+    const rows = tasks
       .map((t) => {
         const [s, e] = spanOf(t);
         const leftPct = ((s - rangeStart) / span) * 100;
         const widthPct = Math.max(2, ((e - s) / span) * 100);
+        const done = t.status === "완료";
         return `<div class="gantt-row">
-          <div class="gantt-label${t.completed ? " done" : ""}">${escapeHtml(t.text)}</div>
-          <div class="gantt-track"><div class="gantt-line${t.completed ? " done" : ""}" style="left:${leftPct}%;width:${widthPct}%;"></div></div>
+          <div class="gantt-label${done ? " done" : ""}">${escapeHtml(t.name)}</div>
+          <div class="gantt-track"><div class="gantt-line${done ? " done" : ""}" style="left:${leftPct}%;width:${widthPct}%;"></div></div>
         </div>`;
       })
       .join("");
@@ -486,183 +544,216 @@
         toggleMilestone(id);
       });
     });
-
-    // 펼쳐진 행이 있을 때만 그 안의 컨트롤들을 연결(한 번에 하나만 열려 있음)
-    const addBtn = document.getElementById("addWbsTodoBtn");
-    if (!addBtn) return;
-    document.getElementById("editMilestoneBtn").addEventListener("click", showMilestoneEditBox);
-    document.getElementById("showAddWbsTodoBtn").addEventListener("click", () => {
-      const box = document.getElementById("addWbsTodoBox");
-      const hidden = box.style.display === "none";
-      box.style.display = hidden ? "block" : "none";
-      if (hidden) document.getElementById("newWbsTodo").focus();
-    });
-    addBtn.addEventListener("click", () => addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart"));
-    document.getElementById("newWbsTodo").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") addTodo(selectedMilestoneId, "newWbsTodo", "newWbsTodoDue", "newWbsTodoStart");
-    });
-    wireDatePicker("newWbsTodoStart", "시작일");
-    wireDatePicker("newWbsTodoDue", "마감일");
-    wireTodoEvents(document.getElementById("wbsTodoList"));
-    document.getElementById("deleteMilestoneBtn").addEventListener("click", async () => {
-      if (!confirm("이 마일스톤과 딸린 WBS 할일을 전부 삭제할까요?")) return;
-      await fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${selectedMilestoneId}`, { method: "DELETE", headers });
-      selectedMilestoneId = null;
-      load();
-    });
-  }
-
-  // 마일스톤 이름/날짜 수정 - 자동 생성된 기본 타임라인을 프로젝트 상황에 맞게 조정할 때 씀
-  function showMilestoneEditBox() {
-    const m = currentMilestones.find((x) => x.id === selectedMilestoneId);
-    if (!m) return;
-    const box = document.getElementById("milestoneEditBox");
-    box.innerHTML = `
-      <div class="timeline-add-row">
-        <input type="text" id="editMilestoneTitle" value="${escapeHtml(m.title)}">
-        ${datepickHtml("editMilestoneDate", m.milestone_date)}
-        <button type="button" id="saveMilestoneBtn" style="width:auto;">저장</button>
-      </div>
-    `;
-    wireDatePicker("editMilestoneDate", "날짜");
-    document.getElementById("saveMilestoneBtn").addEventListener("click", async () => {
-      const title = document.getElementById("editMilestoneTitle").value.trim();
-      const date = document.getElementById("editMilestoneDate").value;
-      if (!title || !date) return;
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${selectedMilestoneId}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ title, milestone_date: date }),
+    document.querySelectorAll(".deleteMilestoneBtn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.id);
+        if (!confirm("이 마일스톤과 딸린 하위 업무를 전부 삭제할까요?")) return;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${id}`, { method: "DELETE", headers });
+        if (selectedMilestoneId === id) selectedMilestoneId = null;
+        load();
       });
-      if (!res.ok) {
-        alert("마일스톤 수정 실패: " + (await res.text()));
-        return;
-      }
-      load();
     });
+    wireWbsTreeEvents(document.getElementById("milestoneListBox"));
   }
 
-  // ---- 공용 할일(일반 할일 + WBS 할일 공용) ----
-  function renderTodoItems(todos) {
-    if (!todos.length) return '<div class="empty">할 일이 없습니다.</div>';
-    return todos
-      .map((t) => {
-        const dday = dDayLabel(t.due_date);
-        return `<div class="todo-item ${t.completed ? "completed" : ""}" data-id="${t.id}">
-          <input type="checkbox" ${t.completed ? "checked" : ""} class="todo-check">
-          <span class="todo-text" contenteditable="true" spellcheck="false">${escapeHtml(t.text)}</span>
-          ${dday.text ? `<span class="todo-due${dday.overdue ? " overdue" : ""}">${dday.text}</span>` : ""}
-          <button type="button" class="todo-del">삭제</button>
-        </div>`;
-      })
-      .join("");
+  // 트리 안의 모든 상호작용(체크박스/이름수정/수정폼 토글/삭제/하위업무 추가) 공용 배선.
+  // 마일스톤 본문이든 그 안의 개별 업무 노드든 구조가 같아서 하나의 함수로 처리
+  function wireWbsTreeEvents(root) {
+    if (!root) return;
+    root.querySelectorAll(".wbs-check").forEach((cb) => {
+      cb.addEventListener("change", async (e) => {
+        const id = Number(e.target.dataset.id);
+        const status = e.target.checked ? "완료" : "예정";
+        await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${id}`, {
+          method: "PATCH", headers, body: JSON.stringify({ status }),
+        });
+        const t = currentWbsTasks.find((x) => x.id === id);
+        if (t) t.status = status;
+        refreshAfterLocalChange();
+      });
+    });
+
+    root.querySelectorAll(".wbs-name").forEach((span) => {
+      const id = Number(span.dataset.id);
+      const original = span.textContent;
+      span.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); span.blur(); }
+      });
+      span.addEventListener("blur", async () => {
+        const newName = span.textContent.trim();
+        if (!newName) { span.textContent = original; return; }
+        if (newName === original) return;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${id}`, {
+          method: "PATCH", headers, body: JSON.stringify({ name: newName }),
+        });
+        const t = currentWbsTasks.find((x) => x.id === id);
+        if (t) t.name = newName;
+      });
+    });
+
+    root.querySelectorAll(".wbs-edit-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.id);
+        const box = document.getElementById(`taskEditBox_${id}`);
+        if (!box) return;
+        const hidden = box.style.display === "none";
+        box.style.display = hidden ? "block" : "none";
+        if (hidden) showTaskEditBox(id, `taskEditBox_${id}`);
+      });
+    });
+
+    root.querySelectorAll(".wbs-del").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.id);
+        const hasKids = childrenOf(id).length > 0;
+        if (hasKids && !confirm("이 업무와 하위 업무를 모두 삭제할까요?")) return;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${id}`, { method: "DELETE", headers });
+        load();
+      });
+    });
+
+    root.querySelectorAll(".showAddSubtaskBtn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const box = root.querySelector(`.addSubtaskBox[data-id="${id}"]`);
+        if (!box) return;
+        const hidden = box.style.display === "none";
+        box.style.display = hidden ? "block" : "none";
+        if (hidden) root.querySelector(`.newSubtaskName[data-id="${id}"]`).focus();
+      });
+    });
+    root.querySelectorAll(".addSubtaskBtn").forEach((btn) => {
+      btn.addEventListener("click", () => addSubtask(Number(btn.dataset.id)));
+    });
+    root.querySelectorAll(".newSubtaskName").forEach((input) => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") addSubtask(Number(input.dataset.id));
+      });
+    });
+    root.querySelectorAll('input[id^="newSubtaskStart_"]').forEach((el) => wireDatePicker(el.id, "시작일"));
+    root.querySelectorAll('input[id^="newSubtaskDue_"]').forEach((el) => wireDatePicker(el.id, "마감일"));
   }
 
-  async function addTodo(milestoneId, inputId, dueInputId, startInputId) {
-    const input = document.getElementById(inputId);
-    const text = input.value.trim();
-    if (!text) return;
-    const dueInput = dueInputId ? document.getElementById(dueInputId) : null;
-    const startInput = startInputId ? document.getElementById(startInputId) : null;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_todos`, {
+  async function addSubtask(parentId) {
+    const nameInput = document.querySelector(`.newSubtaskName[data-id="${parentId}"]`);
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const startInput = document.getElementById(`newSubtaskStart_${parentId}`);
+    const dueInput = document.getElementById(`newSubtaskDue_${parentId}`);
+    const parent = currentWbsTasks.find((t) => t.id === parentId);
+    const level = parent ? parent.level + 1 : 1;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        project_id: Number(projectId),
-        milestone_id: milestoneId,
-        text,
+        project_id: Number(projectId), parent_id: parentId, level,
+        name, status: "예정", progress: 0, is_milestone: false,
         start_date: startInput ? startInput.value || null : null,
         due_date: dueInput ? dueInput.value || null : null,
       }),
     });
     if (!res.ok) {
-      alert("할 일 추가 실패: " + (await res.text()));
+      alert("업무 추가 실패: " + (await res.text()));
       return;
     }
-    input.value = "";
-    if (dueInput) dueInput.value = "";
-    if (startInput) startInput.value = "";
     load();
   }
 
-  function wireTodoEvents(container) {
-    if (!container) return;
-    container.querySelectorAll(".todo-check").forEach((cb) => {
-      cb.addEventListener("change", async (e) => {
-        const item = e.target.closest(".todo-item");
-        const id = item.dataset.id;
-        const completed = e.target.checked;
-        item.classList.toggle("completed", completed);
-        await fetch(`${SUPABASE_URL}/rest/v1/project_todos?id=eq.${id}`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({ completed }),
-        });
-        const t = currentTodos.find((x) => x.id === Number(id));
-        if (t) t.completed = completed;
-        refreshProgress(t ? t.milestone_id : null);
-      });
-    });
-
-    container.querySelectorAll(".todo-text").forEach((span) => {
-      const originalText = span.textContent;
-      span.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          span.blur();
-        }
-      });
-      span.addEventListener("blur", async () => {
-        const item = span.closest(".todo-item");
-        const id = item.dataset.id;
-        const newText = span.textContent.trim();
-        if (!newText) {
-          span.textContent = originalText;
-          return;
-        }
-        if (newText === originalText) return;
-        await fetch(`${SUPABASE_URL}/rest/v1/project_todos?id=eq.${id}`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({ text: newText }),
-        });
-      });
-    });
-
-    container.querySelectorAll(".todo-del").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        const item = e.target.closest(".todo-item");
-        const id = item.dataset.id;
-        await fetch(`${SUPABASE_URL}/rest/v1/project_todos?id=eq.${id}`, { method: "DELETE", headers });
-        load();
-      });
-    });
+  // 마일스톤이면 이름+날짜만, 일반 업무면 담당자/상태/우선순위/일정/예산/산출물까지 편집
+  function showTaskEditBox(taskId, containerId) {
+    const t = currentWbsTasks.find((x) => x.id === taskId);
+    const box = document.getElementById(containerId);
+    if (!t || !box) return;
+    if (t.is_milestone) {
+      box.innerHTML = `
+        <div class="timeline-add-row">
+          <input type="text" id="editTaskName_${taskId}" value="${escapeHtml(t.name)}">
+          ${datepickHtml(`editTaskDate_${taskId}`, t.due_date)}
+          <button type="button" class="saveTaskEditBtn" data-id="${taskId}" style="width:auto;">저장</button>
+        </div>
+      `;
+      wireDatePicker(`editTaskDate_${taskId}`, "날짜");
+    } else {
+      box.innerHTML = `
+        <input type="text" id="editTaskName_${taskId}" value="${escapeHtml(t.name)}" placeholder="업무 이름">
+        <div class="task-edit-grid">
+          <label>담당자</label><input type="text" id="editTaskAssignee_${taskId}" value="${escapeHtml(t.assignee || "")}">
+          <label>상태</label>
+          <select id="editTaskStatus_${taskId}">
+            <option value="예정" ${t.status === "예정" ? "selected" : ""}>예정</option>
+            <option value="진행" ${t.status === "진행" ? "selected" : ""}>진행</option>
+            <option value="검토" ${t.status === "검토" ? "selected" : ""}>검토</option>
+            <option value="완료" ${t.status === "완료" ? "selected" : ""}>완료</option>
+          </select>
+          <label>우선순위</label>
+          <select id="editTaskPriority_${taskId}">
+            <option value="" ${!t.priority ? "selected" : ""}>-</option>
+            <option value="높음" ${t.priority === "높음" ? "selected" : ""}>높음</option>
+            <option value="보통" ${t.priority === "보통" ? "selected" : ""}>보통</option>
+            <option value="낮음" ${t.priority === "낮음" ? "selected" : ""}>낮음</option>
+          </select>
+          <label>시작일</label><div>${datepickHtml(`editTaskStart_${taskId}`, t.start_date)}</div>
+          <label>마감일</label><div>${datepickHtml(`editTaskDue_${taskId}`, t.due_date)}</div>
+          <label>예산(계획)</label><input type="number" id="editTaskBudget_${taskId}" value="${t.budget_planned ?? ""}">
+          <label>산출물</label><input type="text" id="editTaskDeliverables_${taskId}" value="${escapeHtml(t.deliverables || "")}">
+        </div>
+        <button type="button" class="saveTaskEditBtn" data-id="${taskId}" style="width:auto;margin-top:10px;">저장</button>
+      `;
+      wireDatePicker(`editTaskStart_${taskId}`, "시작일");
+      wireDatePicker(`editTaskDue_${taskId}`, "마감일");
+    }
+    document.querySelector(`.saveTaskEditBtn[data-id="${taskId}"]`).addEventListener("click", () => saveTaskEdit(taskId));
   }
 
-  // 체크박스 토글 후 화면 전체 새로고침 없이 진행률/타임라인 점 상태만 즉시 갱신
-  function refreshProgress(milestoneId) {
-    const total = currentTodos.length;
-    const done = currentTodos.filter((t) => t.completed).length;
+  async function saveTaskEdit(taskId) {
+    const t = currentWbsTasks.find((x) => x.id === taskId);
+    if (!t) return;
+    let body;
+    if (t.is_milestone) {
+      const name = document.getElementById(`editTaskName_${taskId}`).value.trim();
+      const date = document.getElementById(`editTaskDate_${taskId}`).value;
+      if (!name || !date) return;
+      body = { name, due_date: date };
+    } else {
+      const name = document.getElementById(`editTaskName_${taskId}`).value.trim();
+      if (!name) return;
+      const budgetVal = document.getElementById(`editTaskBudget_${taskId}`).value;
+      body = {
+        name,
+        assignee: document.getElementById(`editTaskAssignee_${taskId}`).value.trim() || null,
+        status: document.getElementById(`editTaskStatus_${taskId}`).value,
+        priority: document.getElementById(`editTaskPriority_${taskId}`).value || null,
+        start_date: document.getElementById(`editTaskStart_${taskId}`).value || null,
+        due_date: document.getElementById(`editTaskDue_${taskId}`).value || null,
+        budget_planned: budgetVal ? Number(budgetVal) : null,
+        deliverables: document.getElementById(`editTaskDeliverables_${taskId}`).value.trim() || null,
+      };
+    }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${taskId}`, {
+      method: "PATCH", headers, body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      alert("수정 실패: " + (await res.text()));
+      return;
+    }
+    load();
+  }
+
+  // 체크박스 토글처럼 잦은 변화는 서버 재조회 없이 로컬 상태만 갱신해서 화면을 다시 그림
+  // (마일스톤 목록을 통째로 다시 그리되, selectedMilestoneId가 그대로라 열려있던 마일스톤은 계속 열려있음)
+  function refreshAfterLocalChange() {
+    document.getElementById("timelineBox").innerHTML = renderTimeline();
+    wireTimelineEvents();
+    document.getElementById("milestoneListBox").innerHTML = renderMilestoneList();
+    wireMilestoneListEvents();
+    const leaves = countableLeaves(currentWbsTasks);
+    const total = leaves.length;
+    const done = leaves.filter((t) => t.status === "완료").length;
     const pct = total ? Math.round((done / total) * 100) : 0;
     const bar = document.querySelector(".progress-inner");
     const label = document.querySelector(".progress-label");
     if (bar) bar.style.width = pct + "%";
     if (label) label.textContent = `전체 ${done}/${total} 완료 · ${pct}%`;
-    document.getElementById("timelineBox").innerHTML = renderTimeline();
-    wireTimelineEvents();
-    // 마일스톤 목록 전체를 다시 그리면 방금 열어둔 "+ 할 일 추가" 같은 임시 상태가 접혀버리니,
-    // 체크한 항목이 속한 행의 파이차트/진행률 글자만 콕 집어서 갱신
-    if (milestoneId) {
-      const row = document.querySelector(`.milestone-row[data-id="${milestoneId}"]`);
-      const m = currentMilestones.find((x) => x.id === milestoneId);
-      if (row && m) {
-        const { total: mt, done: md, pct: mp } = milestoneProgress(milestoneId);
-        const pie = row.querySelector(".milestone-pie");
-        const dateEl = row.querySelector(".milestone-row-date");
-        if (pie) pie.style.background = pieGradient(mp);
-        if (dateEl) dateEl.textContent = `${fmtDate(m.milestone_date)} · ${md}/${mt} 완료 · ${mp}%`;
-      }
-    }
   }
 
   // ---- 메모/문서 링크 ----
@@ -771,11 +862,12 @@
         if (!res.ok) throw new Error(await res.text());
         // 행사 날짜가 바뀌면 이미 만들어둔 마일스톤은 예전 날짜에 그대로 남아있으므로
         // 새 날짜 기준으로 기본 타임라인을 다시 만들지 물어봄(개별 커스텀했을 수도 있어 확인 후 진행)
-        if (datesChanged && currentMilestones.length > 0) {
+        const ms = milestones();
+        if (datesChanged && ms.length > 0) {
           const regen = confirm("행사 날짜가 바뀌었어요. 기존 마일스톤을 지우고 새 날짜 기준으로 기본 타임라인을 다시 만들까요?\n(취소하면 기존 마일스톤은 그대로 남아있어요)");
           if (regen) {
             await Promise.all(
-              currentMilestones.map((m) => fetch(`${SUPABASE_URL}/rest/v1/project_milestones?id=eq.${m.id}`, { method: "DELETE", headers }))
+              ms.map((m) => fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${m.id}`, { method: "DELETE", headers }))
             );
             await load();
             await generateDefaultTimeline();
@@ -789,7 +881,7 @@
       }
     });
     document.getElementById("deleteProjectBtn").addEventListener("click", async () => {
-      if (!confirm("이 프로젝트와 할 일/메모/타임라인을 전부 삭제할까요? 되돌릴 수 없습니다.")) return;
+      if (!confirm("이 프로젝트와 WBS/메모를 전부 삭제할까요? 되돌릴 수 없습니다.")) return;
       await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, { method: "DELETE", headers });
       location.href = "/projects/list.html";
     });

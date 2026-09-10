@@ -462,6 +462,48 @@ a.back {
   padding: 4px 10px;
   font-size: 0.8rem;
 }
+.todo-item .wbs-edit-toggle {
+  width: auto;
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  background: #0d1b2a;
+}
+.wbs-node-placeholder {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+}
+/* WBS 트리 - 하위 업무 메타(담당/산출물/진행률)는 체크박스 폭만큼 들여써서 이름과 줄을 맞춤 */
+.wbs-node-meta {
+  font-size: 0.72rem;
+  color: #8fa3b8;
+  margin: -4px 0 8px 32px;
+}
+.wbs-children {
+  margin-top: 2px;
+}
+.wbs-tree {
+  margin-bottom: 4px;
+}
+.task-edit-box {
+  margin: 4px 0 10px;
+}
+.task-edit-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+.task-edit-grid label {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #8fa3b8;
+  font-weight: 600;
+  text-transform: none;
+}
 .todo-add-row {
   display: flex;
   gap: 8px;
