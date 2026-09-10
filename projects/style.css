@@ -602,6 +602,32 @@ a.back {
   color: #8fa3b8;
   margin: -4px 0 8px 32px;
 }
+/* 조직도(팀 구성)가 있으면 "담당 OOO" 글씨를 눌러서 담당자를 바로 바꿀 수 있음 */
+.wbs-assignee-pick {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.wbs-assignee-pick:hover {
+  color: #ffffff;
+}
+.assignee-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px 32px;
+}
+.assignee-pick-btn {
+  width: auto;
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  background: #0d1b2a;
+}
+.assignee-pick-clear {
+  background: #2a3f52;
+  color: #8fa3b8;
+}
 .wbs-children {
   margin-top: 2px;
 }

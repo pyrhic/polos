@@ -581,7 +581,13 @@
     const leaf = kids.length === 0;
     const dday = dDayLabel(t.due_date);
     const metaBits = [];
-    if (t.assignee) metaBits.push(`담당 ${escapeHtml(t.assignee)}`);
+    const hasTeam = currentTeam.length > 0;
+    // 조직도(팀 구성)가 있어야 담당자를 "골라서" 바꿀 수 있음 - 없으면 예전처럼 그냥 텍스트로만 표시
+    if (hasTeam) {
+      metaBits.push(`<span class="wbs-assignee-pick" data-id="${t.id}">담당 ${t.assignee ? escapeHtml(t.assignee) : "미지정"}</span>`);
+    } else if (t.assignee) {
+      metaBits.push(`담당 ${escapeHtml(t.assignee)}`);
+    }
     if (t.deliverables) metaBits.push(`산출물 ${escapeHtml(t.deliverables)}`);
     if (t.priority) metaBits.push(`우선순위 ${escapeHtml(t.priority)}`);
     if (!leaf) {
@@ -601,6 +607,12 @@
           <button type="button" class="todo-del wbs-del" data-id="${t.id}">삭제</button>
         </div>
         ${metaBits.length ? `<div class="wbs-node-meta">${metaBits.join(" · ")}</div>` : ""}
+        ${hasTeam ? `
+          <div class="assignee-picker" id="assigneePicker_${t.id}" style="display:none;">
+            ${currentTeam.map((m) => `<button type="button" class="assignee-pick-btn" data-id="${t.id}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</button>`).join("")}
+            <button type="button" class="assignee-pick-btn assignee-pick-clear" data-id="${t.id}" data-name="">미지정</button>
+          </div>
+        ` : ""}
         <div class="task-edit-box" id="taskEditBox_${t.id}" style="display:none;"></div>
         ${addTaskBoxHtml(t.id)}
         ${kids.length ? `<div class="wbs-children">${kids.map((k) => renderTaskNode(k, depth + 1)).join("")}</div>` : ""}
@@ -762,6 +774,28 @@
     });
     root.querySelectorAll('input[id^="newSubtaskStart_"]').forEach((el) => wireDatePicker(el.id, "시작일"));
     root.querySelectorAll('input[id^="newSubtaskDue_"]').forEach((el) => wireDatePicker(el.id, "마감일"));
+
+    // 담당자 글씨를 누르면 팀원 목록이 뜨고, 고르면 바로 저장됨 (팀 구성이 있을 때만 나타남)
+    root.querySelectorAll(".wbs-assignee-pick").forEach((el) => {
+      el.addEventListener("click", () => {
+        const id = el.dataset.id;
+        const picker = document.getElementById(`assigneePicker_${id}`);
+        if (!picker) return;
+        const hidden = picker.style.display === "none";
+        root.querySelectorAll(".assignee-picker").forEach((p) => { if (p !== picker) p.style.display = "none"; });
+        picker.style.display = hidden ? "flex" : "none";
+      });
+    });
+    root.querySelectorAll(".assignee-pick-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.id);
+        const name = btn.dataset.name || null;
+        await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${id}`, {
+          method: "PATCH", headers, body: JSON.stringify({ assignee: name }),
+        });
+        load();
+      });
+    });
   }
 
   async function addSubtask(parentId) {
