@@ -838,10 +838,20 @@
       `;
       wireDatePicker(`editTaskDate_${taskId}`, "날짜");
     } else {
+      // 팀 구성이 있으면 진짜 드롭다운(select)으로 - 기존 값이 팀 목록에 없는 경우(템플릿 기본값
+      // "PM" 등)도 안 사라지게 그 값 자체를 옵션으로 하나 끼워넣음. 팀이 없으면 예전처럼 자유입력
+      const assigneeNotInTeam = t.assignee && !currentTeam.some((m) => m.name === t.assignee);
+      const assigneeField = currentTeam.length
+        ? `<select id="editTaskAssignee_${taskId}">
+            <option value="" ${!t.assignee ? "selected" : ""}>미지정</option>
+            ${assigneeNotInTeam ? `<option value="${escapeHtml(t.assignee)}" selected>${escapeHtml(t.assignee)}(목록에 없음)</option>` : ""}
+            ${currentTeam.map((m) => `<option value="${escapeHtml(m.name)}" ${t.assignee === m.name ? "selected" : ""}>${escapeHtml(m.name)}</option>`).join("")}
+          </select>`
+        : `<input type="text" id="editTaskAssignee_${taskId}" value="${escapeHtml(t.assignee || "")}">`;
       box.innerHTML = `
         <input type="text" id="editTaskName_${taskId}" value="${escapeHtml(t.name)}" placeholder="업무 이름">
         <div class="task-edit-grid">
-          <label>담당자</label><input type="text" id="editTaskAssignee_${taskId}" list="teamNamesList" value="${escapeHtml(t.assignee || "")}">
+          <label>담당자</label>${assigneeField}
           <label>상태</label>
           <select id="editTaskStatus_${taskId}">
             <option value="예정" ${t.status === "예정" ? "selected" : ""}>예정</option>
