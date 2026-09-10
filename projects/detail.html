@@ -31,7 +31,10 @@
   let currentWbsTasks = []; // project_wbs_tasks 전체(마일스톤=level0 parent_id null + 하위 업무들) - 트리는 여기서 파생
   let currentNotes = [];
   let currentTeam = [];
-  let selectedMilestoneId = null;
+  let openMilestoneIds = []; // 열려있는 마일스톤 카드 - 최대 2개, 먼저 연 순서대로 쌓임
+  let zoomLevel = 1; // 0.5~2.5, 타임라인 마일스톤 간격 배율(휠/핀치로 조절)
+  const BOX_WIDTH_PX = 260; // 열린 마일스톤 카드 폭 - 이보다 가까운 마일스톤을 동시에 열면 "간섭"으로 봄
+  const LABEL_CLUSTER_GAP_PX = 64; // 날짜/이름 라벨이 이보다 가까우면 하나로 묶어서 표시
 
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -104,9 +107,7 @@
       currentWbsTasks = tasksRes.ok ? await tasksRes.json() : [];
       currentNotes = notesRes.ok ? await notesRes.json() : [];
       currentTeam = teamRes.ok ? await teamRes.json() : [];
-      if (selectedMilestoneId && !milestones().some((m) => m.id === selectedMilestoneId)) {
-        selectedMilestoneId = null;
-      }
+      openMilestoneIds = openMilestoneIds.filter((id) => milestones().some((m) => m.id === id));
       if (isInit && !initHandled && !milestones().length && currentProject.start_date && currentProject.due_date) {
         initHandled = true;
         await generateDefaultTimeline();
@@ -174,7 +175,7 @@
 
       <div class="section-title" style="margin-top:0;">타임라인</div>
       <div id="timelineBox">${renderTimeline()}</div>
-      <div id="timelineDetailBox">${renderTimelineDetail()}</div>
+      <div id="timelineBoxesArea">${renderTimelineBoxes()}</div>
 
       <button type="button" id="showAddMilestoneBtn" class="add-trigger-btn">+ 마일스톤 추가</button>
       <div id="addMilestoneBox" style="display:none;margin-top:10px;">
@@ -242,7 +243,8 @@
     wireTeamEvents();
 
     wireTimelineEvents();
-    wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
+    wireMilestoneBodyEvents(document.getElementById("timelineBoxesArea"));
+    adjustBoxesViewportHeight();
     wireNoteEvents();
   }
 
@@ -265,11 +267,13 @@
       const { pct: donePct } = subtreeProgress(m.id);
       return { ...m, pct: posPctOf(t), donePct };
     });
+    const trackWidth = Math.max(600, points.length * 110 + 220) * zoomLevel;
     return {
       start: project.start_date,
       end: project.due_date,
       points,
       todayPct: posPctOf(dateStrToUTC(todayDateStr())),
+      trackWidth,
     };
   }
 
@@ -282,22 +286,41 @@
     if (!data.points.length) {
       return `<div class="empty">${escapeHtml(eventLabel)} · 아직 마일스톤이 없습니다. 아래에서 직접 추가해보세요.</div>`;
     }
-    const trackWidth = Math.max(600, data.points.length * 110 + 220);
-
-    // 마일스톤을 위치순으로 정렬한 뒤 한 칸씩 지그재그로 배치해서
-    // 날짜가 가까운 것끼리 라벨 글자가 겹치지 않게 함
+    const trackWidth = data.trackWidth;
     const sorted = [...data.points].sort((a, b) => a.pct - b.pct);
-    const markersHtml = sorted
-      .map((p, i) => {
-        const cls = [
-          "timeline-marker",
-          p.id === selectedMilestoneId ? "selected" : "",
-          i % 2 === 1 ? "stagger" : "",
-        ].filter(Boolean).join(" ");
-        return `<div class="${cls}" style="left:${p.pct}%;background:${pieGradient(p.donePct)};" data-id="${p.id}">
-          <span class="timeline-marker-date">${fmtDate(p.due_date)}</span>
-          <span class="timeline-marker-label">${escapeHtml(p.name)}</span>
-        </div>`;
+
+    // 점(마일스톤)은 항상 자기 실제 위치에 따로 찍히지만, 라벨(날짜/이름)은 너무 가까우면
+    // 하나로 묶어서 맨 앞 날짜 하나 + 이름 목록으로 표시 - 확대(zoomLevel↑)하면 간격이 벌어져서
+    // 자동으로 다시 갈라져 보임
+    const clusterGapPct = (LABEL_CLUSTER_GAP_PX / trackWidth) * 100;
+    const clusters = [];
+    sorted.forEach((p) => {
+      const last = clusters[clusters.length - 1];
+      if (last && p.pct - last[last.length - 1].pct < clusterGapPct) {
+        last.push(p);
+      } else {
+        clusters.push([p]);
+      }
+    });
+
+    const dotsHtml = sorted
+      .map((p) => {
+        const cls = ["timeline-marker", openMilestoneIds.includes(p.id) ? "selected" : ""].filter(Boolean).join(" ");
+        return `<div class="${cls}" style="left:${p.pct}%;background:${pieGradient(p.donePct)};" data-id="${p.id}"></div>`;
+      })
+      .join("");
+
+    const labelsHtml = clusters
+      .map((cluster, i) => {
+        const anchor = cluster[0];
+        const stagger = i % 2 === 1 ? " stagger" : "";
+        const namesHtml = cluster
+          .map((p) => `<div class="timeline-cluster-name" data-id="${p.id}">${escapeHtml(p.name)}</div>`)
+          .join("");
+        return `
+          <div class="timeline-cluster-date${stagger}" style="left:${anchor.pct}%;">${fmtDate(anchor.due_date)}</div>
+          <div class="timeline-cluster-names${stagger}" style="left:${anchor.pct}%;">${namesHtml}</div>
+        `;
       })
       .join("");
 
@@ -308,50 +331,124 @@
           <div class="timeline-line"></div>
           <div class="timeline-line-elapsed" style="width:${data.todayPct}%;"></div>
           <div class="timeline-today-tick" style="left:${data.todayPct}%;"><span class="timeline-today-label">오늘</span></div>
-          ${markersHtml}
+          ${dotsHtml}
+          ${labelsHtml}
         </div>
       </div>
     `;
   }
 
-  // 타임라인 점을 눌렀을 때 그 아래에 바로 뜨는 단일 마일스톤 카드 - 처음 화면엔 이것만 보이고
-  // "전체 WBS 보기"를 눌러야 모든 마일스톤이 아코디언으로 쭉 나열됨
-  function renderTimelineDetail() {
-    if (!selectedMilestoneId) return "";
-    const m = milestones().find((x) => x.id === selectedMilestoneId);
-    if (!m) return "";
-    const { total, done, pct } = subtreeProgress(m.id);
-    return `
-      <div class="timeline-detail-card">
-        <div class="milestone-row-head" style="cursor:default;">
-          <div class="milestone-pie" style="background:${pieGradient(pct)};"></div>
-          <div class="milestone-row-info">
-            <div class="milestone-row-title">${escapeHtml(m.name)}</div>
-            <div class="milestone-row-date">${fmtDate(m.due_date)} · ${done}/${total} 완료 · ${pct}%</div>
+  // 열려있는 마일스톤 카드들 - 각자 자기 마일스톤의 실제 위치(%) 아래에 붙어서 "드롭다운"처럼 뜨고,
+  // 타임라인을 드래그/줌하면 같은 트랙 폭 기준으로 같이 움직이도록 스크롤 위치를 동기화함(wireTimelineEvents)
+  function renderTimelineBoxes() {
+    const data = computeTimelineData();
+    if (!data || !openMilestoneIds.length) return "";
+    const boxesHtml = openMilestoneIds
+      .map((id) => {
+        const p = data.points.find((x) => x.id === id);
+        if (!p) return "";
+        const { total, done, pct } = subtreeProgress(id);
+        return `
+          <div class="timeline-anchor-box" style="left:${p.pct}%;">
+            <div class="milestone-row-head" style="cursor:default;">
+              <div class="milestone-pie" style="background:${pieGradient(pct)};"></div>
+              <div class="milestone-row-info">
+                <div class="milestone-row-title">${escapeHtml(p.name)}</div>
+                <div class="milestone-row-date">${fmtDate(p.due_date)} · ${done}/${total} 완료 · ${pct}%</div>
+              </div>
+            </div>
+            ${renderMilestoneBody(p)}
           </div>
+        `;
+      })
+      .join("");
+    return `
+      <div class="timeline-boxes-viewport" id="timelineBoxesViewport">
+        <div class="timeline-boxes-track" style="width:${data.trackWidth}px;">
+          ${boxesHtml}
         </div>
-        ${renderMilestoneBody(m)}
       </div>
     `;
   }
 
-  // 타임라인의 점을 누르면 그 마일스톤의 체크리스트가 바로 아래(timelineDetailBox)에 펼쳐짐.
-  // 이미 열려있는 걸 다시 누르면 접힘
+  // 마일스톤을 누르면: 이미 열려있으면 닫고, 아니면 연다. 최대 2개까지 동시에 열 수 있는데
+  // 새로 여는 것이 이미 열린 것과 너무 가까우면(카드 폭 이내) 그 열린 걸 먼저 닫고 새로 염
   function toggleMilestone(id) {
-    selectedMilestoneId = selectedMilestoneId === id ? null : id;
+    const data = computeTimelineData();
+    if (!data) return;
+    const trackWidth = data.trackWidth;
+    const pxOf = (mid) => {
+      const p = data.points.find((x) => x.id === mid);
+      return p ? (p.pct / 100) * trackWidth : null;
+    };
+    if (openMilestoneIds.includes(id)) {
+      openMilestoneIds = openMilestoneIds.filter((x) => x !== id);
+    } else {
+      const idPx = pxOf(id);
+      openMilestoneIds = openMilestoneIds.filter((openId) => {
+        const openPx = pxOf(openId);
+        return openPx === null || Math.abs(openPx - idPx) >= BOX_WIDTH_PX;
+      });
+      openMilestoneIds.push(id);
+      if (openMilestoneIds.length > 2) openMilestoneIds = openMilestoneIds.slice(-2);
+    }
+    renderTimelineArea();
+  }
+
+  // 타임라인(점+라벨)과 그 아래 열린 카드들을 함께 다시 그리는 공용 함수 -
+  // 체크박스 토글/줌/드래그 후 등 로컬 상태만 바뀌었을 때 서버 재조회 없이 화면만 갱신할 때 씀
+  function renderTimelineArea() {
     document.getElementById("timelineBox").innerHTML = renderTimeline();
+    document.getElementById("timelineBoxesArea").innerHTML = renderTimelineBoxes();
     wireTimelineEvents();
-    document.getElementById("timelineDetailBox").innerHTML = renderTimelineDetail();
-    wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
+    wireMilestoneBodyEvents(document.getElementById("timelineBoxesArea"));
+    adjustBoxesViewportHeight();
+  }
+
+  // 카드는 absolute로 띄워서 부모 높이에 자동 반영이 안 되므로, 실제 내용 높이(최대 360px)를
+  // 재서 뷰포트 높이를 직접 맞춰줌 - 안 그러면 카드가 통째로 잘려 보임
+  function adjustBoxesViewportHeight() {
+    const viewport = document.getElementById("timelineBoxesViewport");
+    if (!viewport) return;
+    const boxes = viewport.querySelectorAll(".timeline-anchor-box");
+    if (!boxes.length) { viewport.style.height = "0px"; return; }
+    let maxH = 0;
+    boxes.forEach((b) => { maxH = Math.max(maxH, b.scrollHeight); });
+    viewport.style.height = `${Math.min(maxH, 360) + 14}px`;
+  }
+
+  function touchDist(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  // 줌 배율을 바꾸면서 지금 보고 있던 가로 스크롤 위치(비율)를 새 트랙 폭 기준으로 그대로 유지함
+  // (안 그러면 살짝만 확대/축소해도 스크롤이 맨 앞으로 튕겨서 보던 위치를 잃어버림)
+  function applyZoom(newZoomLevel) {
+    const scroller = document.querySelector(".timeline-scroll");
+    const oldData = computeTimelineData();
+    const oldTrackWidth = oldData ? oldData.trackWidth : 1;
+    const scrollRatio = scroller && oldTrackWidth ? scroller.scrollLeft / oldTrackWidth : 0;
+    zoomLevel = Math.min(2.5, Math.max(0.5, newZoomLevel));
+    renderTimelineArea();
+    const newScroller = document.querySelector(".timeline-scroll");
+    const newData = computeTimelineData();
+    if (newScroller && newData) newScroller.scrollLeft = scrollRatio * newData.trackWidth;
   }
 
   function wireTimelineEvents() {
     document.querySelectorAll(".timeline-marker[data-id]").forEach((el) => {
       el.addEventListener("click", () => toggleMilestone(Number(el.dataset.id)));
     });
-    // 스크롤바를 안 보이게 숨긴 대신(스타일시트 처리) 마우스로도 폰처럼 드래그해서 넘길 수 있게 함
+    document.querySelectorAll(".timeline-cluster-name[data-id]").forEach((el) => {
+      el.addEventListener("click", () => toggleMilestone(Number(el.dataset.id)));
+    });
+
     const scroller = document.querySelector(".timeline-scroll");
     if (!scroller) return;
+
+    // 스크롤바를 안 보이게 숨긴 대신(스타일시트 처리) 마우스로도 폰처럼 드래그해서 좌우로 넘길 수 있게 함
     let dragging = false;
     let startX = 0;
     let startScrollLeft = 0;
@@ -368,6 +465,36 @@
     });
     scroller.addEventListener("mouseup", () => { dragging = false; scroller.classList.remove("dragging"); });
     scroller.addEventListener("mouseleave", () => { dragging = false; scroller.classList.remove("dragging"); });
+
+    // 세로 방향 휠(스크롤)은 확대/축소로 씀 - 가로 스와이프(트랙패드 두 손가락)는 그대로 좌우 이동
+    scroller.addEventListener("wheel", (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      applyZoom(zoomLevel - e.deltaY * 0.0015);
+    }, { passive: false });
+
+    // 손가락 두 개로 벌리고 오므리는 핀치 줌(폰)
+    let pinchStartDist = null;
+    scroller.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) pinchStartDist = touchDist(e.touches);
+    });
+    scroller.addEventListener("touchmove", (e) => {
+      if (e.touches.length === 2 && pinchStartDist) {
+        e.preventDefault();
+        const d = touchDist(e.touches);
+        applyZoom(zoomLevel * (d / pinchStartDist));
+        pinchStartDist = d;
+      }
+    }, { passive: false });
+    scroller.addEventListener("touchend", (e) => {
+      if (e.touches.length < 2) pinchStartDist = null;
+    });
+
+    // 타임라인을 드래그/줌하면 열려있는 카드들도 같은 위치를 따라가도록 스크롤을 동기화
+    const boxesViewport = document.getElementById("timelineBoxesViewport");
+    scroller.addEventListener("scroll", () => {
+      if (boxesViewport) boxesViewport.scrollLeft = scroller.scrollLeft;
+    });
   }
 
   async function addMilestone() {
@@ -594,7 +721,7 @@
     </div>`;
   }
 
-  // 마일스톤 본문(수정/삭제/트리) 배선 - 타임라인 아래 단일 카드(timelineDetailBox)에서 씀
+  // 마일스톤 본문(수정/삭제/트리) 배선 - 타임라인 아래 열린 카드들(timelineBoxesArea)에서 씀
   function wireMilestoneBodyEvents(root) {
     if (!root) return;
     root.querySelectorAll(".deleteMilestoneBtn").forEach((btn) => {
@@ -602,7 +729,7 @@
         const id = Number(btn.dataset.id);
         if (!confirm("이 마일스톤과 딸린 하위 업무를 전부 삭제할까요?")) return;
         await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${id}`, { method: "DELETE", headers });
-        if (selectedMilestoneId === id) selectedMilestoneId = null;
+        openMilestoneIds = openMilestoneIds.filter((x) => x !== id);
         load();
       });
     });
@@ -793,12 +920,8 @@
   }
 
   // 체크박스 토글처럼 잦은 변화는 서버 재조회 없이 로컬 상태만 갱신해서 화면을 다시 그림
-  // (마일스톤 목록을 통째로 다시 그리되, selectedMilestoneId가 그대로라 열려있던 마일스톤은 계속 열려있음)
   function refreshAfterLocalChange() {
-    document.getElementById("timelineBox").innerHTML = renderTimeline();
-    wireTimelineEvents();
-    document.getElementById("timelineDetailBox").innerHTML = renderTimelineDetail();
-    wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
+    renderTimelineArea();
   }
 
   // ---- 팀 구성 (담당자 자동완성용 명단) ----
