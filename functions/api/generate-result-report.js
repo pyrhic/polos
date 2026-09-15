@@ -79,6 +79,65 @@ async function callGemini(env, prompt, fallback) {
   }
 }
 
+// 만족도 조사(구글폼) 응답을 읽어서 정량(척도/객관식 평균)과 정성(주관식 답변)으로 나눔.
+// 폼 자체는 사람이 직접 만들어 공유한 것 - 여긴 "이미 있는 폼의 응답 읽기"만 하므로
+// 서비스계정 저장공간 문제와 무관함(새로 만들거나 복사하는 게 아니라 읽기만 함)
+async function fetchSurveyEvaluation(serviceAccount, formId) {
+  const token = await getAccessToken(serviceAccount, [
+    "https://www.googleapis.com/auth/forms.body.readonly",
+    "https://www.googleapis.com/auth/forms.responses.readonly",
+  ]);
+  const [formRes, respRes] = await Promise.all([
+    fetch(`https://forms.googleapis.com/v1/forms/${formId}`, { headers: { Authorization: `Bearer ${token}` } }),
+    fetch(`https://forms.googleapis.com/v1/forms/${formId}/responses`, { headers: { Authorization: `Bearer ${token}` } }),
+  ]);
+  if (!formRes.ok || !respRes.ok) {
+    throw new Error(`설문지 조회 실패 (${!formRes.ok ? await formRes.text() : await respRes.text()})`);
+  }
+  const form = await formRes.json();
+  const respData = await respRes.json();
+  const responses = respData.responses || [];
+
+  const qMeta = new Map(); // questionId -> { title, type }
+  (form.items || []).forEach((item) => {
+    const q = item.questionItem?.question;
+    if (!q) return;
+    const type = q.scaleQuestion ? "SCALE" : q.choiceQuestion ? "CHOICE" : "TEXT";
+    qMeta.set(q.questionId, { title: item.title || "(제목 없음)", type });
+  });
+
+  const numericByQ = new Map();
+  const textByQ = new Map();
+  responses.forEach((r) => {
+    Object.entries(r.answers || {}).forEach(([qid, ans]) => {
+      const meta = qMeta.get(qid);
+      if (!meta) return;
+      (ans.textAnswers?.answers || []).forEach((a) => {
+        const n = Number(a.value);
+        if ((meta.type === "SCALE" || meta.type === "CHOICE") && !Number.isNaN(n)) {
+          if (!numericByQ.has(qid)) numericByQ.set(qid, []);
+          numericByQ.get(qid).push(n);
+        } else {
+          if (!textByQ.has(qid)) textByQ.set(qid, []);
+          textByQ.get(qid).push(a.value);
+        }
+      });
+    });
+  });
+
+  const quantitative = [...numericByQ.entries()].map(([qid, vals]) => ({
+    title: qMeta.get(qid).title,
+    avg: vals.reduce((s, v) => s + v, 0) / vals.length,
+    count: vals.length,
+  }));
+  const qualitative = [...textByQ.entries()].map(([qid, vals]) => ({
+    title: qMeta.get(qid).title,
+    answers: vals,
+  }));
+
+  return { responseCount: responses.length, quantitative, qualitative };
+}
+
 export async function onRequestPost(context) {
   const { env, request } = context;
   try {
@@ -218,11 +277,35 @@ export async function onRequestPost(context) {
       blocks.push({ text: "(등록된 팀원 없음)", style: "NORMAL" });
     }
 
-    blocks.push({ text: "7. 미비점 및 향후 과제", style: "HEADING_1" });
-    if (pendingChildren.length) {
-      pendingChildren.forEach((t) => blocks.push({ text: `${t.name} - ${t.status || "예정"}`, style: "BULLET" }));
+    blocks.push({ text: "7. 평가", style: "HEADING_1" });
+    if (!project.survey_form_id) {
+      blocks.push({ text: "(연결된 만족도 조사가 없습니다)", style: "NORMAL" });
     } else {
-      blocks.push({ text: "(모든 업무 완료)", style: "NORMAL" });
+      let survey = null;
+      try {
+        survey = await fetchSurveyEvaluation(serviceAccount, project.survey_form_id);
+      } catch (err) {
+        blocks.push({ text: `(만족도 조사 조회 실패: ${err.message})`, style: "NORMAL" });
+      }
+      if (survey && !survey.responseCount) {
+        blocks.push({ text: "(설문 응답이 아직 없습니다)", style: "NORMAL" });
+      } else if (survey) {
+        blocks.push({ text: `총 응답 ${survey.responseCount}건`, style: "NORMAL" });
+        survey.quantitative.forEach((q) => {
+          blocks.push({ text: `${q.title} - 평균 ${q.avg.toFixed(1)}점 (${q.count}건)`, style: "BULLET" });
+        });
+        survey.qualitative.forEach((q) => {
+          blocks.push({ text: q.title, style: "HEADING_2" });
+          q.answers.slice(0, 15).forEach((a) => blocks.push({ text: a, style: "BULLET" }));
+        });
+        const evalFacts = [
+          `총 응답 ${survey.responseCount}건`,
+          ...survey.quantitative.map((q) => `${q.title}: 평균 ${q.avg.toFixed(1)}점`),
+          ...survey.qualitative.map((q) => `${q.title} 주관식 답변: ${q.answers.slice(0, 10).join(" / ")}`),
+        ].join("\n");
+        const evalPrompt = `다음은 사교원 후진항 어촌신활력증진사업의 한 프로젝트 만족도 조사 결과야. 이 내용만 바탕으로 정량적 평가(평점 수준)와 정성적 평가(주관식 의견 경향)를 나눠서 3~6문장, 공식 보고서에 어울리는 간결하고 격식있는 문체로 작성해줘. 사실을 지어내지 말고 주어진 내용에서만 판단해. 결과만 출력해(설명이나 따옴표 없이):\n\n${evalFacts}`;
+        blocks.push({ text: await callGemini(env, evalPrompt, "(직접 작성 필요)"), style: "NORMAL" });
+      }
     }
 
     blocks.push({ text: "8. 종합 평가", style: "HEADING_1" });
