@@ -572,6 +572,7 @@
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "동기화 실패");
+      alert("내보내기 완료 — 새로 연 시트에서 하단의 \"WBS\" 탭을 확인해주세요. (처음 만든 빈 탭이 아니라 새로 추가된 WBS 탭에 내용이 들어갑니다)");
       window.open(data.sheet_url, "_blank");
       load();
     } catch (err) {
