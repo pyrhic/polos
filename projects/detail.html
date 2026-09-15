@@ -248,6 +248,15 @@
         `}
       </div>
 
+      <div class="section-title">사진</div>
+      <div style="margin:10px 0;">
+        ${project.photo_folder_id ? `
+        <a href="https://drive.google.com/drive/folders/${project.photo_folder_id}" target="_blank" style="font-size:0.85rem;color:#8b7ff0;">사진 폴더 열기 →</a>
+        ` : `
+        <button type="button" id="createPhotoFolderBtn" class="add-trigger-btn">사진 폴더 만들기</button>
+        `}
+      </div>
+
       <div class="section-title">팀 구성</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <button type="button" id="showOrgChartBtn" class="add-trigger-btn">조직도</button>
@@ -327,6 +336,9 @@
         btn.textContent = "복사됨";
         setTimeout(() => { btn.textContent = "복사"; }, 1500);
       });
+    }
+    if (document.getElementById("createPhotoFolderBtn")) {
+      document.getElementById("createPhotoFolderBtn").addEventListener("click", createPhotoFolder);
     }
     if (document.getElementById("generateReportBtn")) {
       document.getElementById("generateReportBtn").addEventListener("click", generateResultReport);
@@ -604,6 +616,29 @@
       load();
     } catch (err) {
       alert("시트 연결 실패: " + err.message);
+    }
+  }
+
+  // 사진 폴더는 구글시트/독스와 달리 서비스계정이 스스로 만들 수 있어서(용량을 안 씀) 완전 자동.
+  // 보통은 프로젝트를 만들 때 이미 자동 생성되지만, 그 전에 만들어진 프로젝트를 위한 수동 생성 버튼
+  async function createPhotoFolder() {
+    const btn = document.getElementById("createPhotoFolderBtn");
+    btn.disabled = true;
+    btn.textContent = "만드는 중...";
+    try {
+      const res = await fetch("/api/create-photo-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: Number(projectId), project_name: currentProject.name }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "생성 실패");
+      window.open(data.folder_url, "_blank");
+      load();
+    } catch (err) {
+      alert("사진 폴더 생성 실패: " + err.message);
+      btn.disabled = false;
+      btn.textContent = "사진 폴더 만들기";
     }
   }
 

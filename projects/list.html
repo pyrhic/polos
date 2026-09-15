@@ -182,6 +182,15 @@
       });
       if (!res.ok) throw new Error(await res.text());
       const [created] = await res.json();
+      // 사진 업로드용 구글드라이브 폴더 자동 생성 - 실패해도(네트워크 등) 프로젝트 생성 자체는
+      // 막지 않고 그냥 넘어감(나중에 상세페이지에서 폴더 없이 진행 가능)
+      try {
+        await fetch("/api/create-photo-folder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ project_id: created.id, project_name: created.name }),
+        });
+      } catch {}
       // 만들자마자 상세페이지로 이동 - 거기서 기본 타임라인을 자동으로 채워줌
       location.href = `/projects/detail.html?id=${created.id}&init=1`;
     } catch (err) {
