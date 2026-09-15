@@ -65,8 +65,8 @@ async function draftSummary(env, facts) {
       ],
     });
     return (result.response || "(직접 작성 필요)").trim();
-  } catch {
-    return "(직접 작성 필요)";
+  } catch (err) {
+    return "(직접 작성 필요 - AI 오류: " + err.message + ")";
   }
 }
 
