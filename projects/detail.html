@@ -197,6 +197,10 @@
       <div id="timelineBox">${renderTimeline()}</div>
       <div id="timelineDetailBox">${renderTimelineDetail()}</div>
 
+      <div style="margin:10px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button type="button" id="generateGanttBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">간트차트 생성하기</button>
+      </div>
+
       <button type="button" id="showAddMilestoneBtn" class="add-trigger-btn">+ 마일스톤 추가</button>
       <div id="addMilestoneBox" style="display:none;margin-top:10px;">
         <div class="timeline-add-row">
@@ -283,6 +287,7 @@
     if (document.getElementById("syncGanttBtn")) {
       document.getElementById("syncGanttBtn").addEventListener("click", syncGanttSheet);
     }
+    document.getElementById("generateGanttBtn").addEventListener("click", generateGanttChart);
     if (document.getElementById("connectGanttSheetBtn")) {
       document.getElementById("connectGanttSheetBtn").addEventListener("click", connectGanttSheet);
       document.getElementById("ganttSheetLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectGanttSheet(); });
@@ -580,6 +585,33 @@
     } finally {
       btn.disabled = false;
       btn.textContent = "구글시트로 내보내기";
+    }
+  }
+
+  // 연결된 구글시트에 날짜 축 기반 진짜 간트차트를 "간트차트" 탭에 새로 그림(매번 깨끗하게 재생성)
+  async function generateGanttChart() {
+    if (!currentProject.gantt_sheet_id) {
+      alert("먼저 구글시트를 연결해주세요 (아래 '구글시트로 내보내기' 영역 참고)");
+      return;
+    }
+    const btn = document.getElementById("generateGanttBtn");
+    btn.disabled = true;
+    btn.textContent = "생성 중...";
+    try {
+      const res = await fetch("/api/generate-gantt-chart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: Number(projectId) }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "생성 실패");
+      alert("간트차트 생성 완료 — 새로 연 시트에서 \"간트차트\" 탭을 확인해주세요.");
+      window.open(data.sheet_url, "_blank");
+    } catch (err) {
+      alert("간트차트 생성 실패: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "간트차트 생성하기";
     }
   }
 
