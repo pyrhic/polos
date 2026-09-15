@@ -105,18 +105,18 @@ export async function onRequestPost(context) {
     }
     if (!updates.length) return jsonRes({ error: "가져올 업무를 찾지 못했습니다" }, 400);
 
-    const results = await Promise.all(
-      updates.map((u) =>
-        fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?id=eq.${u.id}`, {
-          method: "PATCH",
-          headers: sbHeaders,
-          body: JSON.stringify({ status: u.status }),
-        })
-      )
-    );
-    const failed = results.filter((r) => !r.ok).length;
+    // 업무마다 개별 PATCH를 보내면 업무 수가 많을 때 Cloudflare Worker의 "하위 요청 개수 제한"에
+    // 걸림 - 대신 한 번의 upsert로 전부 반영(id가 이미 있으면 status만 갱신, 다른 열은 안 건드림)
+    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?on_conflict=id`, {
+      method: "POST",
+      headers: { ...sbHeaders, Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify(updates),
+    });
+    if (!upsertRes.ok) {
+      return jsonRes({ error: "Supabase 반영 실패", detail: await upsertRes.text() }, 500);
+    }
 
-    return jsonRes({ success: true, updated: updates.length - failed, failed });
+    return jsonRes({ success: true, updated: updates.length });
   } catch (err) {
     return jsonRes({ error: err.message }, 500);
   }
