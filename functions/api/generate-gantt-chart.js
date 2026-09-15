@@ -274,7 +274,7 @@ export async function onRequestPost(context) {
       {
         repeatCell: {
           range: { sheetId: newSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: LABEL_COLS, endColumnIndex: LABEL_COLS + dayCount },
-          cell: { userEnteredFormat: { textRotation: { vertical: true }, textFormat: { bold: true, fontSize: 8 } } },
+          cell: { userEnteredFormat: { textRotation: { vertical: true }, textFormat: { bold: true, fontSize: 6 } } },
           fields: "userEnteredFormat.textRotation,userEnteredFormat.textFormat",
         },
       },
