@@ -70,12 +70,12 @@ async function callGemini(env, prompt, fallback) {
       if (res.status !== 503 && res.status !== 429) break;
       await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
     }
-    if (!res.ok) return fallback;
+    if (!res.ok) return `${fallback} [DIAG http ${res.status}: ${(await res.text()).slice(0, 300)}]`;
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return text ? text.trim() : fallback;
-  } catch {
-    return fallback;
+    return text ? text.trim() : `${fallback} [DIAG no-text: ${JSON.stringify(data).slice(0, 300)}]`;
+  } catch (err) {
+    return `${fallback} [DIAG throw: ${err.message}]`;
   }
 }
 
