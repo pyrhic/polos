@@ -53,20 +53,29 @@ function jsonRes(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
 }
 
-async function draftSummary(env, facts) {
-  if (!env.AI) return "(직접 작성 필요)";
+// 제미나이 호출 - youtube 자동화 쪽 gemini-script.js와 동일한 방식(GEMINI_API_KEY, 재시도 포함)
+async function callGemini(env, prompt, fallback) {
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) return fallback;
   try {
-    const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-      messages: [
-        {
-          role: "user",
-          content: `다음은 사교원 후진항 어촌신활력증진사업의 한 프로젝트 실적 요약이야. 이 내용만 바탕으로 종합 평가 문단을 3~5문장, 공식 보고서에 어울리는 간결하고 격식있는 문체로 작성해줘. 사실을 지어내지 말고 주어진 내용에서만 판단해. 결과만 출력해(설명이나 따옴표 없이):\n\n${facts}`,
-        },
-      ],
-    });
-    return (result.response || "(직접 작성 필요)").trim();
-  } catch (err) {
-    return "(직접 작성 필요 - AI 오류: " + err.message + ")";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+    let res;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      });
+      if (res.ok) break;
+      if (res.status !== 503 && res.status !== 429) break;
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+    }
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    return text ? text.trim() : fallback;
+  } catch {
+    return fallback;
   }
 }
 
@@ -136,24 +145,52 @@ export async function onRequestPost(context) {
     });
 
     blocks.push({ text: "2. 추진 배경 및 목적", style: "HEADING_1" });
-    blocks.push({ text: project.description || "(작성 필요)", style: "NORMAL" });
+    const bgPrompt = `다음은 사교원 후진항 어촌신활력증진사업의 한 프로젝트 정보야. 이 내용만 바탕으로 "추진 배경 및 목적" 문단을 2~4문장, 공식 보고서에 어울리는 간결하고 격식있는 문체로 작성해줘. 아래 내용에 없는 사실을 지어내지 마. 결과만 출력해(설명이나 따옴표 없이):\n\n사업명: ${project.name}\n메모: ${project.description || "(기록된 배경 메모 없음)"}`;
+    blocks.push({
+      text: await callGemini(env, bgPrompt, project.description || "(작성 필요)"),
+      style: "NORMAL",
+    });
 
+    // 추진 경과는 세부 업무를 전부 나열하지 않고 마일스톤별 완료현황만 간단히 요약함(그건 기획서 몫) -
+    // 결과보고서는 대신 (1) 행사 당일("실행" 마일스톤)에 실제 있었던 일, (2) 예산이 실제로 걸린
+    // 사전준비 업무만 따로 짚어서 "실제로 무슨 일이 있었는지"에 집중되게 함
     blocks.push({ text: "3. 추진 경과", style: "HEADING_1" });
     milestones.forEach((m) => {
-      blocks.push({ text: `${m.name} (${m.due_date || "-"}) - ${m.status || ""}`, style: "HEADING_2" });
-      const kids = sortByDate(flattenDescendants(m.id, []));
-      if (!kids.length) {
-        blocks.push({ text: "(하위 업무 없음)", style: "NORMAL" });
-      } else {
-        kids.forEach((t) => {
-          const mark = t.status === "완료" ? "완료" : t.status || "예정";
+      const kids = flattenDescendants(m.id, []);
+      const total = kids.length;
+      const done = kids.filter((t) => t.status === "완료").length;
+      blocks.push({
+        text: `${m.name} (${m.due_date || "-"}) - ${total ? `${done}/${total} 완료` : m.status || ""}`,
+        style: "BULLET",
+      });
+    });
+
+    const eventMilestone = milestones.find((m) => m.name === "실행");
+    if (eventMilestone) {
+      blocks.push({ text: "행사 당일 진행 내용", style: "HEADING_2" });
+      const eventTasks = sortByDate(flattenDescendants(eventMilestone.id, []));
+      if (eventTasks.length) {
+        eventTasks.forEach((t) => {
           blocks.push({
-            text: `${t.name} - ${mark}${t.deliverables ? " (" + t.deliverables + ")" : ""}`,
+            text: `${t.name} - ${t.status === "완료" ? "완료" : t.status || "예정"}${t.deliverables ? " (" + t.deliverables + ")" : ""}`,
             style: "BULLET",
           });
         });
+      } else {
+        blocks.push({ text: "(등록된 세부 내용 없음)", style: "NORMAL" });
       }
-    });
+    }
+
+    const bigBudgetTasks = allChildren
+      .filter((t) => (Number(t.budget_actual) || Number(t.budget_planned) || 0) > 0)
+      .sort((a, b) => (Number(b.budget_actual) || Number(b.budget_planned) || 0) - (Number(a.budget_actual) || Number(a.budget_planned) || 0));
+    if (bigBudgetTasks.length) {
+      blocks.push({ text: "주요 예산 집행 사전준비", style: "HEADING_2" });
+      bigBudgetTasks.forEach((t) => {
+        const amount = Number(t.budget_actual) || Number(t.budget_planned) || 0;
+        blocks.push({ text: `${t.name} - ${amount.toLocaleString()}원`, style: "BULLET" });
+      });
+    }
 
     blocks.push({ text: "4. 성과 및 산출물", style: "HEADING_1" });
     const deliverables = [...new Set(doneChildren.map((t) => t.deliverables).filter(Boolean))];
@@ -195,7 +232,8 @@ export async function onRequestPost(context) {
       `산출물: ${deliverables.join(", ") || "없음"}`,
       `미완료 과제: ${pendingChildren.map((t) => t.name).join(", ") || "없음"}`,
     ].join("\n");
-    blocks.push({ text: await draftSummary(env, facts), style: "NORMAL" });
+    const summaryPrompt = `다음은 사교원 후진항 어촌신활력증진사업의 한 프로젝트 실적 요약이야. 이 내용만 바탕으로 종합 평가 문단을 3~5문장, 공식 보고서에 어울리는 간결하고 격식있는 문체로 작성해줘. 사실을 지어내지 말고 주어진 내용에서만 판단해. 결과만 출력해(설명이나 따옴표 없이):\n\n${facts}`;
+    blocks.push({ text: await callGemini(env, summaryPrompt, "(직접 작성 필요)"), style: "NORMAL" });
 
     // ---- 구글독스에 반영 ----
     const docRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
