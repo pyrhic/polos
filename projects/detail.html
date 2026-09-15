@@ -228,6 +228,26 @@
 
       ${project.description ? `<p class="role" style="text-align:left;margin-top:22px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
 
+      <div class="section-title">결과보고서</div>
+      <div style="margin:10px 0;">
+        ${project.report_doc_id ? `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button type="button" id="generateReportBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">결과보고서 생성하기</button>
+          <a href="https://docs.google.com/document/d/${project.report_doc_id}/edit" target="_blank" style="font-size:0.8rem;color:#8b7ff0;">문서 열기 →</a>
+        </div>
+        ` : `
+        <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;">
+          아래 계정을 구글독스에 편집자로 등록해주세요.<br>
+          <code style="color:#8b7ff0;">${GANTT_SERVICE_ACCOUNT_EMAIL}</code>
+          <button type="button" id="copyReportEmailBtn" style="width:auto;padding:2px 8px;font-size:0.75rem;margin-left:6px;">복사</button>
+        </div>
+        <div class="timeline-add-row" style="margin-top:8px;">
+          <input type="text" id="reportDocLinkInput" placeholder="구글독스 링크 또는 ID 붙여넣기">
+          <button type="button" id="connectReportDocBtn" style="width:auto;">연결</button>
+        </div>
+        `}
+      </div>
+
       <div class="section-title">팀 구성</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <button type="button" id="showOrgChartBtn" class="add-trigger-btn">조직도</button>
@@ -302,6 +322,21 @@
     }
     if (document.getElementById("copyGanttEmailBtn")) {
       document.getElementById("copyGanttEmailBtn").addEventListener("click", (e) => {
+        copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
+        const btn = e.target;
+        btn.textContent = "복사됨";
+        setTimeout(() => { btn.textContent = "복사"; }, 1500);
+      });
+    }
+    if (document.getElementById("generateReportBtn")) {
+      document.getElementById("generateReportBtn").addEventListener("click", generateResultReport);
+    }
+    if (document.getElementById("connectReportDocBtn")) {
+      document.getElementById("connectReportDocBtn").addEventListener("click", connectReportDoc);
+      document.getElementById("reportDocLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectReportDoc(); });
+    }
+    if (document.getElementById("copyReportEmailBtn")) {
+      document.getElementById("copyReportEmailBtn").addEventListener("click", (e) => {
         copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
         const btn = e.target;
         btn.textContent = "복사됨";
@@ -569,6 +604,54 @@
       load();
     } catch (err) {
       alert("시트 연결 실패: " + err.message);
+    }
+  }
+
+  // 사람이 미리 만들어 공유해준 구글독스를 프로젝트에 연결(구글시트와 동일한 이유 - 서비스계정이
+  // 새 파일을 스스로 못 만듦)
+  async function connectReportDoc() {
+    const input = document.getElementById("reportDocLinkInput");
+    const raw = input.value.trim();
+    if (!raw) return;
+    const m = raw.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    const docId = m ? m[1] : raw;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ report_doc_id: docId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      load();
+    } catch (err) {
+      alert("문서 연결 실패: " + err.message);
+    }
+  }
+
+  // 연결된 구글독스에 프로젝트 실적을 결과보고서로 채워 넣음(매번 전체 내용을 지우고 새로 씀)
+  async function generateResultReport() {
+    if (!currentProject.report_doc_id) {
+      alert("먼저 구글독스를 연결해주세요");
+      return;
+    }
+    const btn = document.getElementById("generateReportBtn");
+    btn.disabled = true;
+    btn.textContent = "생성 중...";
+    try {
+      const res = await fetch("/api/generate-result-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: Number(projectId) }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "생성 실패");
+      alert("결과보고서 생성 완료");
+      window.open(data.doc_url, "_blank");
+    } catch (err) {
+      alert("결과보고서 생성 실패: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "결과보고서 생성하기";
     }
   }
 
