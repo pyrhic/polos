@@ -1,6 +1,6 @@
 // 프로젝트의 WBS를 날짜 축 기반 "진짜" 간트차트로 그려서, 연결된 구글시트의 "간트차트" 탭에 채워 넣음.
 // (같은 시트의 "WBS" 탭은 나열식 표 그대로 두고, 이 탭은 매번 지우고 새로 만들어 깨끗하게 다시 그림)
-// - 맨 위 행: 프로젝트 전체 기간을 하루 단위 컬럼으로 나열(날짜순 타임라인 축)
+// - 맨 위 두 행: 프로젝트 전체 기간을 하루 단위 컬럼으로 나열(월 행 + 일 행, 날짜순 타임라인 축)
 // - 마일스톤/업무마다 자기 행을 따로 가짐(겹쳐서 같은 행에 쌓이지 않음)
 // - 각 업무 행의 시작일~마감일 구간 셀만 배경색을 칠해 막대처럼 보이게 함
 // 인증 방식은 sync-gantt-sheet.js와 동일(서비스계정 JWT, POLOS_PROJECTS_GOOGLE_KEY)
@@ -148,11 +148,28 @@ export async function onRequestPost(context) {
     const colIndexForDate = (d) => LABEL_COLS + daysBetween(minDate, d);
     const colOf = (dateStr) => colIndexForDate(toUTCDate(dateStr));
 
-    const header = ["구분", "업무명", "담당자", "상태"];
+    // 헤더는 두 줄 - 위: 월(같은 달인 구간은 나중에 병합), 아래: 일(숫자만)
+    const monthRow = ["", "", "", ""];
+    const dayRow = ["구분", "업무명", "담당자", "상태"];
+    const monthGroups = []; // { year, month(0-based), startIdx, count } - 연속된 같은 달 구간
     for (let i = 0; i < dayCount; i++) {
-      header.push(shortLabel(new Date(minDate.getTime() + i * 86400000)));
+      const d = new Date(minDate.getTime() + i * 86400000);
+      dayRow.push(String(d.getUTCDate()));
+      const y = d.getUTCFullYear();
+      const mo = d.getUTCMonth();
+      const last = monthGroups[monthGroups.length - 1];
+      if (last && last.year === y && last.month === mo) {
+        last.count++;
+      } else {
+        monthGroups.push({ year: y, month: mo, startIdx: i, count: 1 });
+      }
     }
-    const rows = [header];
+    monthGroups.forEach((g) => {
+      monthRow[LABEL_COLS + g.startIdx] = `${g.month + 1}월`;
+    });
+    for (let i = monthRow.length; i < LABEL_COLS + dayCount; i++) monthRow.push("");
+
+    const rows = [monthRow, dayRow];
     const colorRequests = []; // { rowIndex, startCol, endCol, color, textColor? }
     const boldDataRows = [];
 
@@ -209,7 +226,7 @@ export async function onRequestPost(context) {
     const today = todayUTC();
     if (today >= minDate && today <= maxDate) {
       const c = colIndexForDate(today);
-      colorRequests.push({ rowIndex: 0, startCol: c, endCol: c + 1, color: COLOR_TODAY, textColor: WHITE });
+      colorRequests.push({ rowIndex: 1, startCol: c, endCol: c + 1, color: COLOR_TODAY, textColor: WHITE });
     }
 
     // 기존 "간트차트" 탭이 있으면 지우고(형식까지 깨끗하게), 새로 만듦
@@ -232,7 +249,7 @@ export async function onRequestPost(context) {
       addSheet: {
         properties: {
           title: "간트차트",
-          gridProperties: { frozenRowCount: 1, frozenColumnCount: LABEL_COLS },
+          gridProperties: { frozenRowCount: 2, frozenColumnCount: LABEL_COLS },
         },
       },
     });
@@ -267,24 +284,47 @@ export async function onRequestPost(context) {
       {
         updateDimensionProperties: {
           range: { sheetId: newSheetId, dimension: "COLUMNS", startIndex: LABEL_COLS, endIndex: LABEL_COLS + dayCount },
-          properties: { pixelSize: 28 },
+          properties: { pixelSize: 34 },
           fields: "pixelSize",
         },
       },
       {
+        // 월 표시 행 - 굵게, 가운데 정렬(칸 병합은 아래 mergeReqs에서 따로 처리)
         repeatCell: {
           range: { sheetId: newSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: LABEL_COLS, endColumnIndex: LABEL_COLS + dayCount },
-          cell: { userEnteredFormat: { textRotation: { vertical: true }, textFormat: { bold: true, fontSize: 6 } } },
-          fields: "userEnteredFormat.textRotation,userEnteredFormat.textFormat",
+          cell: { userEnteredFormat: { horizontalAlignment: "CENTER", textFormat: { bold: true, fontSize: 8 } } },
+          fields: "userEnteredFormat.horizontalAlignment,userEnteredFormat.textFormat",
+        },
+      },
+      {
+        // 일 표시 행 - 숫자만, 가운데 정렬
+        repeatCell: {
+          range: { sheetId: newSheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: LABEL_COLS, endColumnIndex: LABEL_COLS + dayCount },
+          cell: { userEnteredFormat: { horizontalAlignment: "CENTER", textFormat: { bold: true, fontSize: 8 } } },
+          fields: "userEnteredFormat.horizontalAlignment,userEnteredFormat.textFormat",
         },
       },
       {
         repeatCell: {
-          range: { sheetId: newSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: LABEL_COLS },
+          range: { sheetId: newSheetId, startRowIndex: 0, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: LABEL_COLS },
           cell: { userEnteredFormat: { textFormat: { bold: true } } },
           fields: "userEnteredFormat.textFormat.bold",
         },
       },
+      ...monthGroups
+        .filter((g) => g.count > 1)
+        .map((g) => ({
+          mergeCells: {
+            range: {
+              sheetId: newSheetId,
+              startRowIndex: 0,
+              endRowIndex: 1,
+              startColumnIndex: LABEL_COLS + g.startIdx,
+              endColumnIndex: LABEL_COLS + g.startIdx + g.count,
+            },
+            mergeType: "MERGE_COLUMNS",
+          },
+        })),
       ...boldDataRows.map((r) => ({
         repeatCell: {
           range: { sheetId: newSheetId, startRowIndex: r, endRowIndex: r + 1, startColumnIndex: 0, endColumnIndex: LABEL_COLS },
