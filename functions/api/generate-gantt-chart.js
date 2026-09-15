@@ -156,6 +156,21 @@ export async function onRequestPost(context) {
     const colorRequests = []; // { rowIndex, startCol, endCol, color, textColor? }
     const boldDataRows = [];
 
+    // 하위 업무는 기본적으로 자기 날짜가 없고(마일스톤만 날짜를 가짐) 그 마일스톤 기간에 속해 수행됨.
+    // 그래서 하위 업무는 "자기 날짜가 따로 있으면 그걸 쓰고, 없으면 자기가 속한 마일스톤의 기간(직전
+    // 마일스톤 다음날~이 마일스톤 날짜)"을 막대로 씀 - 그래야 같은 마일스톤 아래 업무들이 그 구간에
+    // 나란히 걸쳐 보이고, 마일스톤이 바뀌면 막대 위치도 그 다음 구간으로 넘어감
+    let prevMilestoneDate = null;
+    const milestonePeriod = new Map(); // milestone.id -> { start: Date, end: Date }
+    milestones.forEach((m) => {
+      const mDateStr = m.due_date || m.start_date;
+      if (!mDateStr) return;
+      const end = toUTCDate(mDateStr);
+      const start = prevMilestoneDate ? new Date(prevMilestoneDate.getTime() + 86400000) : end;
+      milestonePeriod.set(m.id, { start, end });
+      prevMilestoneDate = end;
+    });
+
     milestones.forEach((m) => {
       const rowIndex = rows.length;
       rows.push(["마일스톤", m.name, "", m.status || ""]);
@@ -165,14 +180,22 @@ export async function onRequestPost(context) {
         const c = colOf(mDate);
         colorRequests.push({ rowIndex, startCol: c, endCol: c + 1, color: COLOR_MILESTONE });
       }
+      const period = milestonePeriod.get(m.id);
       sortByDate(flattenDescendants(m.id, [])).forEach((t) => {
         const r = rows.length;
         rows.push(["", "  " + t.name, t.assignee || "", t.status || ""]);
-        const start = t.start_date || t.due_date;
-        const end = t.due_date || t.start_date;
+        let start = null;
+        let end = null;
+        if (t.start_date || t.due_date) {
+          start = toUTCDate(t.start_date || t.due_date);
+          end = toUTCDate(t.due_date || t.start_date);
+        } else if (period) {
+          start = period.start;
+          end = period.end;
+        }
         if (start && end) {
-          const c1 = colOf(start);
-          const c2 = colOf(end);
+          const c1 = colIndexForDate(start);
+          const c2 = colIndexForDate(end);
           colorRequests.push({
             rowIndex: r,
             startCol: Math.min(c1, c2),
