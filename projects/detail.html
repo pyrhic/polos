@@ -19,6 +19,7 @@
 <script>
   const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const GANTT_SERVICE_ACCOUNT_EMAIL = "polos-projects-sync@polos-projects.iam.gserviceaccount.com";
   const headers = {
     apikey: SUPABASE_ANON_KEY,
     Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
@@ -187,9 +188,22 @@
         </div>
       </div>
 
-      <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <button type="button" id="syncGanttBtn" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">구글시트로 내보내기</button>
-        ${project.gantt_sheet_id ? `<a href="https://docs.google.com/spreadsheets/d/${project.gantt_sheet_id}/edit" target="_blank" style="font-size:0.8rem;color:#8b7ff0;">시트 열기 →</a>` : ""}
+      <div style="margin-top:14px;">
+        ${project.gantt_sheet_id ? `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button type="button" id="syncGanttBtn" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">구글시트로 내보내기</button>
+          <a href="https://docs.google.com/spreadsheets/d/${project.gantt_sheet_id}/edit" target="_blank" style="font-size:0.8rem;color:#8b7ff0;">시트 열기 →</a>
+        </div>
+        ` : `
+        <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;">
+          구글시트로 내보내려면 먼저 구글시트를 하나 만들어서 아래 계정에 편집자로 공유한 뒤, 그 시트 링크를 붙여넣어 연결해주세요.<br>
+          공유할 계정: <code style="color:#8b7ff0;">${GANTT_SERVICE_ACCOUNT_EMAIL}</code>
+        </div>
+        <div class="timeline-add-row" style="margin-top:8px;">
+          <input type="text" id="ganttSheetLinkInput" placeholder="구글시트 링크 또는 ID 붙여넣기">
+          <button type="button" id="connectGanttSheetBtn" style="width:auto;">연결</button>
+        </div>
+        `}
       </div>
 
       ${project.description ? `<p class="role" style="text-align:left;margin-top:22px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
@@ -247,7 +261,13 @@
     document.getElementById("addTeamBtn").addEventListener("click", addTeamMember);
     document.getElementById("newTeamRole").addEventListener("keydown", (e) => { if (e.key === "Enter") addTeamMember(); });
     wireTeamEvents();
-    document.getElementById("syncGanttBtn").addEventListener("click", syncGanttSheet);
+    if (document.getElementById("syncGanttBtn")) {
+      document.getElementById("syncGanttBtn").addEventListener("click", syncGanttSheet);
+    }
+    if (document.getElementById("connectGanttSheetBtn")) {
+      document.getElementById("connectGanttSheetBtn").addEventListener("click", connectGanttSheet);
+      document.getElementById("ganttSheetLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectGanttSheet(); });
+    }
 
     wireTimelineEvents();
     wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
@@ -492,7 +512,27 @@
     load();
   }
 
-  // 구글시트로 WBS 내보내기 - 처음 누르면 새 시트를 만들어서 계정과 공유하고, 그다음부턴 그 시트를 갱신함
+  // 사람이 미리 만들어 공유해준 구글시트를 프로젝트에 연결 (서비스계정은 저장공간이 없어 새 파일을 못 만들기 때문)
+  async function connectGanttSheet() {
+    const input = document.getElementById("ganttSheetLinkInput");
+    const raw = input.value.trim();
+    if (!raw) return;
+    const m = raw.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    const sheetId = m ? m[1] : raw;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ gantt_sheet_id: sheetId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      load();
+    } catch (err) {
+      alert("시트 연결 실패: " + err.message);
+    }
+  }
+
+  // 연결된 구글시트에 WBS(마일스톤+하위업무)를 표로 채워 넣음
   async function syncGanttSheet() {
     const btn = document.getElementById("syncGanttBtn");
     btn.disabled = true;
@@ -501,7 +541,7 @@
       const res = await fetch("/api/sync-gantt-sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: Number(projectId), owner_email: "pyrhic@sakyowon.co.kr" }),
+        body: JSON.stringify({ project_id: Number(projectId) }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "동기화 실패");
