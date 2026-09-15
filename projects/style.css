@@ -407,6 +407,15 @@ a.back {
   padding: 0 14px 14px;
 }
 
+/* 연결(등록)만 하는 평범한 버튼과 구분되게, 실제로 내보내기가 실행되는 버튼은 강조색으로 표시 */
+.btn-accent {
+  background: #8b7ff0;
+  color: #0d1b2a;
+}
+.btn-accent:hover {
+  background: #a89bff;
+}
+
 /* 마일스톤 추가/할일 추가/메모 추가 - 작은 텍스트 버튼, 누르면 아래로 입력창이 펼쳐짐 */
 .add-trigger-btn {
   width: auto;
