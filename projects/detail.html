@@ -197,23 +197,11 @@
       <div id="timelineBox">${renderTimeline()}</div>
       <div id="timelineDetailBox">${renderTimelineDetail()}</div>
 
-      <div style="margin:10px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <button type="button" id="generateGanttBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">간트차트 생성하기</button>
-      </div>
-
-      <button type="button" id="showAddMilestoneBtn" class="add-trigger-btn">+ 마일스톤 추가</button>
-      <div id="addMilestoneBox" style="display:none;margin-top:10px;">
-        <div class="timeline-add-row">
-          <input type="text" id="newMilestoneTitle" placeholder="마일스톤 이름">
-          ${datepickHtml("newMilestoneDate")}
-          <button type="button" id="addMilestoneBtn" style="width:auto;">추가</button>
-        </div>
-      </div>
-
-      <div style="margin-top:14px;">
+      <div style="margin:10px 0;">
         ${project.gantt_sheet_id ? `
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button type="button" id="syncGanttBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">구글시트로 내보내기</button>
+          <button type="button" id="generateGanttBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">간트차트 생성하기</button>
+          <button type="button" id="importGanttStatusBtn" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">시트에서 가져오기</button>
           <a href="https://docs.google.com/spreadsheets/d/${project.gantt_sheet_id}/edit" target="_blank" style="font-size:0.8rem;color:#8b7ff0;">시트 열기 →</a>
         </div>
         ` : `
@@ -227,6 +215,15 @@
           <button type="button" id="connectGanttSheetBtn" style="width:auto;">연결</button>
         </div>
         `}
+      </div>
+
+      <button type="button" id="showAddMilestoneBtn" class="add-trigger-btn">+ 마일스톤 추가</button>
+      <div id="addMilestoneBox" style="display:none;margin-top:10px;">
+        <div class="timeline-add-row">
+          <input type="text" id="newMilestoneTitle" placeholder="마일스톤 이름">
+          ${datepickHtml("newMilestoneDate")}
+          <button type="button" id="addMilestoneBtn" style="width:auto;">추가</button>
+        </div>
       </div>
 
       ${project.description ? `<p class="role" style="text-align:left;margin-top:22px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
@@ -284,10 +281,12 @@
     document.getElementById("addTeamBtn").addEventListener("click", addTeamMember);
     document.getElementById("newTeamRole").addEventListener("keydown", (e) => { if (e.key === "Enter") addTeamMember(); });
     wireTeamEvents();
-    if (document.getElementById("syncGanttBtn")) {
-      document.getElementById("syncGanttBtn").addEventListener("click", syncGanttSheet);
+    if (document.getElementById("generateGanttBtn")) {
+      document.getElementById("generateGanttBtn").addEventListener("click", generateGanttChart);
     }
-    document.getElementById("generateGanttBtn").addEventListener("click", generateGanttChart);
+    if (document.getElementById("importGanttStatusBtn")) {
+      document.getElementById("importGanttStatusBtn").addEventListener("click", importGanttStatus);
+    }
     if (document.getElementById("connectGanttSheetBtn")) {
       document.getElementById("connectGanttSheetBtn").addEventListener("click", connectGanttSheet);
       document.getElementById("ganttSheetLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectGanttSheet(); });
@@ -564,34 +563,11 @@
     }
   }
 
-  // 연결된 구글시트에 WBS(마일스톤+하위업무)를 표로 채워 넣음
-  async function syncGanttSheet() {
-    const btn = document.getElementById("syncGanttBtn");
-    btn.disabled = true;
-    btn.textContent = "동기화 중...";
-    try {
-      const res = await fetch("/api/sync-gantt-sheet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: Number(projectId) }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "동기화 실패");
-      alert("내보내기 완료 — 새로 연 시트에서 하단의 \"WBS\" 탭을 확인해주세요. (처음 만든 빈 탭이 아니라 새로 추가된 WBS 탭에 내용이 들어갑니다)");
-      window.open(data.sheet_url, "_blank");
-      load();
-    } catch (err) {
-      alert("구글시트 동기화 실패: " + err.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "구글시트로 내보내기";
-    }
-  }
-
-  // 연결된 구글시트에 날짜 축 기반 진짜 간트차트를 "간트차트" 탭에 새로 그림(매번 깨끗하게 재생성)
+  // 연결된 구글시트에 날짜 축 기반 진짜 간트차트("간트차트" 탭)와 담당자별 R&R("R&R" 탭)을
+  // 매번 깨끗하게 새로 그림. 예전에 있던 나열식 "WBS" 탭은 간트차트와 중복돼서 폐기(있으면 지움)
   async function generateGanttChart() {
     if (!currentProject.gantt_sheet_id) {
-      alert("먼저 구글시트를 연결해주세요 (아래 '구글시트로 내보내기' 영역 참고)");
+      alert("먼저 구글시트를 연결해주세요");
       return;
     }
     const btn = document.getElementById("generateGanttBtn");
@@ -605,13 +581,37 @@
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "생성 실패");
-      alert("간트차트 생성 완료 — 새로 연 시트에서 \"간트차트\" 탭을 확인해주세요.");
+      alert("생성 완료 — 새로 연 시트에서 \"간트차트\"/\"R&R\" 탭을 확인해주세요.");
       window.open(data.sheet_url, "_blank");
     } catch (err) {
-      alert("간트차트 생성 실패: " + err.message);
+      alert("생성 실패: " + err.message);
     } finally {
       btn.disabled = false;
       btn.textContent = "간트차트 생성하기";
+    }
+  }
+
+  // 간트차트 D열(상태: O/X/보류)에서 사람이 직접 바꾼 값을 앱으로 가져와 반영 - 수동 양방향 동기화
+  async function importGanttStatus() {
+    if (!currentProject.gantt_sheet_id) return;
+    const btn = document.getElementById("importGanttStatusBtn");
+    btn.disabled = true;
+    btn.textContent = "가져오는 중...";
+    try {
+      const res = await fetch("/api/import-gantt-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: Number(projectId) }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "가져오기 실패");
+      alert(`시트에서 ${data.updated}건 반영했어요.`);
+      load();
+    } catch (err) {
+      alert("가져오기 실패: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "시트에서 가져오기";
     }
   }
 
