@@ -233,7 +233,7 @@
       <div id="addTeamBox" style="display:none;margin:10px 0;">
         <div class="todo-add-row">
           <input type="text" id="newTeamName" placeholder="이름">
-          <input type="text" id="newTeamRole" placeholder="역할(선택)">
+          <input type="text" id="newTeamRole" placeholder="직함(선택)">
           <button type="button" id="addTeamBtn" style="width:auto;">추가</button>
         </div>
       </div>
@@ -732,13 +732,14 @@
     const metaBits = [];
     const hasTeam = currentTeam.length > 0;
     // 조직도(팀 구성)가 있어야 담당자를 "골라서" 바꿀 수 있음 - 없으면 예전처럼 그냥 텍스트로만 표시.
-    // assignee_role은 실제 이름이 아니라 역할(PM 등) 라벨이라 절대 이름 대신 보여주지 않고,
-    // 아직 그 역할의 팀원이 없어 담당자가 비어있을 때 "누가 맡을 자리인지" 힌트로만 곁들임
-    const roleHint = !t.assignee && t.assignee_role ? ` (${escapeHtml(t.assignee_role)} 예정)` : "";
+    // assignee_role(PM/홍보담당 등, WBS 템플릿이 자동으로 매긴 "직책")은 사람의 직함과는 다른
+    // 개념이라 이름 대신 쓰지 않고, 이름 앞에 태그처럼 붙여서만 보여줌(예: "PM 이규영")
+    const roleTag = t.assignee_role ? `${escapeHtml(t.assignee_role)} ` : "";
+    const assigneeText = `${roleTag}${t.assignee ? escapeHtml(t.assignee) : "미지정"}`;
     if (hasTeam) {
-      metaBits.push(`<span class="wbs-assignee-pick" data-id="${t.id}">담당 ${t.assignee ? escapeHtml(t.assignee) : "미지정"}${roleHint}</span>`);
-    } else if (t.assignee || roleHint) {
-      metaBits.push(`담당 ${t.assignee ? escapeHtml(t.assignee) : "미지정"}${roleHint}`);
+      metaBits.push(`<span class="wbs-assignee-pick" data-id="${t.id}">담당 ${assigneeText}</span>`);
+    } else if (t.assignee || t.assignee_role) {
+      metaBits.push(`담당 ${assigneeText}`);
     }
     if (t.deliverables) metaBits.push(`산출물 ${escapeHtml(t.deliverables)}`);
     if (t.priority) metaBits.push(`우선순위 ${escapeHtml(t.priority)}`);
