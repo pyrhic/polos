@@ -138,6 +138,32 @@ async function fetchSurveyEvaluation(serviceAccount, formId) {
   return { responseCount: responses.length, quantitative, qualitative };
 }
 
+const MAX_REPORT_PHOTOS = 20;
+
+// 사진 폴더(사람이 올린 실제 사진)에서 이미지 목록을 가져와, 문서에 끼워 넣을 수 있게 각 파일을
+// "링크가 있는 모든 사용자가 보기" 권한으로 바꿈(독스가 서버에서 직접 이미지를 가져오려면 인증 없이
+// 접근 가능해야 함). 폴더 자체는 이미 사람이 올린 파일이 있는 곳이라 저장공간 문제와 무관함
+async function fetchFolderPhotos(accessToken, folderId) {
+  const q = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed = false`);
+  const listRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&orderBy=name&pageSize=${MAX_REPORT_PHOTOS}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!listRes.ok) return [];
+  const data = await listRes.json();
+  const files = data.files || [];
+  await Promise.all(
+    files.map((f) =>
+      fetch(`https://www.googleapis.com/drive/v3/files/${f.id}/permissions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "reader", type: "anyone" }),
+      })
+    )
+  );
+  return files.map((f) => ({ uri: `https://drive.google.com/uc?export=view&id=${f.id}`, name: f.name }));
+}
+
 export async function onRequestPost(context) {
   const { env, request } = context;
   try {
@@ -145,7 +171,10 @@ export async function onRequestPost(context) {
     if (!project_id) return jsonRes({ error: "project_id가 필요합니다" }, 400);
 
     const serviceAccount = JSON.parse(env.POLOS_PROJECTS_GOOGLE_KEY);
-    const accessToken = await getAccessToken(serviceAccount, ["https://www.googleapis.com/auth/documents"]);
+    const accessToken = await getAccessToken(serviceAccount, [
+      "https://www.googleapis.com/auth/documents",
+      "https://www.googleapis.com/auth/drive",
+    ]);
 
     const sbHeaders = {
       apikey: SUPABASE_ANON_KEY,
@@ -318,6 +347,20 @@ export async function onRequestPost(context) {
     const summaryPrompt = `다음은 사교원 후진항 어촌신활력증진사업의 한 프로젝트 실적 요약이야. 이 내용만 바탕으로 종합 평가 문단을 3~5문장, 공식 보고서에 어울리는 간결하고 격식있는 문체로 작성해줘. 사실을 지어내지 말고 주어진 내용에서만 판단해. 결과만 출력해(설명이나 따옴표 없이):\n\n${facts}`;
     blocks.push({ text: await callGemini(env, summaryPrompt, "(직접 작성 필요)"), style: "NORMAL" });
 
+    blocks.push({ text: "9. 사진", style: "HEADING_1" });
+    if (!project.photo_folder_id) {
+      blocks.push({ text: "(연결된 사진 폴더가 없습니다)", style: "NORMAL" });
+    } else {
+      const photos = await fetchFolderPhotos(accessToken, project.photo_folder_id);
+      if (!photos.length) {
+        blocks.push({ text: "(폴더에 등록된 사진이 없습니다)", style: "NORMAL" });
+      } else {
+        photos.forEach((p) => {
+          blocks.push({ style: "IMAGE", uri: p.uri, caption: p.name });
+        });
+      }
+    }
+
     // ---- 구글독스에 반영 ----
     const docRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -339,6 +382,20 @@ export async function onRequestPost(context) {
     let cursor = 1;
     const styleRequests = [];
     blocks.forEach((b) => {
+      if (b.style === "IMAGE") {
+        requests.push({
+          insertInlineImage: {
+            uri: b.uri,
+            location: { index: cursor },
+            objectSize: { width: { magnitude: 350, unit: "PT" } },
+          },
+        });
+        cursor += 1;
+        const capText = `${b.caption}\n`;
+        requests.push({ insertText: { location: { index: cursor }, text: capText } });
+        cursor += capText.length;
+        return;
+      }
       const text = `${b.text}\n`;
       requests.push({ insertText: { location: { index: cursor }, text } });
       const range = { startIndex: cursor, endIndex: cursor + text.length };
