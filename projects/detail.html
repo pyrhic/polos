@@ -684,13 +684,20 @@
       } else {
         const parentId = idByMaster.get(mt.parent_id);
         if (!parentId) continue;
+        // default_assignee는 실제 사람 이름이 아니라 "PM"/"홍보담당" 같은 역할(직책) 라벨임.
+        // 그래서 그대로 담당자로 넣지 않고 assignee_role에 역할만 남겨두고, 팀 구성(조직도)에
+        // 그 역할을 가진 사람이 이미 등록돼 있으면 그 사람 이름을 담당자로 채움(없으면 미지정으로
+        // 남아있다가, 나중에 그 역할의 팀원이 추가되는 순간 addTeamMember에서 자동으로 채워짐)
+        const matchedMember = currentTeam.find((m) => m.role === mt.default_assignee);
         await fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks`, {
           method: "POST",
           headers,
           body: JSON.stringify({
             project_id: Number(projectId), master_task_id: mt.id, parent_id: parentId, level: 1,
             name: mt.name, status: "예정", progress: 0, is_milestone: false,
-            assignee: mt.default_assignee || null, deliverables: mt.deliverables_template || null,
+            assignee_role: mt.default_assignee || null,
+            assignee: matchedMember ? matchedMember.name : null,
+            deliverables: mt.deliverables_template || null,
             evidence_required: mt.evidence_required || false, sort_order: sortCounter++,
           }),
         });
@@ -724,11 +731,14 @@
     const dday = dDayLabel(t.due_date);
     const metaBits = [];
     const hasTeam = currentTeam.length > 0;
-    // 조직도(팀 구성)가 있어야 담당자를 "골라서" 바꿀 수 있음 - 없으면 예전처럼 그냥 텍스트로만 표시
+    // 조직도(팀 구성)가 있어야 담당자를 "골라서" 바꿀 수 있음 - 없으면 예전처럼 그냥 텍스트로만 표시.
+    // assignee_role은 실제 이름이 아니라 역할(PM 등) 라벨이라 절대 이름 대신 보여주지 않고,
+    // 아직 그 역할의 팀원이 없어 담당자가 비어있을 때 "누가 맡을 자리인지" 힌트로만 곁들임
+    const roleHint = !t.assignee && t.assignee_role ? ` (${escapeHtml(t.assignee_role)} 예정)` : "";
     if (hasTeam) {
-      metaBits.push(`<span class="wbs-assignee-pick" data-id="${t.id}">담당 ${t.assignee ? escapeHtml(t.assignee) : "미지정"}</span>`);
-    } else if (t.assignee) {
-      metaBits.push(`담당 ${escapeHtml(t.assignee)}`);
+      metaBits.push(`<span class="wbs-assignee-pick" data-id="${t.id}">담당 ${t.assignee ? escapeHtml(t.assignee) : "미지정"}${roleHint}</span>`);
+    } else if (t.assignee || roleHint) {
+      metaBits.push(`담당 ${t.assignee ? escapeHtml(t.assignee) : "미지정"}${roleHint}`);
     }
     if (t.deliverables) metaBits.push(`산출물 ${escapeHtml(t.deliverables)}`);
     if (t.priority) metaBits.push(`우선순위 ${escapeHtml(t.priority)}`);
@@ -1088,15 +1098,24 @@
     const nameInput = document.getElementById("newTeamName");
     const roleInput = document.getElementById("newTeamRole");
     const name = nameInput.value.trim();
+    const role = roleInput.value.trim() || null;
     if (!name) return;
     const res = await fetch(`${SUPABASE_URL}/rest/v1/project_team_members`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ project_id: Number(projectId), name, role: roleInput.value.trim() || null }),
+      body: JSON.stringify({ project_id: Number(projectId), name, role }),
     });
     if (!res.ok) {
       alert("팀원 추가 실패: " + (await res.text()));
       return;
+    }
+    // 이 역할이 걸려있던(아직 이름 미배정) 업무들을 이 사람 이름으로 한 번에 채워 넣음 -
+    // 조직도(팀 구성)에 이름을 등록하면 자동으로 해당 업무가 그 사람에게 지정되는 부분
+    if (role) {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/project_wbs_tasks?project_id=eq.${projectId}&assignee_role=eq.${encodeURIComponent(role)}&assignee=is.null`,
+        { method: "PATCH", headers, body: JSON.stringify({ assignee: name }) }
+      );
     }
     nameInput.value = "";
     roleInput.value = "";
