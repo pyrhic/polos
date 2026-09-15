@@ -196,8 +196,9 @@
         </div>
         ` : `
         <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;">
-          구글시트로 내보내려면 먼저 구글시트를 하나 만들어서 아래 계정에 편집자로 공유한 뒤, 그 시트 링크를 붙여넣어 연결해주세요.<br>
-          공유할 계정: <code style="color:#8b7ff0;">${GANTT_SERVICE_ACCOUNT_EMAIL}</code>
+          아래 계정을 구글시트에 편집자로 등록해주세요.<br>
+          <code style="color:#8b7ff0;">${GANTT_SERVICE_ACCOUNT_EMAIL}</code>
+          <button type="button" id="copyGanttEmailBtn" style="width:auto;padding:2px 8px;font-size:0.75rem;margin-left:6px;">복사</button>
         </div>
         <div class="timeline-add-row" style="margin-top:8px;">
           <input type="text" id="ganttSheetLinkInput" placeholder="구글시트 링크 또는 ID 붙여넣기">
@@ -267,6 +268,14 @@
     if (document.getElementById("connectGanttSheetBtn")) {
       document.getElementById("connectGanttSheetBtn").addEventListener("click", connectGanttSheet);
       document.getElementById("ganttSheetLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectGanttSheet(); });
+    }
+    if (document.getElementById("copyGanttEmailBtn")) {
+      document.getElementById("copyGanttEmailBtn").addEventListener("click", async (e) => {
+        await navigator.clipboard.writeText(GANTT_SERVICE_ACCOUNT_EMAIL);
+        const btn = e.target;
+        btn.textContent = "복사됨";
+        setTimeout(() => { btn.textContent = "복사"; }, 1500);
+      });
     }
 
     wireTimelineEvents();
