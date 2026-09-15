@@ -28,6 +28,24 @@
   const projectId = new URLSearchParams(location.search).get("id");
   const content = document.getElementById("content");
 
+  function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  }
+  function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch {}
+    document.body.removeChild(ta);
+  }
+
   let currentProject = null;
   let currentWbsTasks = []; // project_wbs_tasks 전체(마일스톤=level0 parent_id null + 하위 업무들) - 트리는 여기서 파생
   let currentNotes = [];
@@ -270,8 +288,8 @@
       document.getElementById("ganttSheetLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectGanttSheet(); });
     }
     if (document.getElementById("copyGanttEmailBtn")) {
-      document.getElementById("copyGanttEmailBtn").addEventListener("click", async (e) => {
-        await navigator.clipboard.writeText(GANTT_SERVICE_ACCOUNT_EMAIL);
+      document.getElementById("copyGanttEmailBtn").addEventListener("click", (e) => {
+        copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
         const btn = e.target;
         btn.textContent = "복사됨";
         setTimeout(() => { btn.textContent = "복사"; }, 1500);
