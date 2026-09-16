@@ -159,6 +159,13 @@
   function milestones() {
     return childrenOf(null);
   }
+  // 결과보고서는 프로젝트가 마무리되는 시점(날짜상 마지막 마일스톤)에 쓰는 거라, 그 마일스톤을
+  // 펼쳤을 때만 "결과보고" 항목이 보이게 함(상시 노출 대신)
+  function lastMilestoneId() {
+    const ms = milestones().filter((m) => m.due_date);
+    if (!ms.length) return null;
+    return ms.reduce((a, b) => (a.due_date > b.due_date ? a : b)).id;
+  }
   function descendantsFlat(id) {
     const kids = childrenOf(id);
     return kids.flatMap((k) => [k, ...descendantsFlat(k.id)]);
@@ -227,26 +234,6 @@
       </div>
 
       ${project.description ? `<p class="role" style="text-align:left;margin-top:22px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
-
-      <div class="section-title">결과보고서</div>
-      <div style="margin:10px 0;">
-        ${project.report_doc_id ? `
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button type="button" id="generateReportBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">결과보고서 생성하기</button>
-          <a href="https://docs.google.com/document/d/${project.report_doc_id}/edit" target="_blank" style="font-size:0.8rem;color:#8b7ff0;">문서 열기 →</a>
-        </div>
-        ` : `
-        <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;">
-          아래 계정을 구글독스에 편집자로 등록해주세요.<br>
-          <code style="color:#8b7ff0;">${GANTT_SERVICE_ACCOUNT_EMAIL}</code>
-          <button type="button" id="copyReportEmailBtn" style="width:auto;padding:2px 8px;font-size:0.75rem;margin-left:6px;">복사</button>
-        </div>
-        <div class="timeline-add-row" style="margin-top:8px;">
-          <input type="text" id="reportDocLinkInput" placeholder="구글독스 링크 또는 ID 붙여넣기">
-          <button type="button" id="connectReportDocBtn" style="width:auto;">연결</button>
-        </div>
-        `}
-      </div>
 
       <div class="section-title">만족도 조사</div>
       <div style="margin:10px 0;">
@@ -371,22 +358,6 @@
         setTimeout(() => { btn.textContent = "복사"; }, 1500);
       });
     }
-    if (document.getElementById("generateReportBtn")) {
-      document.getElementById("generateReportBtn").addEventListener("click", generateResultReport);
-    }
-    if (document.getElementById("connectReportDocBtn")) {
-      document.getElementById("connectReportDocBtn").addEventListener("click", connectReportDoc);
-      document.getElementById("reportDocLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectReportDoc(); });
-    }
-    if (document.getElementById("copyReportEmailBtn")) {
-      document.getElementById("copyReportEmailBtn").addEventListener("click", (e) => {
-        copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
-        const btn = e.target;
-        btn.textContent = "복사됨";
-        setTimeout(() => { btn.textContent = "복사"; }, 1500);
-      });
-    }
-
     wireTimelineEvents();
     wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
     wireNoteEvents();
@@ -694,6 +665,27 @@
     }
   }
 
+  // 마일스톤별 사진 하위 폴더 생성 - 프로젝트 메인 사진 폴더 안에 그 마일스톤 이름으로 만듦
+  async function createMilestonePhotoFolder(taskId) {
+    const btn = document.querySelector(`.createMilestonePhotoFolderBtn[data-id="${taskId}"]`);
+    if (btn) { btn.disabled = true; btn.textContent = "만드는 중..."; }
+    try {
+      const m = currentWbsTasks.find((t) => t.id === taskId);
+      const res = await fetch("/api/create-milestone-photo-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: Number(projectId), task_id: taskId, milestone_name: m ? m.name : "마일스톤" }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "생성 실패");
+      window.open(data.folder_url, "_blank");
+      load();
+    } catch (err) {
+      alert("사진 폴더 생성 실패: " + err.message);
+      if (btn) { btn.disabled = false; btn.textContent = "+ 사진 폴더 만들기"; }
+    }
+  }
+
   // 사람이 미리 만들어 공유해준 구글독스를 프로젝트에 연결(구글시트와 동일한 이유 - 서비스계정이
   // 새 파일을 스스로 못 만듦)
   async function connectReportDoc() {
@@ -899,6 +891,47 @@
         ${kids.length ? kids.map((t) => renderTaskNode(t, 0)).join("") : '<div class="empty">아직 하위 업무가 없습니다.</div>'}
       </div>
       ${addTaskBoxHtml(m.id)}
+      ${renderMilestonePhotoBox(m)}
+      ${m.id === lastMilestoneId() ? renderResultReportBox() : ""}
+    `;
+  }
+
+  // 마일스톤별 사진 폴더 - 업로드 자체는 서비스계정이 못 하지만(저장공간 문제),
+  // 그 마일스톤 이름의 하위 폴더는 만들 수 있어서 만들기+열기까지만 지원
+  function renderMilestonePhotoBox(m) {
+    return `
+      <div style="margin-top:10px;">
+        ${m.photo_folder_id
+          ? `<a href="https://drive.google.com/drive/folders/${m.photo_folder_id}" target="_blank" class="add-trigger-btn" style="text-decoration:none;display:inline-block;">사진 폴더 열기 →</a>`
+          : `<button type="button" class="createMilestonePhotoFolderBtn add-trigger-btn" data-id="${m.id}">+ 사진 폴더 만들기</button>`
+        }
+      </div>
+    `;
+  }
+
+  // 결과보고서 - 날짜상 마지막 마일스톤(프로젝트 마무리 시점)에서만 노출
+  function renderResultReportBox() {
+    const project = currentProject;
+    return `
+      <div style="margin-top:14px;border-top:1px solid #1e3a52;padding-top:14px;">
+        <div style="font-size:0.8rem;color:#9fb0c3;margin-bottom:8px;">결과보고서</div>
+        ${project.report_doc_id ? `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button type="button" id="generateReportBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">결과보고서 생성하기</button>
+          <a href="https://docs.google.com/document/d/${project.report_doc_id}/edit" target="_blank" style="font-size:0.8rem;color:#8b7ff0;">문서 열기 →</a>
+        </div>
+        ` : `
+        <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;">
+          아래 계정을 구글독스에 편집자로 등록해주세요.<br>
+          <code style="color:#8b7ff0;">${GANTT_SERVICE_ACCOUNT_EMAIL}</code>
+          <button type="button" id="copyReportEmailBtn" style="width:auto;padding:2px 8px;font-size:0.75rem;margin-left:6px;">복사</button>
+        </div>
+        <div class="timeline-add-row" style="margin-top:8px;">
+          <input type="text" id="reportDocLinkInput" placeholder="구글독스 링크 또는 ID 붙여넣기">
+          <button type="button" id="connectReportDocBtn" style="width:auto;">연결</button>
+        </div>
+        `}
+      </div>
     `;
   }
 
@@ -1027,6 +1060,25 @@
         load();
       });
     });
+    root.querySelectorAll(".createMilestonePhotoFolderBtn").forEach((btn) => {
+      btn.addEventListener("click", () => createMilestonePhotoFolder(Number(btn.dataset.id)));
+    });
+    const reportBtn = root.querySelector("#generateReportBtn");
+    if (reportBtn) reportBtn.addEventListener("click", generateResultReport);
+    const connectBtn = root.querySelector("#connectReportDocBtn");
+    if (connectBtn) {
+      connectBtn.addEventListener("click", connectReportDoc);
+      root.querySelector("#reportDocLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectReportDoc(); });
+    }
+    const copyBtn = root.querySelector("#copyReportEmailBtn");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", (e) => {
+        copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
+        const btn = e.target;
+        btn.textContent = "복사됨";
+        setTimeout(() => { btn.textContent = "복사"; }, 1500);
+      });
+    }
     wireWbsTreeEvents(root);
   }
 
