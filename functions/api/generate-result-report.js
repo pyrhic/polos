@@ -160,117 +160,6 @@ async function fetchSurveyEvaluation(serviceAccount, formId) {
   return { responseCount: responses.length, quantitative, qualitative };
 }
 
-// 정량 문항 평균을 "그림"이 아니라 연결된 구글시트 안에 진짜 편집 가능한 차트로 만들어 넣음.
-// (독스 API에는 "시트에 연결된 차트 삽입" 기능이 아예 없어서 - 그건 독스 UI에서 사람이 직접
-// "삽입 > 차트 > 시트에서"를 눌러야만 되는 기능임. 대신 시트 안에는 API로 진짜 차트를 만들 수
-// 있으니, 데이터+차트를 시트의 "설문결과" 탭에 만들어두고 보고서에는 그 탭 링크만 넣음 -
-// 그러면 나중에 시트에서 직접 차트를 고칠 수 있음)
-async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
-  const metaRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  if (!metaRes.ok) return null;
-  const meta = await metaRes.json();
-  const existing = (meta.sheets || []).find((s) => s.properties?.title === "설문결과");
-
-  const createReqs = [];
-  if (existing) createReqs.push({ deleteSheet: { sheetId: existing.properties.sheetId } });
-  createReqs.push({ addSheet: { properties: { title: "설문결과" } } });
-  const createRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ requests: createReqs }),
-  });
-  if (!createRes.ok) return null;
-  const created = await createRes.json();
-  const addSheetReply = (created.replies || []).find((r) => r.addSheet);
-  const newSheetId = addSheetReply.addSheet.properties.sheetId;
-
-  // 문항마다 "제목 행 + 값/응답수/비율 표"를 세로로 쌓고, 그 표 옆(D열)에 그 문항만의 분포
-  // 차트를 하나씩 앉힘 - 구글폼 자체 응답 요약 화면처럼 문항별로 분포가 따로 보이게 함.
-  // 비율은 숫자(0~1)로 저장해두고 셀 서식을 퍼센트로 입혀서, 차트 막대 길이도 비율 기준으로
-  // 통일되고(문항마다 척도가 달라도 비교 가능) 막대 위 라벨에도 "40%"처럼 그대로 표시됨
-  const rows = [];
-  const blocks = [];
-  quantitative.forEach((q) => {
-    const titleRow = rows.length;
-    rows.push([q.title]);
-    rows.push(["값", "응답 수", "비율"]);
-    const dataStartRow = rows.length;
-    q.dist.forEach((d) => {
-      rows.push([d.value, d.count, q.total ? d.count / q.total : 0]);
-    });
-    blocks.push({ titleRow, dataStartRow, dataEndRow: rows.length });
-    rows.push([]);
-    rows.push([]);
-  });
-
-  const valuesRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/설문결과!A1?valueInputOption=RAW`,
-    {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ values: rows }),
-    }
-  );
-  if (!valuesRes.ok) return null;
-
-  const ACCENT_COLOR = { red: 0.545, green: 0.498, blue: 0.941 }; // #8b7ff0, 앱 강조색과 통일
-  const formatRequests = blocks.map((b) => ({
-    repeatCell: {
-      range: { sheetId: newSheetId, startRowIndex: b.dataStartRow, endRowIndex: b.dataEndRow, startColumnIndex: 2, endColumnIndex: 3 },
-      cell: { userEnteredFormat: { numberFormat: { type: "PERCENT", pattern: "0%" } } },
-      fields: "userEnteredFormat.numberFormat",
-    },
-  }));
-  const chartRequests = quantitative.map((q, i) => ({
-    addChart: {
-      chart: {
-        spec: {
-          title: q.title,
-          basicChart: {
-            chartType: "COLUMN",
-            legendPosition: "NO_LEGEND",
-            axis: [{ position: "LEFT_AXIS", format: { pattern: "0%" }, viewWindowOptions: { viewWindowMin: 0, viewWindowMax: 1 } }],
-            domains: [
-              {
-                domain: {
-                  sourceRange: {
-                    sources: [{ sheetId: newSheetId, startRowIndex: blocks[i].dataStartRow, endRowIndex: blocks[i].dataEndRow, startColumnIndex: 0, endColumnIndex: 1 }],
-                  },
-                },
-              },
-            ],
-            series: [
-              {
-                series: {
-                  sourceRange: {
-                    sources: [{ sheetId: newSheetId, startRowIndex: blocks[i].dataStartRow, endRowIndex: blocks[i].dataEndRow, startColumnIndex: 2, endColumnIndex: 3 }],
-                  },
-                },
-                targetAxis: "LEFT_AXIS",
-                color: ACCENT_COLOR,
-                dataLabel: { type: "DATA" },
-              },
-            ],
-          },
-        },
-        position: {
-          overlayPosition: { anchorCell: { sheetId: newSheetId, rowIndex: blocks[i].titleRow, columnIndex: 3 }, widthPixels: 500, heightPixels: 300 },
-        },
-      },
-    },
-  }));
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ requests: [...formatRequests, ...chartRequests] }),
-  });
-
-  return `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=${newSheetId}`;
-}
-
 const MAX_REPORT_PHOTOS = 20;
 
 // 사진 폴더(사람이 올린 실제 사진)에서 이미지 목록을 가져와, 문서에 끼워 넣을 수 있게 각 파일을
@@ -307,7 +196,6 @@ export async function onRequestPost(context) {
     const accessToken = await getAccessToken(serviceAccount, [
       "https://www.googleapis.com/auth/documents",
       "https://www.googleapis.com/auth/drive",
-      "https://www.googleapis.com/auth/spreadsheets",
     ]);
 
     const sbHeaders = {
@@ -459,16 +347,14 @@ export async function onRequestPost(context) {
           const summary = q.avg !== null ? `평균 ${q.avg.toFixed(1)}점 (${q.total}건) - ${distSummary(q)}` : distSummary(q);
           blocks.push({ text: `${q.title} - ${summary}`, style: "BULLET" });
         });
-        if (survey.quantitative.length) {
-          if (!project.gantt_sheet_id) {
-            blocks.push({ text: "(그래프를 만들려면 먼저 간트차트 시트를 연결해주세요)", style: "NORMAL" });
-          } else {
-            const chartUrl = await writeSurveyChartToSheet(accessToken, project.gantt_sheet_id, survey.quantitative);
-            if (chartUrl) {
-              blocks.push({ style: "LINK", text: "만족도 조사 결과 그래프 (구글시트에서 보기/수정) →", url: chartUrl });
-            }
-          }
-        }
+        // 차트를 우리가 다시 만들면 응답이 새로 들어와도 "생성하기"를 눌러야 갱신되는 반면,
+        // 폼 자체의 Responses 화면은 응답이 들어오는 즉시 반영됨 - 그래서 차트를 직접 그리지
+        // 않고 그 화면으로 가는 링크만 남김
+        blocks.push({
+          style: "LINK",
+          text: "만족도 조사 응답 보기 (실시간, 구글폼) →",
+          url: `https://docs.google.com/forms/d/${project.survey_form_id}/edit#responses`,
+        });
         survey.qualitative.forEach((q) => {
           blocks.push({ text: q.title, style: "HEADING_2" });
           q.answers.slice(0, 15).forEach((a) => blocks.push({ text: a, style: "BULLET" }));
