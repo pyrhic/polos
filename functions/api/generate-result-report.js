@@ -98,25 +98,40 @@ async function fetchSurveyEvaluation(serviceAccount, formId) {
   const respData = await respRes.json();
   const responses = respData.responses || [];
 
-  const qMeta = new Map(); // questionId -> { title, type }
+  // qMeta에 SCALE의 low~high, CHOICE의 전체 선택지 목록까지 담아둠 - 응답이 0건인 값도
+  // 분포표에 "0건"으로 표시되게 하려면(구글폼 자체 응답 요약 화면과 같은 방식) 답변에만
+  // 의존하지 않고 문항 구조에서 전체 값 목록을 미리 알아야 함
+  const qMeta = new Map(); // questionId -> { title, type, categories }
   (form.items || []).forEach((item) => {
     const q = item.questionItem?.question;
     if (!q) return;
-    const type = q.scaleQuestion ? "SCALE" : q.choiceQuestion ? "CHOICE" : "TEXT";
-    qMeta.set(q.questionId, { title: item.title || "(제목 없음)", type });
+    if (q.scaleQuestion) {
+      const { low, high } = q.scaleQuestion;
+      const categories = [];
+      for (let v = low; v <= high; v++) categories.push(String(v));
+      qMeta.set(q.questionId, { title: item.title || "(제목 없음)", type: "SCALE", categories });
+    } else if (q.choiceQuestion) {
+      qMeta.set(q.questionId, {
+        title: item.title || "(제목 없음)",
+        type: "CHOICE",
+        categories: (q.choiceQuestion.options || []).map((o) => o.value),
+      });
+    } else {
+      qMeta.set(q.questionId, { title: item.title || "(제목 없음)", type: "TEXT" });
+    }
   });
 
-  const numericByQ = new Map();
+  const tallyByQ = new Map(); // qid -> Map(answerValue -> count)
   const textByQ = new Map();
   responses.forEach((r) => {
     Object.entries(r.answers || {}).forEach(([qid, ans]) => {
       const meta = qMeta.get(qid);
       if (!meta) return;
       (ans.textAnswers?.answers || []).forEach((a) => {
-        const n = Number(a.value);
-        if ((meta.type === "SCALE" || meta.type === "CHOICE") && !Number.isNaN(n)) {
-          if (!numericByQ.has(qid)) numericByQ.set(qid, []);
-          numericByQ.get(qid).push(n);
+        if (meta.type === "SCALE" || meta.type === "CHOICE") {
+          if (!tallyByQ.has(qid)) tallyByQ.set(qid, new Map());
+          const t = tallyByQ.get(qid);
+          t.set(a.value, (t.get(a.value) || 0) + 1);
         } else {
           if (!textByQ.has(qid)) textByQ.set(qid, []);
           textByQ.get(qid).push(a.value);
@@ -125,11 +140,18 @@ async function fetchSurveyEvaluation(serviceAccount, formId) {
     });
   });
 
-  const quantitative = [...numericByQ.entries()].map(([qid, vals]) => ({
-    title: qMeta.get(qid).title,
-    avg: vals.reduce((s, v) => s + v, 0) / vals.length,
-    count: vals.length,
-  }));
+  // 정량 문항은 "평균 하나"가 아니라 각 값(1~5점 등)별 응답 수 분포로 - 응답이 1건뿐이어도
+  // "몇 명 중 몇 명이 이 값을 골랐는지"가 그대로 의미를 가짐(평균만 내면 응답이 적을 때 의미가 없음)
+  const quantitative = [...tallyByQ.entries()].map(([qid, tally]) => {
+    const meta = qMeta.get(qid);
+    const total = [...tally.values()].reduce((s, c) => s + c, 0);
+    const dist = meta.categories.map((c) => ({ value: c, count: tally.get(c) || 0 }));
+    const avg =
+      meta.type === "SCALE"
+        ? [...tally.entries()].reduce((s, [v, c]) => s + Number(v) * c, 0) / (total || 1)
+        : null;
+    return { title: meta.title, dist, total, avg };
+  });
   const qualitative = [...textByQ.entries()].map(([qid, vals]) => ({
     title: qMeta.get(qid).title,
     answers: vals,
@@ -165,7 +187,24 @@ async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
   const addSheetReply = (created.replies || []).find((r) => r.addSheet);
   const newSheetId = addSheetReply.addSheet.properties.sheetId;
 
-  const rows = [["문항", "평균 점수", "응답 수"], ...quantitative.map((q) => [q.title, Number(q.avg.toFixed(1)), q.count])];
+  // 문항마다 "제목 행 + 값/응답수/비율 표"를 세로로 쌓고, 그 표 옆(D열)에 그 문항만의 분포
+  // 차트를 하나씩 앉힘 - 구글폼 자체 응답 요약 화면처럼 문항별로 분포가 따로 보이게 함
+  const rows = [];
+  const blocks = [];
+  quantitative.forEach((q) => {
+    const titleRow = rows.length;
+    rows.push([q.title]);
+    rows.push(["값", "응답 수", "비율"]);
+    const dataStartRow = rows.length;
+    q.dist.forEach((d) => {
+      const pct = q.total ? Math.round((d.count / q.total) * 100) : 0;
+      rows.push([d.value, d.count, `${pct}%`]);
+    });
+    blocks.push({ titleRow, dataStartRow, dataEndRow: rows.length });
+    rows.push([]);
+    rows.push([]);
+  });
+
   const valuesRes = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/설문결과!A1?valueInputOption=RAW`,
     {
@@ -176,46 +215,44 @@ async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
   );
   if (!valuesRes.ok) return null;
 
-  const n = quantitative.length;
+  const chartRequests = quantitative.map((q, i) => ({
+    addChart: {
+      chart: {
+        spec: {
+          title: q.title,
+          basicChart: {
+            chartType: "COLUMN",
+            legendPosition: "NO_LEGEND",
+            domains: [
+              {
+                domain: {
+                  sourceRange: {
+                    sources: [{ sheetId: newSheetId, startRowIndex: blocks[i].dataStartRow, endRowIndex: blocks[i].dataEndRow, startColumnIndex: 0, endColumnIndex: 1 }],
+                  },
+                },
+              },
+            ],
+            series: [
+              {
+                series: {
+                  sourceRange: {
+                    sources: [{ sheetId: newSheetId, startRowIndex: blocks[i].dataStartRow, endRowIndex: blocks[i].dataEndRow, startColumnIndex: 1, endColumnIndex: 2 }],
+                  },
+                },
+              },
+            ],
+          },
+        },
+        position: {
+          overlayPosition: { anchorCell: { sheetId: newSheetId, rowIndex: blocks[i].titleRow, columnIndex: 3 }, widthPixels: 500, heightPixels: 300 },
+        },
+      },
+    },
+  }));
   await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      requests: [
-        {
-          addChart: {
-            chart: {
-              spec: {
-                title: "만족도 조사 결과",
-                basicChart: {
-                  chartType: "COLUMN",
-                  legendPosition: "NO_LEGEND",
-                  axis: [{ position: "LEFT_AXIS", viewWindowOptions: { viewWindowMin: 0, viewWindowMax: 5 } }],
-                  domains: [
-                    {
-                      domain: {
-                        sourceRange: { sources: [{ sheetId: newSheetId, startRowIndex: 1, endRowIndex: 1 + n, startColumnIndex: 0, endColumnIndex: 1 }] },
-                      },
-                    },
-                  ],
-                  series: [
-                    {
-                      series: {
-                        sourceRange: { sources: [{ sheetId: newSheetId, startRowIndex: 1, endRowIndex: 1 + n, startColumnIndex: 1, endColumnIndex: 2 }] },
-                      },
-                      targetAxis: "LEFT_AXIS",
-                    },
-                  ],
-                },
-              },
-              position: {
-                overlayPosition: { anchorCell: { sheetId: newSheetId, rowIndex: 0, columnIndex: 3 }, widthPixels: 600, heightPixels: 350 },
-              },
-            },
-          },
-        },
-      ],
-    }),
+    body: JSON.stringify({ requests: chartRequests }),
   });
 
   return `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=${newSheetId}`;
@@ -404,8 +441,10 @@ export async function onRequestPost(context) {
         blocks.push({ text: "(설문 응답이 아직 없습니다)", style: "NORMAL" });
       } else if (survey) {
         blocks.push({ text: `총 응답 ${survey.responseCount}건`, style: "NORMAL" });
+        const distSummary = (q) => q.dist.map((d) => `${d.value} ${d.count}건`).join(", ");
         survey.quantitative.forEach((q) => {
-          blocks.push({ text: `${q.title} - 평균 ${q.avg.toFixed(1)}점 (${q.count}건)`, style: "BULLET" });
+          const summary = q.avg !== null ? `평균 ${q.avg.toFixed(1)}점 (${q.total}건) - ${distSummary(q)}` : distSummary(q);
+          blocks.push({ text: `${q.title} - ${summary}`, style: "BULLET" });
         });
         if (survey.quantitative.length) {
           if (!project.survey_sheet_id) {
@@ -423,7 +462,7 @@ export async function onRequestPost(context) {
         });
         const evalFacts = [
           `총 응답 ${survey.responseCount}건`,
-          ...survey.quantitative.map((q) => `${q.title}: 평균 ${q.avg.toFixed(1)}점`),
+          ...survey.quantitative.map((q) => `${q.title}: ${q.avg !== null ? `평균 ${q.avg.toFixed(1)}점, ` : ""}분포 ${distSummary(q)}`),
           ...survey.qualitative.map((q) => `${q.title} 주관식 답변: ${q.answers.slice(0, 10).join(" / ")}`),
         ].join("\n");
         const evalPrompt = `다음은 사교원 후진항 어촌신활력증진사업의 한 프로젝트 만족도 조사 결과야. 이 내용만 바탕으로 정량적 평가(평점 수준)와 정성적 평가(주관식 의견 경향)를 나눠서 3~6문장, 공식 보고서에 어울리는 간결하고 격식있는 문체로 작성해줘. 사실을 지어내지 말고 주어진 내용에서만 판단해. 결과만 출력해(설명이나 따옴표 없이):\n\n${evalFacts}`;
