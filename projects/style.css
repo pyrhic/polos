@@ -416,6 +416,16 @@ a.back {
   background: #a89bff;
 }
 
+/* 간트차트 "생성"(최초 1회, 만드는 동작)과 "가져오기"(그 이후 반복하는 동기화 동작)를
+   색으로 구분 - 가져오기는 앱에서 "완료/정상" 의미로 이미 쓰는 초록을 재사용 */
+.btn-accent-green {
+  background: #3ecf8e;
+  color: #0d1b2a;
+}
+.btn-accent-green:hover {
+  background: #63dba4;
+}
+
 /* 구글시트 열기 - 텍스트 링크 대신 구글시트 아이콘만 있는 작은 원형 버튼 */
 .sheet-icon-btn {
   display: inline-flex;
