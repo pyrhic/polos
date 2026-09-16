@@ -235,9 +235,7 @@ export async function onRequestPost(context) {
       return acc;
     }
     const milestones = sortByDate(byParent.get("root") || []);
-    const allChildren = milestones.flatMap((m) => flattenDescendants(m.id, []));
-    const doneChildren = allChildren.filter((t) => t.status === "완료");
-    const pendingChildren = allChildren.filter((t) => t.status !== "완료");
+    const doneChildren = milestones.flatMap((m) => flattenDescendants(m.id, [])).filter((t) => t.status === "완료");
 
     // ---- 문서 내용 블록 구성 ----
     const blocks = [];
@@ -261,49 +259,16 @@ export async function onRequestPost(context) {
       style: "NORMAL",
     });
 
-    // 추진 경과는 세부 업무를 전부 나열하지 않고 마일스톤별 완료현황만 간단히 요약함(그건 기획서 몫) -
-    // 결과보고서는 대신 (1) 행사 당일("실행" 마일스톤)에 실제 있었던 일, (2) 예산이 실제로 걸린
-    // 사전준비 업무만 따로 짚어서 "실제로 무슨 일이 있었는지"에 집중되게 함
-    blocks.push({ text: "3. 추진 경과", style: "HEADING_1" });
-    milestones.forEach((m) => {
-      const kids = flattenDescendants(m.id, []);
-      const total = kids.length;
-      const done = kids.filter((t) => t.status === "완료").length;
-      blocks.push({
-        text: `${m.name} (${m.due_date || "-"}) - ${total ? `${done}/${total} 완료` : m.status || ""}`,
-        style: "BULLET",
-      });
-    });
-
-    const eventMilestone = milestones.find((m) => m.name === "실행");
-    if (eventMilestone) {
-      blocks.push({ text: "행사 당일 진행 내용", style: "HEADING_2" });
-      const eventTasks = sortByDate(flattenDescendants(eventMilestone.id, []));
-      if (eventTasks.length) {
-        eventTasks.forEach((t) => {
-          blocks.push({
-            text: `${t.name} - ${t.status === "완료" ? "완료" : t.status || "예정"}${t.deliverables ? " (" + t.deliverables + ")" : ""}`,
-            style: "BULLET",
-          });
-        });
-      } else {
-        blocks.push({ text: "(등록된 세부 내용 없음)", style: "NORMAL" });
-      }
-    }
-
-    const bigBudgetTasks = allChildren
-      .filter((t) => (Number(t.budget_actual) || Number(t.budget_planned) || 0) > 0)
-      .sort((a, b) => (Number(b.budget_actual) || Number(b.budget_planned) || 0) - (Number(a.budget_actual) || Number(a.budget_planned) || 0));
-    if (bigBudgetTasks.length) {
-      blocks.push({ text: "주요 예산 집행 사전준비", style: "HEADING_2" });
-      bigBudgetTasks.forEach((t) => {
-        const amount = Number(t.budget_actual) || Number(t.budget_planned) || 0;
-        blocks.push({ text: `${t.name} - ${amount.toLocaleString()}원`, style: "BULLET" });
-      });
-    }
+    // WBS(업무관리 목록)는 내부적으로 일을 어떻게 나눠 진행했는지 보여주는 도구일 뿐, 읽는 사람이
+    // "이 행사/프로젝트가 무엇이었고 어떻게 진행됐는지"를 이해하는 데는 오히려 방해가 됨. 그래서
+    // 마일스톤/업무 목록을 그대로 나열하지 않고, 실제로 있었던 일 위주(특히 행사 당일 중심)로
+    // 제미나이가 서술형으로 정리함 - 여기 주어지지 않은 세부 진행 순서는 지어내지 않도록 함
+    blocks.push({ text: "3. 주요 추진 내용", style: "HEADING_1" });
+    const deliverables = [...new Set(doneChildren.map((t) => t.deliverables).filter(Boolean))];
+    const contentPrompt = `다음은 사교원 후진항 어촌신활력증진사업의 한 프로젝트/행사 정보야. 이 사실만 바탕으로 "주요 추진 내용"을 3~5문장으로 서술해줘. 내부 업무관리 목록을 나열하는 게 아니라, 이 글을 읽는 사람이 이 행사/프로젝트가 실제로 어떻게 진행되었는지(특히 행사 당일 중심으로) 이해할 수 있게 써야 해. 여기 없는 세부 시간표나 진행 순서는 지어내지 말고 주어진 사실 안에서만 서술해줘. 결과만 출력해(설명이나 따옴표 없이):\n\n사업명: ${project.name}\n추진기간: ${project.start_date || "-"} ~ ${project.due_date || "-"}\n사업 개요: ${project.description || "(기록된 메모 없음)"}\n확보된 산출물: ${deliverables.join(", ") || "(기록 없음)"}`;
+    blocks.push({ text: await callGemini(env, contentPrompt, "(직접 작성 필요)"), style: "NORMAL" });
 
     blocks.push({ text: "4. 성과 및 산출물", style: "HEADING_1" });
-    const deliverables = [...new Set(doneChildren.map((t) => t.deliverables).filter(Boolean))];
     if (deliverables.length) {
       deliverables.forEach((d) => blocks.push({ text: d, style: "BULLET" }));
     } else {
@@ -372,9 +337,7 @@ export async function onRequestPost(context) {
     blocks.push({ text: "8. 종합 평가", style: "HEADING_1" });
     const facts = [
       `추진기간 ${project.start_date || "-"}~${project.due_date || "-"}`,
-      `전체 업무 ${allChildren.length}건 중 완료 ${doneChildren.length}건`,
       `산출물: ${deliverables.join(", ") || "없음"}`,
-      `미완료 과제: ${pendingChildren.map((t) => t.name).join(", ") || "없음"}`,
     ].join("\n");
     const summaryPrompt = `다음은 사교원 후진항 어촌신활력증진사업의 한 프로젝트 실적 요약이야. 이 내용만 바탕으로 종합 평가 문단을 3~5문장, 공식 보고서에 어울리는 간결하고 격식있는 문체로 작성해줘. 사실을 지어내지 말고 주어진 내용에서만 판단해. 결과만 출력해(설명이나 따옴표 없이):\n\n${facts}`;
     blocks.push({ text: await callGemini(env, summaryPrompt, "(직접 작성 필요)"), style: "NORMAL" });
