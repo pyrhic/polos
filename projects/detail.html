@@ -166,6 +166,12 @@
     if (!ms.length) return null;
     return ms.reduce((a, b) => (a.due_date > b.due_date ? a : b)).id;
   }
+  // 만족도 조사는 "평가" 마일스톤에서 진행 - 그 이름의 마일스톤이 없으면(커스텀 구성 등)
+  // 마지막 마일스톤에서라도 볼 수 있게 함
+  function evalMilestoneId() {
+    const found = milestones().find((m) => m.name === "평가");
+    return found ? found.id : lastMilestoneId();
+  }
   function descendantsFlat(id) {
     const kids = childrenOf(id);
     return kids.flatMap((k) => [k, ...descendantsFlat(k.id)]);
@@ -235,33 +241,6 @@
 
       ${project.description ? `<p class="role" style="text-align:left;margin-top:22px;">${escapeHtml(project.description).replace(/\n/g, "<br>")}</p>` : ""}
 
-      <div class="section-title">만족도 조사</div>
-      <div style="margin:10px 0;">
-        ${project.survey_form_id ? `
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <a href="https://docs.google.com/forms/d/${project.survey_form_id}/edit" target="_blank" style="font-size:0.85rem;color:#8b7ff0;">설문지 열기 →</a>
-        </div>
-        ` : `
-        <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;">
-          만족도 조사 폼은 직접 만들어주셔야 해요(구글폼은 자동 생성이 안 됨). 아래 계정을 편집자로 등록해주세요.<br>
-          <code style="color:#8b7ff0;">${GANTT_SERVICE_ACCOUNT_EMAIL}</code>
-          <button type="button" id="copySurveyEmailBtn" style="width:auto;padding:2px 8px;font-size:0.75rem;margin-left:6px;">복사</button>
-        </div>
-        <div class="timeline-add-row" style="margin-top:8px;">
-          <input type="text" id="surveyFormLinkInput" placeholder="구글폼 링크 또는 ID 붙여넣기">
-          <button type="button" id="connectSurveyFormBtn" style="width:auto;">연결</button>
-        </div>
-        `}
-      </div>
-
-      <div class="section-title">사진</div>
-      <div style="margin:10px 0;">
-        ${project.photo_folder_id ? `
-        <a href="https://drive.google.com/drive/folders/${project.photo_folder_id}" target="_blank" style="font-size:0.85rem;color:#8b7ff0;">사진 폴더 열기 →</a>
-        ` : `
-        <button type="button" id="createPhotoFolderBtn" class="add-trigger-btn">사진 폴더 만들기</button>
-        `}
-      </div>
 
       <div class="section-title">팀 구성</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -337,21 +316,6 @@
     }
     if (document.getElementById("copyGanttEmailBtn")) {
       document.getElementById("copyGanttEmailBtn").addEventListener("click", (e) => {
-        copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
-        const btn = e.target;
-        btn.textContent = "복사됨";
-        setTimeout(() => { btn.textContent = "복사"; }, 1500);
-      });
-    }
-    if (document.getElementById("createPhotoFolderBtn")) {
-      document.getElementById("createPhotoFolderBtn").addEventListener("click", createPhotoFolder);
-    }
-    if (document.getElementById("connectSurveyFormBtn")) {
-      document.getElementById("connectSurveyFormBtn").addEventListener("click", connectSurveyForm);
-      document.getElementById("surveyFormLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectSurveyForm(); });
-    }
-    if (document.getElementById("copySurveyEmailBtn")) {
-      document.getElementById("copySurveyEmailBtn").addEventListener("click", (e) => {
         copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
         const btn = e.target;
         btn.textContent = "복사됨";
@@ -642,29 +606,6 @@
     }
   }
 
-  // 사진 폴더는 구글시트/독스와 달리 서비스계정이 스스로 만들 수 있어서(용량을 안 씀) 완전 자동.
-  // 보통은 프로젝트를 만들 때 이미 자동 생성되지만, 그 전에 만들어진 프로젝트를 위한 수동 생성 버튼
-  async function createPhotoFolder() {
-    const btn = document.getElementById("createPhotoFolderBtn");
-    btn.disabled = true;
-    btn.textContent = "만드는 중...";
-    try {
-      const res = await fetch("/api/create-photo-folder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: Number(projectId), project_name: currentProject.name }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "생성 실패");
-      window.open(data.folder_url, "_blank");
-      load();
-    } catch (err) {
-      alert("사진 폴더 생성 실패: " + err.message);
-      btn.disabled = false;
-      btn.textContent = "사진 폴더 만들기";
-    }
-  }
-
   // 마일스톤별 사진 하위 폴더 생성 - 프로젝트 메인 사진 폴더 안에 그 마일스톤 이름으로 만듦
   async function createMilestonePhotoFolder(taskId) {
     const btn = document.querySelector(`.createMilestonePhotoFolderBtn[data-id="${taskId}"]`);
@@ -892,7 +833,33 @@
       </div>
       ${addTaskBoxHtml(m.id)}
       ${renderMilestonePhotoBox(m)}
+      ${m.id === evalMilestoneId() ? renderSurveyBox() : ""}
       ${m.id === lastMilestoneId() ? renderResultReportBox() : ""}
+    `;
+  }
+
+  // 만족도 조사 - "평가" 마일스톤(없으면 마지막 마일스톤)에서만 노출
+  function renderSurveyBox() {
+    const project = currentProject;
+    return `
+      <div style="margin-top:14px;border-top:1px solid #1e3a52;padding-top:14px;">
+        <div style="font-size:0.8rem;color:#9fb0c3;margin-bottom:8px;">만족도 조사</div>
+        ${project.survey_form_id ? `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <a href="https://docs.google.com/forms/d/${project.survey_form_id}/edit" target="_blank" style="font-size:0.85rem;color:#8b7ff0;">설문지 열기 →</a>
+        </div>
+        ` : `
+        <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;">
+          만족도 조사 폼은 직접 만들어주셔야 해요(구글폼은 자동 생성이 안 됨). 아래 계정을 편집자로 등록해주세요.<br>
+          <code style="color:#8b7ff0;">${GANTT_SERVICE_ACCOUNT_EMAIL}</code>
+          <button type="button" id="copySurveyEmailBtn" style="width:auto;padding:2px 8px;font-size:0.75rem;margin-left:6px;">복사</button>
+        </div>
+        <div class="timeline-add-row" style="margin-top:8px;">
+          <input type="text" id="surveyFormLinkInput" placeholder="구글폼 링크 또는 ID 붙여넣기">
+          <button type="button" id="connectSurveyFormBtn" style="width:auto;">연결</button>
+        </div>
+        `}
+      </div>
     `;
   }
 
@@ -1073,6 +1040,20 @@
     const copyBtn = root.querySelector("#copyReportEmailBtn");
     if (copyBtn) {
       copyBtn.addEventListener("click", (e) => {
+        copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
+        const btn = e.target;
+        btn.textContent = "복사됨";
+        setTimeout(() => { btn.textContent = "복사"; }, 1500);
+      });
+    }
+    const connectSurveyBtn = root.querySelector("#connectSurveyFormBtn");
+    if (connectSurveyBtn) {
+      connectSurveyBtn.addEventListener("click", connectSurveyForm);
+      root.querySelector("#surveyFormLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectSurveyForm(); });
+    }
+    const copySurveyBtn = root.querySelector("#copySurveyEmailBtn");
+    if (copySurveyBtn) {
+      copySurveyBtn.addEventListener("click", (e) => {
         copyToClipboard(GANTT_SERVICE_ACCOUNT_EMAIL);
         const btn = e.target;
         btn.textContent = "복사됨";
