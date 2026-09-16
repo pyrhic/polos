@@ -440,6 +440,31 @@ a.back {
 .sheet-icon-btn:hover {
   background: #1e3a52;
 }
+/* 드라이브 아이콘을 누르면 뜨는 "구글 시트에서 열기" 확인 팝업 - 바로 이동하지 않고 한 번 확인 */
+.drive-open-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  background: #16324a;
+  border-radius: 4px;
+  padding: 4px;
+  white-space: nowrap;
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+.drive-open-popup a {
+  display: block;
+  padding: 7px 12px;
+  font-size: 0.75rem;
+  color: #8b7ff0;
+  text-decoration: none;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.drive-open-popup a:hover {
+  background: #1e3a52;
+}
 
 /* 마일스톤 추가/할일 추가/메모 추가 - 작은 텍스트 버튼, 누르면 아래로 입력창이 펼쳐짐 */
 .add-trigger-btn {
