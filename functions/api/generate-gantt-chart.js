@@ -503,6 +503,15 @@ export async function onRequestPost(context) {
     });
     if (!formatRes.ok) return jsonRes({ error: "서식 적용 실패", detail: await formatRes.text() }, 500);
 
+    // 최초 생성 여부를 기록해둠 - 앱에서 이 값이 있으면 "생성하기" 대신 "가져오기" 버튼만 보여줌
+    if (!project.gantt_generated_at) {
+      await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${project_id}`, {
+        method: "PATCH",
+        headers: sbHeaders,
+        body: JSON.stringify({ gantt_generated_at: new Date().toISOString() }),
+      });
+    }
+
     return jsonRes({ success: true, sheet_url: `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=${ganttSheetId}` });
   } catch (err) {
     return jsonRes({ error: err.message }, 500);

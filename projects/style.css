@@ -416,6 +416,21 @@ a.back {
   background: #a89bff;
 }
 
+/* 구글시트 열기 - 텍스트 링크 대신 구글시트 아이콘만 있는 작은 원형 버튼 */
+.sheet-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #16324a;
+  flex-shrink: 0;
+}
+.sheet-icon-btn:hover {
+  background: #1e3a52;
+}
+
 /* 마일스톤 추가/할일 추가/메모 추가 - 작은 텍스트 버튼, 누르면 아래로 입력창이 펼쳐짐 */
 .add-trigger-btn {
   width: auto;

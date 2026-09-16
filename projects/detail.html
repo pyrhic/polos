@@ -213,9 +213,18 @@
       <div style="margin:10px 0;">
         ${project.gantt_sheet_id ? `
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button type="button" id="generateGanttBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">간트차트 생성하기</button>
-          <button type="button" id="importGanttStatusBtn" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">시트에서 가져오기</button>
-          <a href="https://docs.google.com/spreadsheets/d/${project.gantt_sheet_id}/edit" target="_blank" style="font-size:0.8rem;color:#8b7ff0;">시트 열기 →</a>
+          ${project.gantt_generated_at
+            ? `<button type="button" id="importGanttStatusBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">시트에서 가져오기</button>`
+            : `<button type="button" id="generateGanttBtn" class="btn-accent" style="width:auto;padding:8px 14px;font-size:0.85rem;margin:0;">간트차트 생성하기</button>`
+          }
+          <a href="https://docs.google.com/spreadsheets/d/${project.gantt_sheet_id}/edit" target="_blank" class="sheet-icon-btn" title="시트 열기">
+            <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+              <path d="M28 4H10a2 2 0 0 0-2 2v36a2 2 0 0 0 2 2h28a2 2 0 0 0 2-2V16Z" fill="#0F9D58"/>
+              <path d="M28 4v10a2 2 0 0 0 2 2h10Z" fill="#87CEAC"/>
+              <rect x="12" y="20" width="24" height="16" fill="#fff"/>
+              <path d="M12 20h24M12 25.3h24M12 30.7h24M12 36h24M18 20v16M24 20v16M30 20v16" stroke="#0F9D58" stroke-width="1"/>
+            </svg>
+          </a>
         </div>
         ` : `
         <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;">
