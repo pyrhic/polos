@@ -138,22 +138,87 @@ async function fetchSurveyEvaluation(serviceAccount, formId) {
   return { responseCount: responses.length, quantitative, qualitative };
 }
 
-// 정량 문항 평균을 막대그래프 이미지로 - quickchart.io가 Chart.js 설정을 그대로 PNG로 그려주는
-// 공개 서비스라, 사진과 똑같이 insertInlineImage로 끼워 넣을 수 있음(우리 쪽에서 그릴 필요 없음)
-function buildSurveyChartUrl(quantitative) {
-  const labels = quantitative.map((q) => (q.title.length > 20 ? q.title.slice(0, 20) + "…" : q.title));
-  const config = {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{ label: "평균 점수", data: quantitative.map((q) => Number(q.avg.toFixed(1))), backgroundColor: "#8b7ff0" }],
-    },
-    options: {
-      plugins: { title: { display: true, text: "만족도 조사 결과" }, legend: { display: false } },
-      scales: { y: { min: 0, max: 5 } },
-    },
-  };
-  return `https://quickchart.io/chart?width=600&height=350&backgroundColor=white&c=${encodeURIComponent(JSON.stringify(config))}`;
+// 정량 문항 평균을 "그림"이 아니라 연결된 구글시트 안에 진짜 편집 가능한 차트로 만들어 넣음.
+// (독스 API에는 "시트에 연결된 차트 삽입" 기능이 아예 없어서 - 그건 독스 UI에서 사람이 직접
+// "삽입 > 차트 > 시트에서"를 눌러야만 되는 기능임. 대신 시트 안에는 API로 진짜 차트를 만들 수
+// 있으니, 데이터+차트를 시트의 "설문결과" 탭에 만들어두고 보고서에는 그 탭 링크만 넣음 -
+// 그러면 나중에 시트에서 직접 차트를 고칠 수 있음)
+async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
+  const metaRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!metaRes.ok) return null;
+  const meta = await metaRes.json();
+  const existing = (meta.sheets || []).find((s) => s.properties?.title === "설문결과");
+
+  const createReqs = [];
+  if (existing) createReqs.push({ deleteSheet: { sheetId: existing.properties.sheetId } });
+  createReqs.push({ addSheet: { properties: { title: "설문결과" } } });
+  const createRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests: createReqs }),
+  });
+  if (!createRes.ok) return null;
+  const created = await createRes.json();
+  const addSheetReply = (created.replies || []).find((r) => r.addSheet);
+  const newSheetId = addSheetReply.addSheet.properties.sheetId;
+
+  const rows = [["문항", "평균 점수", "응답 수"], ...quantitative.map((q) => [q.title, Number(q.avg.toFixed(1)), q.count])];
+  const valuesRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/설문결과!A1?valueInputOption=RAW`,
+    {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: rows }),
+    }
+  );
+  if (!valuesRes.ok) return null;
+
+  const n = quantitative.length;
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      requests: [
+        {
+          addChart: {
+            chart: {
+              spec: {
+                title: "만족도 조사 결과",
+                basicChart: {
+                  chartType: "COLUMN",
+                  legendPosition: "NO_LEGEND",
+                  axis: [{ position: "LEFT_AXIS", viewWindowOptions: { viewWindowMin: 0, viewWindowMax: 5 } }],
+                  domains: [
+                    {
+                      domain: {
+                        sourceRange: { sources: [{ sheetId: newSheetId, startRowIndex: 1, endRowIndex: 1 + n, startColumnIndex: 0, endColumnIndex: 1 }] },
+                      },
+                    },
+                  ],
+                  series: [
+                    {
+                      series: {
+                        sourceRange: { sources: [{ sheetId: newSheetId, startRowIndex: 1, endRowIndex: 1 + n, startColumnIndex: 1, endColumnIndex: 2 }] },
+                      },
+                      targetAxis: "LEFT_AXIS",
+                    },
+                  ],
+                },
+              },
+              position: {
+                overlayPosition: { anchorCell: { sheetId: newSheetId, rowIndex: 0, columnIndex: 3 }, widthPixels: 600, heightPixels: 350 },
+              },
+            },
+          },
+        },
+      ],
+    }),
+  });
+
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=${newSheetId}`;
 }
 
 const MAX_REPORT_PHOTOS = 20;
@@ -192,6 +257,7 @@ export async function onRequestPost(context) {
     const accessToken = await getAccessToken(serviceAccount, [
       "https://www.googleapis.com/auth/documents",
       "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/spreadsheets",
     ]);
 
     const sbHeaders = {
@@ -342,7 +408,14 @@ export async function onRequestPost(context) {
           blocks.push({ text: `${q.title} - 평균 ${q.avg.toFixed(1)}점 (${q.count}건)`, style: "BULLET" });
         });
         if (survey.quantitative.length) {
-          blocks.push({ style: "IMAGE", uri: buildSurveyChartUrl(survey.quantitative), caption: "만족도 조사 결과 그래프" });
+          if (!project.survey_sheet_id) {
+            blocks.push({ text: "(그래프를 만들려면 먼저 설문 결과용 구글시트를 연결해주세요)", style: "NORMAL" });
+          } else {
+            const chartUrl = await writeSurveyChartToSheet(accessToken, project.survey_sheet_id, survey.quantitative);
+            if (chartUrl) {
+              blocks.push({ style: "LINK", text: "만족도 조사 결과 그래프 (구글시트에서 보기/수정) →", url: chartUrl });
+            }
+          }
         }
         survey.qualitative.forEach((q) => {
           blocks.push({ text: q.title, style: "HEADING_2" });
@@ -427,6 +500,14 @@ export async function onRequestPost(context) {
       } else if (b.style === "BULLET") {
         styleRequests.push({
           createParagraphBullets: { range, bulletPreset: "BULLET_DISC_CIRCLE_SQUARE" },
+        });
+      } else if (b.style === "LINK") {
+        styleRequests.push({
+          updateTextStyle: {
+            range: { startIndex: cursor, endIndex: cursor + b.text.length },
+            textStyle: { link: { url: b.url } },
+            fields: "link",
+          },
         });
       }
       cursor += text.length;

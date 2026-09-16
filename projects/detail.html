@@ -265,6 +265,19 @@
           <button type="button" id="connectSurveyFormBtn" style="width:auto;">연결</button>
         </div>
         `}
+        ${project.survey_sheet_id ? `
+        <div style="margin-top:10px;">
+          <a href="https://docs.google.com/spreadsheets/d/${project.survey_sheet_id}/edit" target="_blank" style="font-size:0.85rem;color:#8b7ff0;">설문 결과 차트 시트 열기 →</a>
+        </div>
+        ` : `
+        <div style="font-size:0.8rem;color:#9fb0c3;line-height:1.6;margin-top:10px;">
+          결과보고서에 넣을 편집 가능한 차트를 만들려면, 빈 구글시트 하나를 더 만들어 위 계정을 편집자로 등록하고 연결해주세요.
+        </div>
+        <div class="timeline-add-row" style="margin-top:8px;">
+          <input type="text" id="surveySheetLinkInput" placeholder="구글시트 링크 또는 ID 붙여넣기">
+          <button type="button" id="connectSurveySheetBtn" style="width:auto;">연결</button>
+        </div>
+        `}
       </div>
 
       <div class="section-title">사진</div>
@@ -362,6 +375,10 @@
     if (document.getElementById("connectSurveyFormBtn")) {
       document.getElementById("connectSurveyFormBtn").addEventListener("click", connectSurveyForm);
       document.getElementById("surveyFormLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectSurveyForm(); });
+    }
+    if (document.getElementById("connectSurveySheetBtn")) {
+      document.getElementById("connectSurveySheetBtn").addEventListener("click", connectSurveySheet);
+      document.getElementById("surveySheetLinkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connectSurveySheet(); });
     }
     if (document.getElementById("copySurveyEmailBtn")) {
       document.getElementById("copySurveyEmailBtn").addEventListener("click", (e) => {
@@ -668,6 +685,26 @@
       load();
     } catch (err) {
       alert("설문지 연결 실패: " + err.message);
+    }
+  }
+
+  // 설문 결과용 차트를 만들 별도 구글시트 연결(간트차트 시트와는 다른 시트)
+  async function connectSurveySheet() {
+    const input = document.getElementById("surveySheetLinkInput");
+    const raw = input.value.trim();
+    if (!raw) return;
+    const m = raw.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    const sheetId = m ? m[1] : raw;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ survey_sheet_id: sheetId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      load();
+    } catch (err) {
+      alert("시트 연결 실패: " + err.message);
     }
   }
 
