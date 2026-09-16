@@ -188,7 +188,9 @@ async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
   const newSheetId = addSheetReply.addSheet.properties.sheetId;
 
   // 문항마다 "제목 행 + 값/응답수/비율 표"를 세로로 쌓고, 그 표 옆(D열)에 그 문항만의 분포
-  // 차트를 하나씩 앉힘 - 구글폼 자체 응답 요약 화면처럼 문항별로 분포가 따로 보이게 함
+  // 차트를 하나씩 앉힘 - 구글폼 자체 응답 요약 화면처럼 문항별로 분포가 따로 보이게 함.
+  // 비율은 숫자(0~1)로 저장해두고 셀 서식을 퍼센트로 입혀서, 차트 막대 길이도 비율 기준으로
+  // 통일되고(문항마다 척도가 달라도 비교 가능) 막대 위 라벨에도 "40%"처럼 그대로 표시됨
   const rows = [];
   const blocks = [];
   quantitative.forEach((q) => {
@@ -197,8 +199,7 @@ async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
     rows.push(["값", "응답 수", "비율"]);
     const dataStartRow = rows.length;
     q.dist.forEach((d) => {
-      const pct = q.total ? Math.round((d.count / q.total) * 100) : 0;
-      rows.push([d.value, d.count, `${pct}%`]);
+      rows.push([d.value, d.count, q.total ? d.count / q.total : 0]);
     });
     blocks.push({ titleRow, dataStartRow, dataEndRow: rows.length });
     rows.push([]);
@@ -215,6 +216,14 @@ async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
   );
   if (!valuesRes.ok) return null;
 
+  const ACCENT_COLOR = { red: 0.545, green: 0.498, blue: 0.941 }; // #8b7ff0, 앱 강조색과 통일
+  const formatRequests = blocks.map((b) => ({
+    repeatCell: {
+      range: { sheetId: newSheetId, startRowIndex: b.dataStartRow, endRowIndex: b.dataEndRow, startColumnIndex: 2, endColumnIndex: 3 },
+      cell: { userEnteredFormat: { numberFormat: { type: "PERCENT", pattern: "0%" } } },
+      fields: "userEnteredFormat.numberFormat",
+    },
+  }));
   const chartRequests = quantitative.map((q, i) => ({
     addChart: {
       chart: {
@@ -223,6 +232,7 @@ async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
           basicChart: {
             chartType: "COLUMN",
             legendPosition: "NO_LEGEND",
+            axis: [{ position: "LEFT_AXIS", format: { pattern: "0%" }, viewWindowOptions: { viewWindowMin: 0, viewWindowMax: 1 } }],
             domains: [
               {
                 domain: {
@@ -236,9 +246,12 @@ async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
               {
                 series: {
                   sourceRange: {
-                    sources: [{ sheetId: newSheetId, startRowIndex: blocks[i].dataStartRow, endRowIndex: blocks[i].dataEndRow, startColumnIndex: 1, endColumnIndex: 2 }],
+                    sources: [{ sheetId: newSheetId, startRowIndex: blocks[i].dataStartRow, endRowIndex: blocks[i].dataEndRow, startColumnIndex: 2, endColumnIndex: 3 }],
                   },
                 },
+                targetAxis: "LEFT_AXIS",
+                color: ACCENT_COLOR,
+                dataLabel: { type: "DATA" },
               },
             ],
           },
@@ -252,7 +265,7 @@ async function writeSurveyChartToSheet(accessToken, sheetId, quantitative) {
   await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ requests: chartRequests }),
+    body: JSON.stringify({ requests: [...formatRequests, ...chartRequests] }),
   });
 
   return `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=${newSheetId}`;
@@ -447,10 +460,10 @@ export async function onRequestPost(context) {
           blocks.push({ text: `${q.title} - ${summary}`, style: "BULLET" });
         });
         if (survey.quantitative.length) {
-          if (!project.survey_sheet_id) {
-            blocks.push({ text: "(그래프를 만들려면 먼저 설문 결과용 구글시트를 연결해주세요)", style: "NORMAL" });
+          if (!project.gantt_sheet_id) {
+            blocks.push({ text: "(그래프를 만들려면 먼저 간트차트 시트를 연결해주세요)", style: "NORMAL" });
           } else {
-            const chartUrl = await writeSurveyChartToSheet(accessToken, project.survey_sheet_id, survey.quantitative);
+            const chartUrl = await writeSurveyChartToSheet(accessToken, project.gantt_sheet_id, survey.quantitative);
             if (chartUrl) {
               blocks.push({ style: "LINK", text: "만족도 조사 결과 그래프 (구글시트에서 보기/수정) →", url: chartUrl });
             }
