@@ -138,6 +138,24 @@ async function fetchSurveyEvaluation(serviceAccount, formId) {
   return { responseCount: responses.length, quantitative, qualitative };
 }
 
+// 정량 문항 평균을 막대그래프 이미지로 - quickchart.io가 Chart.js 설정을 그대로 PNG로 그려주는
+// 공개 서비스라, 사진과 똑같이 insertInlineImage로 끼워 넣을 수 있음(우리 쪽에서 그릴 필요 없음)
+function buildSurveyChartUrl(quantitative) {
+  const labels = quantitative.map((q) => (q.title.length > 20 ? q.title.slice(0, 20) + "…" : q.title));
+  const config = {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{ label: "평균 점수", data: quantitative.map((q) => Number(q.avg.toFixed(1))), backgroundColor: "#8b7ff0" }],
+    },
+    options: {
+      plugins: { title: { display: true, text: "만족도 조사 결과" }, legend: { display: false } },
+      scales: { y: { min: 0, max: 5 } },
+    },
+  };
+  return `https://quickchart.io/chart?width=600&height=350&backgroundColor=white&c=${encodeURIComponent(JSON.stringify(config))}`;
+}
+
 const MAX_REPORT_PHOTOS = 20;
 
 // 사진 폴더(사람이 올린 실제 사진)에서 이미지 목록을 가져와, 문서에 끼워 넣을 수 있게 각 파일을
@@ -323,6 +341,9 @@ export async function onRequestPost(context) {
         survey.quantitative.forEach((q) => {
           blocks.push({ text: `${q.title} - 평균 ${q.avg.toFixed(1)}점 (${q.count}건)`, style: "BULLET" });
         });
+        if (survey.quantitative.length) {
+          blocks.push({ style: "IMAGE", uri: buildSurveyChartUrl(survey.quantitative), caption: "만족도 조사 결과 그래프" });
+        }
         survey.qualitative.forEach((q) => {
           blocks.push({ text: q.title, style: "HEADING_2" });
           q.answers.slice(0, 15).forEach((a) => blocks.push({ text: a, style: "BULLET" }));
