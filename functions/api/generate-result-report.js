@@ -324,7 +324,7 @@ export async function onRequestPost(context) {
       blocks.push({ text: "(등록된 팀원 없음)", style: "NORMAL" });
     }
 
-    blocks.push({ text: "7. 평가", style: "HEADING_1" });
+    blocks.push({ text: "7. 주요성과", style: "HEADING_1" });
     if (!project.survey_form_id) {
       blocks.push({ text: "(연결된 만족도 조사가 없습니다)", style: "NORMAL" });
     } else {
