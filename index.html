@@ -259,6 +259,7 @@
     <span class="copyright">All copy rights reserved @SKIMMMIKS</span>
   </button>
 
+<script src="/projects/auth.js"></script>
 <script>
   const QUOTES = [
     { text: "시작이 반이다.", source: "" },
@@ -364,11 +365,15 @@
   const PROJECTS_SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
   const PROJECTS_SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
 
+  // 프로젝트 항목을 눌렀을 때(진입 시점)에 로그인부터 요구 - 나중에 개별 프로젝트를 열 때 가서야
+  // 로그인하라고 끊기는 게 아니라, 앱 진입 자체를 로그인 관문으로 둠. 로그인된 다음엔 그 사람이
+  // 실제로 접근 가능한(RLS로 걸러진) 프로젝트만 이 목록에 뜸.
   async function buildProjectsLinks() {
     try {
+      const session = await requireProjectAuth();
       const res = await fetch(
         `${PROJECTS_SUPABASE_URL}/rest/v1/projects?select=id,name,status&status=eq.진행중&order=created_at.desc`,
-        { headers: { apikey: PROJECTS_SUPABASE_ANON_KEY, Authorization: `Bearer ${PROJECTS_SUPABASE_ANON_KEY}` } }
+        { headers: { apikey: PROJECTS_SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}` } }
       );
       const rows = res.ok ? await res.json() : [];
       const links = rows.map((p) => ({ label: `${p.name} (${p.status})`, href: `/projects/detail.html?id=${p.id}` }));
