@@ -79,9 +79,11 @@ export async function onRequestPost(context) {
     const serviceAccount = JSON.parse(env.POLOS_PROJECTS_GOOGLE_KEY);
     const accessToken = await getAccessToken(serviceAccount, ["https://www.googleapis.com/auth/drive"]);
 
+    // RLS가 프로젝트 멤버십을 기준으로 판단하므로, 고정 anon key가 아니라 호출한 사람의 로그인 토큰을 그대로 전달
+    const userToken = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "") || SUPABASE_ANON_KEY;
     const sbHeaders = {
       apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      Authorization: `Bearer ${userToken}`,
       "Content-Type": "application/json",
     };
 

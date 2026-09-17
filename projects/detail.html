@@ -16,6 +16,7 @@
     <div id="content"><div class="empty">불러오는 중...</div></div>
   </div>
 
+<script src="/projects/auth.js"></script>
 <script>
   const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
@@ -25,6 +26,10 @@
     Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
     "Content-Type": "application/json",
   };
+  // 로그인 완료 후 headers.Authorization을 로그인한 사용자의 토큰으로 교체 - 그래야 RLS가 멤버십을 인식함
+  const authReady = requireProjectAuth().then((session) => {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  });
   const projectId = new URLSearchParams(location.search).get("id");
   const content = document.getElementById("content");
 
@@ -50,6 +55,7 @@
   let currentWbsTasks = []; // project_wbs_tasks 전체(마일스톤=level0 parent_id null + 하위 업무들) - 트리는 여기서 파생
   let currentNotes = [];
   let currentTeam = [];
+  let currentCollaborators = []; // project_collaborators - 로그인해서 이 프로젝트에 접근 가능한 사람 명단
   let selectedMilestoneId = null; // 타임라인에서 열려있는 마일스톤(하나만)
   let zoomLevel = 1; // 0.5~2.5, 타임라인 마일스톤 간격 배율(휠/핀치로 조절)
   const LABEL_CLUSTER_GAP_PX = 64; // 날짜/이름 라벨이 이보다 가까우면 하나로 묶어서 표시
@@ -105,16 +111,17 @@
   if (!projectId) {
     content.innerHTML = '<div class="empty">프로젝트를 찾을 수 없습니다.</div>';
   } else {
-    load();
+    authReady.then(load);
   }
 
   async function load() {
     try {
-      const [pRes, tasksRes, notesRes, teamRes] = await Promise.all([
+      const [pRes, tasksRes, notesRes, teamRes, collabRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/projects?select=*&id=eq.${projectId}`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/project_wbs_tasks?select=*&project_id=eq.${projectId}&order=sort_order.asc,id.asc`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/project_notes?select=*&project_id=eq.${projectId}&order=id.desc`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/project_team_members?select=*&project_id=eq.${projectId}&order=sort_order.asc,id.asc`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/project_collaborators?select=*&project_id=eq.${projectId}&order=role.asc,id.asc`, { headers }),
       ]);
       const projects = await pRes.json();
       if (!projects.length) {
@@ -125,6 +132,7 @@
       currentWbsTasks = tasksRes.ok ? await tasksRes.json() : [];
       currentNotes = notesRes.ok ? await notesRes.json() : [];
       currentTeam = teamRes.ok ? await teamRes.json() : [];
+      currentCollaborators = collabRes.ok ? await collabRes.json() : [];
       if (selectedMilestoneId && !milestones().some((m) => m.id === selectedMilestoneId)) {
         selectedMilestoneId = null;
       }
@@ -279,6 +287,13 @@
       </div>
       <div id="noteList">${renderNotes()}</div>
 
+      <div class="section-title">협업자</div>
+      <div id="collabList">${renderCollaborators()}</div>
+      <div class="todo-add-row" style="margin:10px 0;">
+        <input type="email" id="newCollabEmail" placeholder="이메일">
+        <button type="button" id="addCollabBtn" style="width:auto;">초대</button>
+      </div>
+
       <button type="button" id="editBtn" style="margin-top:26px;">프로젝트 정보 수정</button>
       <div id="editBox"></div>
     `;
@@ -337,6 +352,9 @@
     wireTimelineEvents();
     wireMilestoneBodyEvents(document.getElementById("timelineDetailBox"));
     wireNoteEvents();
+    document.getElementById("addCollabBtn").addEventListener("click", addCollaborator);
+    document.getElementById("newCollabEmail").addEventListener("keydown", (e) => { if (e.key === "Enter") addCollaborator(); });
+    wireCollaboratorEvents();
   }
 
   // ---- 타임라인 ----
@@ -626,7 +644,7 @@
       const m = currentWbsTasks.find((t) => t.id === taskId);
       const res = await fetch("/api/create-milestone-photo-folder", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: headers.Authorization },
         body: JSON.stringify({ project_id: Number(projectId), task_id: taskId, milestone_name: m ? m.name : "마일스톤" }),
       });
       const data = await res.json();
@@ -672,7 +690,7 @@
     try {
       const res = await fetch("/api/generate-result-report", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: headers.Authorization },
         body: JSON.stringify({ project_id: Number(projectId) }),
       });
       const data = await res.json();
@@ -700,7 +718,7 @@
     try {
       const res = await fetch("/api/generate-gantt-chart", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: headers.Authorization },
         body: JSON.stringify({ project_id: Number(projectId) }),
       });
       const data = await res.json();
@@ -724,7 +742,7 @@
     try {
       const res = await fetch("/api/import-gantt-status", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: headers.Authorization },
         body: JSON.stringify({ project_id: Number(projectId) }),
       });
       const data = await res.json();
@@ -1383,6 +1401,48 @@
     });
     if (!res.ok) {
       alert("메모 추가 실패: " + (await res.text()));
+      return;
+    }
+    input.value = "";
+    load();
+  }
+
+  // ---- 협업자 (로그인해서 이 프로젝트를 함께 보고 쓸 수 있는 사람 명단) ----
+  function renderCollaborators() {
+    if (!currentCollaborators.length) return '<div class="empty">등록된 협업자가 없습니다.</div>';
+    return currentCollaborators
+      .map(
+        (c) => `<div class="note-item" data-id="${c.id}">
+          ${escapeHtml(c.email)}${c.role === "owner" ? ' <span class="role" style="display:inline;margin:0;">(오너)</span>' : ""}
+          ${c.role !== "owner" ? '<div><button type="button" class="collab-del" style="width:auto;margin-top:8px;padding:4px 10px;font-size:0.75rem;">삭제</button></div>' : ""}
+        </div>`
+      )
+      .join("");
+  }
+
+  function wireCollaboratorEvents() {
+    document.querySelectorAll(".collab-del").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.closest(".note-item").dataset.id;
+        if (!confirm("이 사람의 접근 권한을 없앨까요?")) return;
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/project_collaborators?id=eq.${id}`, { method: "DELETE", headers });
+        if (!res.ok) { alert("삭제 실패: " + (await res.text())); return; }
+        load();
+      });
+    });
+  }
+
+  async function addCollaborator() {
+    const input = document.getElementById("newCollabEmail");
+    const email = input.value.trim();
+    if (!email) return;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/project_collaborators`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ project_id: Number(projectId), email, role: "collaborator" }),
+    });
+    if (!res.ok) {
+      alert("초대 실패(오너만 초대할 수 있어요): " + (await res.text()));
       return;
     }
     input.value = "";

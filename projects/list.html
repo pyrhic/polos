@@ -64,6 +64,7 @@
     <div id="list"><div class="empty">불러오는 중...</div></div>
   </div>
 
+<script src="/projects/auth.js"></script>
 <script>
   const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
@@ -72,6 +73,10 @@
     Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
     "Content-Type": "application/json",
   };
+  // 로그인 완료 후 headers.Authorization을 로그인한 사용자의 토큰으로 교체 - 그래야 RLS가 멤버십을 인식함
+  const authReady = requireProjectAuth().then((session) => {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  });
 
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -160,6 +165,7 @@
     btn.disabled = true;
     btn.textContent = "만드는 중...";
     try {
+      await authReady;
       const durationType = document.getElementById("duration_type").value;
       const eventStart = document.getElementById("event_start").value;
       const eventEnd = durationType === "1일" ? eventStart : document.getElementById("event_end").value || eventStart;
@@ -187,7 +193,7 @@
       try {
         await fetch("/api/create-photo-folder", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Authorization: headers.Authorization },
           body: JSON.stringify({ project_id: created.id, project_name: created.name }),
         });
       } catch {}
@@ -202,7 +208,7 @@
     }
   });
 
-  loadProjects();
+  authReady.then(loadProjects);
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js");
