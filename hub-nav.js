@@ -1,5 +1,6 @@
 (function () {
-  // 순서: 스킴밐스 - 글쓰기 - 사교원(홈) - 트레이딩 - 유튜브 - 프로젝트 (전부 같은 도메인 아래 경로)
+  // 순서: 스킴밐스 - 글쓰기 - 사교원(홈) - 트레이딩 - 유튜브 (전부 같은 도메인 아래 경로)
+  // 프로젝트 관리는 별도 앱(polos-projects.pages.dev)으로 분리되어 이 스와이프 허브에서 빠짐
   // 모든 페이지 배경이 네이비(#0d1b2a)로 통일되어 점 색깔도 하나로 맞춤
   const PAGES = [
     { url: "/skimmmiks/index.html", color: "#ffffff" },
@@ -7,7 +8,6 @@
     { url: "/sakyowon/index.html", color: "#ffffff" },
     { url: "/trading/index.html", color: "#ffffff" },
     { url: "/youtube/index.html", color: "#ffffff" },
-    { url: "/projects/index.html", color: "#ffffff" },
   ];
 
   function getSection() {
@@ -16,7 +16,6 @@
     if (location.pathname.startsWith("/sakyowon")) return 2;
     if (location.pathname.startsWith("/trading")) return 3;
     if (location.pathname.startsWith("/youtube")) return 4;
-    if (location.pathname.startsWith("/projects")) return 5;
     return -1;
   }
 
