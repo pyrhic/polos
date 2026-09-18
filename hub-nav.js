@@ -5,7 +5,7 @@
   const PAGES = [
     { url: "/skimmmiks/index.html", color: "#ffffff" },
     { url: "/writing/index.html", color: "#ffffff" },
-    { url: "/sakyowon/index.html", color: "#ffffff" },
+    { url: "/todo/index.html", color: "#ffffff" },
     { url: "/trading/index.html", color: "#ffffff" },
     { url: "/youtube/index.html", color: "#ffffff" },
   ];
@@ -13,7 +13,7 @@
   function getSection() {
     if (location.pathname.startsWith("/skimmmiks")) return 0;
     if (location.pathname.startsWith("/writing")) return 1;
-    if (location.pathname.startsWith("/sakyowon")) return 2;
+    if (location.pathname.startsWith("/todo")) return 2;
     if (location.pathname.startsWith("/trading")) return 3;
     if (location.pathname.startsWith("/youtube")) return 4;
     return -1;

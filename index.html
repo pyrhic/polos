@@ -236,8 +236,8 @@
         <div class="logo-item boxed" data-id="writing">
           <div class="logo-box"><img src="/writing/logo.jpg" alt=""></div>
         </div>
-        <div class="logo-item boxed" data-id="sakyowon">
-          <div class="logo-box"><img src="/sakyowon/logo.jpg" alt=""></div>
+        <div class="logo-item boxed" data-id="todo">
+          <div class="logo-box"><img src="/todo/logo.png" alt=""></div>
         </div>
         <div class="logo-item boxed" data-id="trading">
           <div class="logo-box"><img src="/trading/logo.jpg" alt=""></div>
@@ -289,11 +289,11 @@
         { label: "습작의기억", href: "/writing/drafts.html" },
       ],
     },
-    sakyowon: {
+    todo: {
       links: [
-        { label: "오늘 업무 입력", href: "/sakyowon/daily-log.html" },
-        { label: "주간보고서", href: "/sakyowon/reports.html" },
-        { label: "투두리스트", href: "/sakyowon/todo.html" },
+        { label: "오늘 업무 입력", href: "/todo/daily-log.html" },
+        { label: "주간보고서", href: "/todo/reports.html" },
+        { label: "투두리스트", href: "/todo/todo.html" },
         { label: "내 위키", href: "https://sakyowon-wiki-2a5.pages.dev", external: true },
       ],
     },
@@ -489,7 +489,7 @@
     const target = item.offsetLeft - (logoScroll.clientWidth - item.clientWidth) / 2;
     logoScroll.scrollTo({ left: target, behavior: smooth ? "smooth" : "instant" });
   }
-  const initialIndex = logoItems.findIndex((it) => it.dataset.id === "sakyowon");
+  const initialIndex = logoItems.findIndex((it) => it.dataset.id === "todo");
   window.addEventListener("resize", () => {
     layoutCoverflow();
     const idx = expanded ? logoItems.findIndex((it) => it.dataset.id === selectedId) : initialIndex;
