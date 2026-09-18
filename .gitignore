@@ -1,3 +1,4 @@
 *.json.key
 polos-projects-*.json
+polos-writing-*.json
 .claude/
