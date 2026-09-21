@@ -67,29 +67,30 @@
       });
 
       document.querySelectorAll(".todo-check").forEach((cb) => {
-        // 체크박스를 누를 때마다 안 함 -> 완료(삭선) -> 완료(굵게) -> 안 함 순으로 순환
-        cb.addEventListener("click", async (e) => {
-          e.preventDefault(); // 체크박스 상태는 직접 관리
+        // 누를 때마다 안 함 -> 완료(삭선) -> 완료(굵게) -> 안 함 순으로 순환.
+        // (체크박스의 checked를 change 이벤트 안에서 직접 조정 - click에서 preventDefault로
+        // 막으면 브라우저가 checked를 클릭 이전 값으로 강제로 되돌려버려서 안 먹힘)
+        cb.addEventListener("change", async (e) => {
           const item = cb.closest(".todo-item");
           const id = item.dataset.id;
-          const wasCompleted = item.classList.contains("completed");
           const wasFlagged = item.classList.contains("flagged");
 
           let completed, flagged;
-          if (!wasCompleted && !wasFlagged) {
-            completed = true;
-            flagged = false;
-          } else if (wasCompleted && !wasFlagged) {
-            completed = true;
-            flagged = true;
-          } else {
+          if (wasFlagged) {
             completed = false;
             flagged = false;
+            cb.checked = false;
+          } else if (cb.checked) {
+            completed = true;
+            flagged = false;
+          } else {
+            completed = true;
+            flagged = true;
+            cb.checked = true;
           }
 
           item.classList.toggle("completed", completed);
           item.classList.toggle("flagged", flagged);
-          cb.checked = completed;
 
           try {
             await fetch(`${SUPABASE_URL}/rest/v1/todos?id=eq.${id}`, {
