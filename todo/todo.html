@@ -42,7 +42,7 @@
   async function loadTodos() {
     const list = document.getElementById("list");
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/todos?select=*&order=id.asc`, { headers });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/todos?select=*&order=sort_order.asc.nullslast,id.asc`, { headers });
       const rows = await res.json();
 
       if (!rows.length) {
@@ -55,6 +55,7 @@
           (row) => `<div class="todo-item ${row.completed ? "completed" : ""}" data-id="${row.id}">
             <input type="checkbox" ${row.completed ? "checked" : ""} class="todo-check">
             <span class="todo-text" contenteditable="true" spellcheck="false"></span>
+            <span class="todo-handle">⠿</span>
             <button type="button" class="todo-del">삭제</button>
           </div>`
         )
@@ -127,8 +128,123 @@
           }
         });
       });
+
+      attachDragHandlers();
     } catch (err) {
       list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  // 길게 누르면 순서 조정 - pointer 이벤트로 롱프레스 감지 후 드래그로 순서 변경
+  const LONG_PRESS_MS = 450;
+  const MOVE_CANCEL_PX = 8;
+
+  function attachDragHandlers() {
+    document.querySelectorAll(".todo-item").forEach((item) => {
+      let pressTimer = null;
+      let dragging = false;
+      let startX = 0;
+      let startY = 0;
+      let pointerId = null;
+      let ghost = null;
+      let placeholder = null;
+
+      item.addEventListener("contextmenu", (e) => e.preventDefault());
+
+      item.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".todo-check, .todo-del")) return;
+        startX = e.clientX;
+        startY = e.clientY;
+        pointerId = e.pointerId;
+        item.setPointerCapture(pointerId);
+
+        pressTimer = setTimeout(() => {
+          pressTimer = null;
+          dragging = true;
+          const rect = item.getBoundingClientRect();
+
+          ghost = item.cloneNode(true);
+          ghost.classList.add("todo-ghost");
+          ghost.style.width = rect.width + "px";
+          ghost.style.left = rect.left + "px";
+          ghost.style.top = rect.top + "px";
+          document.body.appendChild(ghost);
+
+          placeholder = document.createElement("div");
+          placeholder.className = "todo-placeholder";
+          placeholder.style.height = rect.height + "px";
+          item.replaceWith(placeholder);
+          item.classList.add("dragging-source");
+
+          if (navigator.vibrate) navigator.vibrate(10);
+        }, LONG_PRESS_MS);
+      });
+
+      item.addEventListener("pointermove", (e) => {
+        if (pressTimer && (Math.abs(e.clientX - startX) > MOVE_CANCEL_PX || Math.abs(e.clientY - startY) > MOVE_CANCEL_PX)) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+          return;
+        }
+        if (!dragging || !ghost) return;
+        e.preventDefault();
+        ghost.style.transform = `translateY(${e.clientY - startY}px)`;
+
+        const siblings = Array.from(document.querySelectorAll("#list .todo-item"));
+        let target = null;
+        for (const sib of siblings) {
+          const r = sib.getBoundingClientRect();
+          if (e.clientY < r.top + r.height / 2) {
+            target = sib;
+            break;
+          }
+        }
+        const list = document.getElementById("list");
+        if (target) list.insertBefore(placeholder, target);
+        else list.appendChild(placeholder);
+      });
+
+      function finishDrag(commit) {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+        if (dragging) {
+          item.classList.remove("dragging-source");
+          if (placeholder) placeholder.replaceWith(item);
+          if (ghost) ghost.remove();
+          if (commit) persistOrder();
+        }
+        dragging = false;
+        ghost = null;
+        placeholder = null;
+        if (pointerId !== null) {
+          try {
+            item.releasePointerCapture(pointerId);
+          } catch (err) {}
+        }
+        pointerId = null;
+      }
+
+      item.addEventListener("pointerup", () => finishDrag(true));
+      item.addEventListener("pointercancel", () => finishDrag(false));
+    });
+  }
+
+  async function persistOrder() {
+    const ids = Array.from(document.querySelectorAll("#list .todo-item")).map((el) => el.dataset.id);
+    try {
+      await Promise.all(
+        ids.map((id, i) =>
+          fetch(`${SUPABASE_URL}/rest/v1/todos?id=eq.${id}`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ sort_order: i }),
+          })
+        )
+      );
+    } catch (err) {
+      showError(err.message);
     }
   }
 

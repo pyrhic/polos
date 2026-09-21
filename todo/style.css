@@ -207,6 +207,32 @@ a.hwp-btn:hover {
   padding: 4px 10px;
   font-size: 0.8rem;
 }
+.todo-item .todo-handle {
+  color: #8fa3b8;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.todo-item.dragging-source {
+  display: none;
+}
+.todo-placeholder {
+  border-radius: 3px;
+  margin-bottom: 10px;
+  background: #16324a;
+  opacity: 0.35;
+}
+.todo-ghost {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  opacity: 0.95;
+}
 .todo-add-row {
   display: flex;
   gap: 8px;
