@@ -218,20 +218,15 @@ a.hwp-btn:hover {
   -webkit-touch-callout: none;
 }
 .todo-item.dragging-source {
-  display: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  opacity: 0.95;
+  margin-bottom: 0;
 }
 .todo-placeholder {
   border-radius: 3px;
   margin-bottom: 10px;
   background: #16324a;
   opacity: 0.35;
-}
-.todo-ghost {
-  position: fixed;
-  z-index: 100;
-  pointer-events: none;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-  opacity: 0.95;
 }
 .todo-add-row {
   display: flex;

@@ -145,8 +145,9 @@
       let dragging = false;
       let startX = 0;
       let startY = 0;
+      let baseTop = 0;
+      let baseLeft = 0;
       let pointerId = null;
-      let ghost = null;
       let placeholder = null;
 
       item.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -162,19 +163,23 @@
           pressTimer = null;
           dragging = true;
           const rect = item.getBoundingClientRect();
+          baseTop = rect.top;
+          baseLeft = rect.left;
 
-          ghost = item.cloneNode(true);
-          ghost.classList.add("todo-ghost");
-          ghost.style.width = rect.width + "px";
-          ghost.style.left = rect.left + "px";
-          ghost.style.top = rect.top + "px";
-          document.body.appendChild(ghost);
-
+          // item을 DOM에서 떼어내지 않고(포인터 캡처가 풀리지 않도록) 그 자리에 placeholder만 넣고
+          // item 자체는 fixed로 띄워서 손가락/마우스를 따라오게 만듦
           placeholder = document.createElement("div");
           placeholder.className = "todo-placeholder";
           placeholder.style.height = rect.height + "px";
-          item.replaceWith(placeholder);
+          item.parentNode.insertBefore(placeholder, item);
+
           item.classList.add("dragging-source");
+          item.style.position = "fixed";
+          item.style.left = baseLeft + "px";
+          item.style.top = baseTop + "px";
+          item.style.width = rect.width + "px";
+          item.style.zIndex = "100";
+          item.style.pointerEvents = "none";
 
           if (navigator.vibrate) navigator.vibrate(10);
         }, LONG_PRESS_MS);
@@ -186,11 +191,11 @@
           pressTimer = null;
           return;
         }
-        if (!dragging || !ghost) return;
+        if (!dragging) return;
         e.preventDefault();
-        ghost.style.transform = `translateY(${e.clientY - startY}px)`;
+        item.style.top = baseTop + (e.clientY - startY) + "px";
 
-        const siblings = Array.from(document.querySelectorAll("#list .todo-item"));
+        const siblings = Array.from(document.querySelectorAll("#list .todo-item:not(.dragging-source)"));
         let target = null;
         for (const sib of siblings) {
           const r = sib.getBoundingClientRect();
@@ -211,12 +216,16 @@
         }
         if (dragging) {
           item.classList.remove("dragging-source");
+          item.style.position = "";
+          item.style.left = "";
+          item.style.top = "";
+          item.style.width = "";
+          item.style.zIndex = "";
+          item.style.pointerEvents = "";
           if (placeholder) placeholder.replaceWith(item);
-          if (ghost) ghost.remove();
           if (commit) persistOrder();
         }
         dragging = false;
-        ghost = null;
         placeholder = null;
         if (pointerId !== null) {
           try {
