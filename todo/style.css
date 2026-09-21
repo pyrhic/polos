@@ -201,6 +201,21 @@ a.hwp-btn:hover {
   text-decoration: line-through;
   color: #6b7d8f;
 }
+.todo-item.flagged .todo-text {
+  font-weight: 800;
+  text-decoration: none;
+  color: #ffffff;
+}
+.todo-item.flagged .todo-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 50%;
+  background: #e8362a;
+  border: none;
+}
 .todo-item .todo-del {
   width: auto;
   margin-top: 0;

@@ -52,7 +52,7 @@
 
       list.innerHTML = rows
         .map(
-          (row) => `<div class="todo-item ${row.completed ? "completed" : ""}" data-id="${row.id}">
+          (row) => `<div class="todo-item ${row.completed ? "completed" : ""} ${row.flagged ? "flagged" : ""}" data-id="${row.id}">
             <input type="checkbox" ${row.completed ? "checked" : ""} class="todo-check">
             <span class="todo-text" contenteditable="true" spellcheck="false"></span>
             <span class="todo-handle">⠿</span>
@@ -77,6 +77,56 @@
               method: "PATCH",
               headers,
               body: JSON.stringify({ completed }),
+            });
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+
+        // 체크박스를 길게 누르면 완료 체크 대신 구분자(플래그) 표시를 토글함
+        let flagPressTimer = null;
+        let flagLongPressed = false;
+        let flagStartX = 0;
+        let flagStartY = 0;
+
+        cb.addEventListener("pointerdown", (e) => {
+          flagLongPressed = false;
+          flagStartX = e.clientX;
+          flagStartY = e.clientY;
+          flagPressTimer = setTimeout(() => {
+            flagPressTimer = null;
+            flagLongPressed = true;
+            if (navigator.vibrate) navigator.vibrate(15);
+          }, LONG_PRESS_MS);
+        });
+
+        cb.addEventListener("pointermove", (e) => {
+          if (flagPressTimer && (Math.abs(e.clientX - flagStartX) > MOVE_CANCEL_PX || Math.abs(e.clientY - flagStartY) > MOVE_CANCEL_PX)) {
+            clearTimeout(flagPressTimer);
+            flagPressTimer = null;
+          }
+        });
+
+        cb.addEventListener("pointerup", () => {
+          if (flagPressTimer) {
+            clearTimeout(flagPressTimer);
+            flagPressTimer = null;
+          }
+        });
+
+        cb.addEventListener("click", async (e) => {
+          if (!flagLongPressed) return;
+          e.preventDefault(); // 길게 누른 경우 완료 체크(체크표시)는 토글되지 않도록 막음
+          flagLongPressed = false;
+          const item = cb.closest(".todo-item");
+          const id = item.dataset.id;
+          const flagged = !item.classList.contains("flagged");
+          item.classList.toggle("flagged", flagged);
+          try {
+            await fetch(`${SUPABASE_URL}/rest/v1/todos?id=eq.${id}`, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({ flagged }),
             });
           } catch (err) {
             showError(err.message);
