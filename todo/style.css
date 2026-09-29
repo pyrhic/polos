@@ -171,6 +171,7 @@ a.hwp-btn:hover {
 
 .todo-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   background: #16324a;
@@ -207,10 +208,46 @@ a.hwp-btn:hover {
   color: #ffffff;
 }
 .todo-item .todo-del,
-.todo-item .todo-restore {
+.todo-item .todo-restore,
+.todo-item .todo-event-btn {
   width: auto;
   margin-top: 0;
   padding: 4px 10px;
+  font-size: 0.8rem;
+}
+.todo-item .todo-event-btn {
+  background: #cfe9f5;
+  color: #0d1b2a;
+}
+.todo-item .todo-event-btn:hover {
+  background: #a9d7ec;
+  color: #0d1b2a;
+}
+.todo-item .todo-event-badge {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.event-picker {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.event-picker input[type="date"],
+.event-picker input[type="time"] {
+  width: auto;
+  flex: 1;
+  min-width: 110px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+.event-picker button {
+  width: auto;
+  margin-top: 0;
+  padding: 6px 12px;
   font-size: 0.8rem;
 }
 .todo-item .todo-handle {
