@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>휴지통 — 사교원</title>
+<link rel="stylesheet" href="/todo/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d1b2a">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/todo/todo.html">← 투두리스트</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">휴지통</h1>
+    <p class="role" style="text-align:left;font-size:0.85rem;">삭제한 항목은 여기서 7일간 보관되고, 그 후 자동으로 완전히 삭제됩니다.</p>
+
+    <div id="list"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+  const TRASH_RETENTION_DAYS = 7;
+
+  function showError(err) {
+    const msg = document.createElement("div");
+    msg.className = "msg err";
+    msg.textContent = "오류: " + err;
+    document.querySelector(".wrap").appendChild(msg);
+  }
+
+  async function purgeExpiredTrash() {
+    const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/todos?deleted_at=lt.${encodeURIComponent(cutoff)}`, {
+        method: "DELETE",
+        headers,
+      });
+    } catch (err) {
+      // 조용히 무시
+    }
+  }
+
+  function daysLeft(deletedAt) {
+    const elapsedMs = Date.now() - new Date(deletedAt).getTime();
+    const remaining = TRASH_RETENTION_DAYS - Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
+    return Math.max(0, remaining);
+  }
+
+  async function loadTrash() {
+    const list = document.getElementById("list");
+    await purgeExpiredTrash();
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/todos?select=*&deleted_at=not.is.null&order=deleted_at.desc`,
+        { headers }
+      );
+      const rows = await res.json();
+
+      if (!rows.length) {
+        list.innerHTML = '<div class="empty">휴지통이 비어 있습니다.</div>';
+        return;
+      }
+
+      list.innerHTML = rows
+        .map(
+          (row) => `<div class="todo-item" data-id="${row.id}">
+            <span class="todo-text"></span>
+            <span class="role" style="margin:0 8px;font-size:0.75rem;white-space:nowrap;">D-${daysLeft(row.deleted_at)}</span>
+            <button type="button" class="todo-restore">복구</button>
+          </div>`
+        )
+        .join("");
+
+      document.querySelectorAll(".todo-item").forEach((el, i) => {
+        el.querySelector(".todo-text").textContent = rows[i].text;
+      });
+
+      document.querySelectorAll(".todo-restore").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          const item = e.target.closest(".todo-item");
+          const id = item.dataset.id;
+          try {
+            await fetch(`${SUPABASE_URL}/rest/v1/todos?id=eq.${id}`, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({ deleted_at: null }),
+            });
+            loadTrash();
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+      });
+    } catch (err) {
+      list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  loadTrash();
+</script>
+</body>
+</html>

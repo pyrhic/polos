@@ -206,7 +206,8 @@ a.hwp-btn:hover {
   text-decoration: none;
   color: #ffffff;
 }
-.todo-item .todo-del {
+.todo-item .todo-del,
+.todo-item .todo-restore {
   width: auto;
   margin-top: 0;
   padding: 4px 10px;

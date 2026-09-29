@@ -13,6 +13,7 @@
 <body>
   <div class="wrap">
     <a class="back" href="/todo/index.html">← 돌아가기</a>
+    <a class="back" href="/todo/trash.html" style="float:right;">휴지통 →</a>
     <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">투두리스트</h1>
 
     <div class="todo-add-row">
@@ -42,7 +43,9 @@
   async function loadTodos() {
     const list = document.getElementById("list");
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/todos?select=*&order=sort_order.asc.nullslast,id.asc`, { headers });
+      purgeExpiredTrash();
+
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/todos?select=*&deleted_at=is.null&order=sort_order.asc.nullslast,id.asc`, { headers });
       const rows = await res.json();
 
       if (!rows.length) {
@@ -138,9 +141,11 @@
           const item = e.target.closest(".todo-item");
           const id = item.dataset.id;
           try {
+            // 바로 삭제하지 않고 휴지통으로 보냄 (1주일 후 자동 삭제)
             await fetch(`${SUPABASE_URL}/rest/v1/todos?id=eq.${id}`, {
-              method: "DELETE",
+              method: "PATCH",
               headers,
+              body: JSON.stringify({ deleted_at: new Date().toISOString() }),
             });
             loadTodos();
           } catch (err) {
@@ -274,6 +279,20 @@
       );
     } catch (err) {
       showError(err.message);
+    }
+  }
+
+  // 휴지통에서 7일 지난 항목을 영구 삭제 (앱을 열 때마다 한 번씩 정리)
+  const TRASH_RETENTION_DAYS = 7;
+  async function purgeExpiredTrash() {
+    const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/todos?deleted_at=lt.${encodeURIComponent(cutoff)}`, {
+        method: "DELETE",
+        headers,
+      });
+    } catch (err) {
+      // 조용히 무시 - 다음에 열 때 다시 시도됨
     }
   }
 
