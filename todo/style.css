@@ -187,6 +187,9 @@ a.hwp-btn:hover {
   accent-color: #e8362a;
   cursor: pointer;
 }
+.todo-item.completed:not(.flagged) input[type="checkbox"] {
+  accent-color: #6b7d8f;
+}
 .todo-item .todo-text {
   flex: 1;
   font-size: 1rem;
