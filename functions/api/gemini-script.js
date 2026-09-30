@@ -60,10 +60,12 @@ export async function onRequestPost(context) {
     });
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
-    const MAX_ATTEMPTS = 5;
-    const BACKOFF_MS = [1000, 2000, 4000, 6000];
+    const MAX_ATTEMPTS = 4;
+    const BACKOFF_MS = [1000, 2500, 5000];
     let geminiRes;
     let lastErrText = "";
+    let quotaExceeded = false;
+
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       geminiRes = await fetch(url, {
         method: "POST",
@@ -72,14 +74,23 @@ export async function onRequestPost(context) {
       });
       if (geminiRes.ok) break;
       lastErrText = await geminiRes.text();
-      // 503/429(혼잡)뿐 아니라 5xx(구글/클라우드플레어 쪽 일시 오류)도 재시도
-      const retriable = geminiRes.status === 429 || geminiRes.status >= 500;
+
+      // 하루 무료 사용량 초과(RESOURCE_EXHAUSTED)는 몇 초 기다린다고 해결 안 되니 바로 중단
+      if (geminiRes.status === 429 && lastErrText.includes("RESOURCE_EXHAUSTED")) {
+        quotaExceeded = true;
+        break;
+      }
+      // 그 외 일시적 혼잡(503)이나 5xx는 재시도
+      const retriable = geminiRes.status === 503 || geminiRes.status >= 500;
       if (!retriable || attempt === MAX_ATTEMPTS - 1) break;
-      await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt] ?? 6000));
+      await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt] ?? 5000));
     }
 
     if (!geminiRes.ok) {
-      return new Response(JSON.stringify({ error: "제미나이 호출 실패 (혼잡할 수 있음, 잠시 후 다시 시도해주세요)", detail: lastErrText }), {
+      const message = quotaExceeded
+        ? "제미나이 무료 사용량을 오늘 다 썼습니다 (하루 20회 제한). 내일 다시 시도하거나, 유료 전환을 고려해보세요."
+        : "제미나이 호출 실패 (일시적 혼잡일 수 있음, 잠시 후 다시 시도해주세요)";
+      return new Response(JSON.stringify({ error: message, quotaExceeded, detail: lastErrText }), {
         status: 502, headers: { "Content-Type": "application/json" },
       });
     }
