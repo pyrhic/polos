@@ -60,9 +60,11 @@ export async function onRequestPost(context) {
     });
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+    const MAX_ATTEMPTS = 5;
+    const BACKOFF_MS = [1000, 2000, 4000, 6000];
     let geminiRes;
     let lastErrText = "";
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       geminiRes = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -70,8 +72,10 @@ export async function onRequestPost(context) {
       });
       if (geminiRes.ok) break;
       lastErrText = await geminiRes.text();
-      if (geminiRes.status !== 503 && geminiRes.status !== 429) break;
-      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      // 503/429(혼잡)뿐 아니라 5xx(구글/클라우드플레어 쪽 일시 오류)도 재시도
+      const retriable = geminiRes.status === 429 || geminiRes.status >= 500;
+      if (!retriable || attempt === MAX_ATTEMPTS - 1) break;
+      await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt] ?? 6000));
     }
 
     if (!geminiRes.ok) {
