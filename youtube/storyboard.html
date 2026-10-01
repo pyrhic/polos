@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>콘티 — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .seg-item { }
+  .seg-item .seg-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .seg-item .seg-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .seg-item input { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
+  .seg-thumb { width:100%; height:140px; border-radius:3px; object-fit:cover; background:#0f0a14; margin-bottom:8px; }
+  .seg-thumb-empty { width:100%; height:70px; border-radius:3px; background:#0f0a14; margin-bottom:8px; display:flex; align-items:center; justify-content:center; color:#a89bb5; font-size:0.8rem; text-align:center; padding:8px; }
+  .seg-actions { display:flex; gap:8px; }
+  .seg-actions button, .seg-actions label { width:auto; flex:1; padding:8px 10px; font-size:0.75rem; margin:0; }
+  .seg-actions input[type="file"] { display:none; }
+  .seg-file-label { background:#221a2e; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">콘티</h1>
+    <p class="role">대본을 장면별로 나눠 보여줍니다. 섹션/키워드는 고쳐 쓸 수 있고, 사진·영상을 직접 올리면 그 장면엔 Pexels 대신 그 소재가 쓰입니다. 비워두면 키워드로 자동 검색됩니다.</p>
+
+    <label for="scriptSelect">대본 선택</label>
+    <select id="scriptSelect">
+      <option value="">불러오는 중...</option>
+    </select>
+
+    <div id="regenWrap" style="display:none;margin-top:10px;">
+      <button type="button" id="regenBtn">콘티 (다시) 생성</button>
+    </div>
+    <div class="msg" id="msg"></div>
+
+    <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const BUCKET = "youtube-assets";
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  };
+  const jsonHeaders = { ...headers, "Content-Type": "application/json" };
+  let scripts = [];
+  let segments = [];
+
+  function showMsg(text, ok) {
+    const msg = document.getElementById("msg");
+    msg.className = "msg " + (ok ? "ok" : "err");
+    msg.textContent = text;
+  }
+
+  function publicUrl(path) {
+    return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+  }
+
+  function isImage(path) {
+    return /\.(jpe?g|png|gif|webp)$/i.test(path);
+  }
+
+  async function loadScripts() {
+    const sel = document.getElementById("scriptSelect");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&order=created_at.desc`, { headers });
+      scripts = await res.json();
+      if (!scripts.length) {
+        sel.innerHTML = '<option value="">승인된 대본이 없습니다</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">선택하세요</option>' +
+        scripts.map((r) => `<option value="${r.id}">${(r.hook || "").slice(0, 30)}</option>`).join("");
+    } catch (err) {
+      sel.innerHTML = '<option value="">불러오기 실패</option>';
+    }
+  }
+
+  async function loadSegments(scriptId) {
+    const list = document.getElementById("segList");
+    const regenWrap = document.getElementById("regenWrap");
+    if (!scriptId) {
+      list.innerHTML = '<div class="empty">대본을 먼저 선택하세요.</div>';
+      regenWrap.style.display = "none";
+      return;
+    }
+    list.innerHTML = '<div class="empty">불러오는 중...</div>';
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=*&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
+    segments = await res.json();
+    regenWrap.style.display = "block";
+    document.getElementById("regenBtn").textContent = segments.length ? "콘티 다시 생성" : "콘티 생성";
+    render();
+  }
+
+  function render() {
+    const list = document.getElementById("segList");
+    if (!segments.length) {
+      list.innerHTML = '<div class="empty">아직 콘티가 없습니다. 위 "콘티 생성" 버튼을 눌러주세요.</div>';
+      return;
+    }
+    list.innerHTML = segments.map((seg) => `
+      <div class="card-box seg-item" data-id="${seg.id}">
+        <div class="seg-head"><div class="seg-no">${seg.order_no}</div></div>
+        ${seg.asset_path
+          ? (isImage(seg.asset_path)
+              ? `<img class="seg-thumb" src="${publicUrl(seg.asset_path)}" alt="">`
+              : `<video class="seg-thumb" src="${publicUrl(seg.asset_path)}" controls></video>`)
+          : `<div class="seg-thumb-empty">비어있음 — 키워드로 Pexels 자동 검색됨</div>`}
+        <input type="text" class="seg-section" value="${seg.section ? seg.section.replace(/"/g, "&quot;") : ""}" placeholder="장면 설명">
+        <input type="text" class="seg-keyword" value="${seg.keyword ? seg.keyword.replace(/"/g, "&quot;") : ""}" placeholder="Pexels 검색 키워드 (영어)">
+        <div class="seg-actions">
+          <label class="seg-file-label">
+            직접 올리기
+            <input type="file" class="seg-file-input" accept="image/*,video/*">
+          </label>
+          ${seg.asset_path ? `<button type="button" class="seg-remove-btn">소재 삭제</button>` : ""}
+        </div>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".seg-item").forEach((el) => {
+      const id = el.dataset.id;
+      el.querySelector(".seg-section").addEventListener("change", (e) => saveField(id, "section", e.target.value));
+      el.querySelector(".seg-keyword").addEventListener("change", (e) => saveField(id, "keyword", e.target.value));
+      el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAsset(id, e.target.files[0]));
+      const removeBtn = el.querySelector(".seg-remove-btn");
+      if (removeBtn) removeBtn.addEventListener("click", () => removeSegmentAsset(id));
+    });
+  }
+
+  async function saveField(id, field, value) {
+    await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
+      method: "PATCH",
+      headers: jsonHeaders,
+      body: JSON.stringify({ [field]: value }),
+    });
+    const seg = segments.find((s) => String(s.id) === id);
+    if (seg) seg[field] = value;
+  }
+
+  async function uploadSegmentAsset(id, file) {
+    if (!file) return;
+    const scriptId = document.getElementById("scriptSelect").value;
+    const safeName = file.name.replace(/[^\w.\-]/g, "_");
+    const path = `${scriptId}/seg${id}_${Date.now()}_${safeName}`;
+    try {
+      const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!upRes.ok) throw new Error(await upRes.text());
+      await saveField(id, "asset_path", path);
+      showMsg("업로드 완료.", true);
+      loadSegments(scriptId);
+    } catch (err) {
+      showMsg("업로드 실패: " + err.message, false);
+    }
+  }
+
+  async function removeSegmentAsset(id) {
+    const seg = segments.find((s) => String(s.id) === id);
+    if (!seg || !seg.asset_path) return;
+    if (!confirm("이 장면의 소재를 삭제하고 Pexels 자동검색으로 되돌릴까요?")) return;
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${seg.asset_path}`, { method: "DELETE", headers });
+    await saveField(id, "asset_path", null);
+    loadSegments(document.getElementById("scriptSelect").value);
+  }
+
+  document.getElementById("scriptSelect").addEventListener("change", (e) => loadSegments(e.target.value));
+
+  document.getElementById("regenBtn").addEventListener("click", async () => {
+    const scriptId = document.getElementById("scriptSelect").value;
+    const row = scripts.find((r) => String(r.id) === scriptId);
+    if (!row) return;
+    if (segments.length && !confirm("기존 콘티를 지우고 새로 만들까요?")) return;
+
+    const btn = document.getElementById("regenBtn");
+    btn.disabled = true;
+    btn.textContent = "생성 중...";
+    try {
+      const res = await fetch("/api/gemini-storyboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: row.category, hook: row.hook, story: row.story, closing: row.closing }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "콘티 생성 실패");
+
+      for (const seg of segments) {
+        if (seg.asset_path) {
+          await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${seg.asset_path}`, { method: "DELETE", headers });
+        }
+      }
+      await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?script_id=eq.${scriptId}`, { method: "DELETE", headers });
+
+      const inserts = data.segments.map((seg, i) => ({
+        script_id: Number(scriptId),
+        order_no: i + 1,
+        section: seg.section,
+        keyword: seg.keyword,
+      }));
+      await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify(inserts),
+      });
+      showMsg("콘티 생성 완료.", true);
+      loadSegments(scriptId);
+    } catch (err) {
+      showMsg("콘티 생성 실패: " + err.message, false);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  loadScripts();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>

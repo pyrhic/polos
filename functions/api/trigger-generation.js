@@ -15,9 +15,14 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json();
-    const { scriptId, scriptContent, assetUrls, channel } = body;
+    const { scriptId, scriptContent, segments, channel } = body;
     if (!scriptId || !scriptContent) {
       return new Response(JSON.stringify({ error: "scriptId, scriptContent가 필요합니다" }), {
+        status: 400, headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (!segments || !segments.length) {
+      return new Response(JSON.stringify({ error: "콘티(segments)가 없습니다 — 콘티 페이지에서 먼저 만들어주세요" }), {
         status: 400, headers: { "Content-Type": "application/json" },
       });
     }
@@ -37,7 +42,7 @@ export async function onRequestPost(context) {
           channel: channel || "wicked-wiki",
           script_id: String(scriptId),
           script_content: scriptContent,
-          asset_urls: (assetUrls || []).join("\n"),
+          segments_json: JSON.stringify({ segments }),
         },
       }),
     });

@@ -169,6 +169,33 @@ ${r.closing || ""}
     }
   });
 
+  async function generateStoryboard(row) {
+    try {
+      const res = await fetch("/api/gemini-storyboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: row.category, hook: row.hook, story: row.story, closing: row.closing }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "콘티 생성 실패");
+
+      const inserts = data.segments.map((seg, i) => ({
+        script_id: row.id,
+        order_no: i + 1,
+        section: seg.section,
+        keyword: seg.keyword,
+      }));
+      await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(inserts),
+      });
+      showMsg("대본 승인 + 콘티 생성 완료. 콘티 페이지에서 확인하세요.", true);
+    } catch (err) {
+      showMsg("대본은 승인됐지만 콘티 자동 생성은 실패했습니다: " + err.message + " — 콘티 페이지에서 다시 시도하세요.", false);
+    }
+  }
+
   async function load() {
     const list = document.getElementById("list");
     try {
@@ -204,11 +231,15 @@ ${r.closing || ""}
 
     document.querySelectorAll(".approve-btn").forEach((btn) =>
       btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.textContent = "승인 중...";
         await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${btn.dataset.id}`, {
           method: "PATCH",
           headers,
           body: JSON.stringify({ status: "approved" }),
         });
+        const row = rows.find((r) => String(r.id) === btn.dataset.id);
+        await generateStoryboard(row);
         load();
       })
     );

@@ -67,10 +67,23 @@ ${r.closing || ""}
 `;
   }
 
-  async function loadAssetUrls(scriptId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_assets?select=storage_path&script_id=eq.${scriptId}`, { headers });
+  async function loadSegmentCounts(scriptIds) {
+    if (!scriptIds.length) return {};
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=script_id&script_id=in.(${scriptIds.join(",")})`, { headers });
     const rows = await res.json();
-    return rows.map((a) => assetPublicUrl(a.storage_path));
+    const counts = {};
+    rows.forEach((r) => { counts[r.script_id] = (counts[r.script_id] || 0) + 1; });
+    return counts;
+  }
+
+  async function loadSegments(scriptId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=section,keyword,asset_path&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
+    const rows = await res.json();
+    return rows.map((s) => ({
+      section: s.section,
+      keyword: s.keyword,
+      asset_url: s.asset_path ? assetPublicUrl(s.asset_path) : null,
+    }));
   }
 
   async function load() {
@@ -81,24 +94,30 @@ ${r.closing || ""}
       list.innerHTML = '<div class="empty">승인된 대본이 없습니다. 대본 페이지에서 먼저 승인하세요.</div>';
       return;
     }
+    const segCounts = await loadSegmentCounts(rows.map((r) => r.id));
 
-    list.innerHTML = rows.map((r) => `
+    list.innerHTML = rows.map((r) => {
+      const hasSegments = (segCounts[r.id] || 0) > 0;
+      return `
       <div class="card-box" data-id="${r.id}">
         <div class="s-meta" style="margin-bottom:6px;">
           <span class="status-tag status-${r.generation_status || "idle"}">${r.generation_status || "idle"}</span>
           · ${escapeHtml(r.category || "")}
         </div>
         <div class="title" style="font-weight:700;margin-bottom:8px;">${escapeHtml(r.hook)}</div>
-        <button type="button" class="gen-btn" data-id="${r.id}" ${r.generation_status === "running" ? "disabled" : ""}>
-          ${r.generation_status === "running" ? "생성 중..." : "생성 시작"}
-        </button>
+        ${hasSegments
+          ? `<button type="button" class="gen-btn" data-id="${r.id}" ${r.generation_status === "running" ? "disabled" : ""}>
+              ${r.generation_status === "running" ? "생성 중..." : "생성 시작"}
+            </button>`
+          : `<div class="msg err" style="display:block;">콘티가 없습니다 — <a class="accent" href="/youtube/storyboard.html">콘티 페이지</a>에서 먼저 만들어주세요.</div>`}
         <div class="video-wrap" id="video-${r.id}">
           ${r.generation_status === "done" && r.video_url
             ? `<video controls src="${r.video_url}"></video><a class="link-btn" style="margin-top:8px;" href="${r.video_url}" download>다운로드</a>`
             : ""}
         </div>
       </div>
-    `).join("");
+    `;
+    }).join("");
 
     document.querySelectorAll(".gen-btn").forEach((btn) =>
       btn.addEventListener("click", () => startGeneration(btn.dataset.id, rows.find((r) => String(r.id) === btn.dataset.id)))
@@ -112,13 +131,13 @@ ${r.closing || ""}
 
   async function startGeneration(scriptId, row) {
     if (!confirm("이 대본으로 영상 생성을 시작할까요? 몇 분 정도 걸립니다.")) return;
-    const assetUrls = await loadAssetUrls(scriptId);
+    const segments = await loadSegments(scriptId);
     const scriptContent = toMarkdown(row);
 
     const res = await fetch("/api/trigger-generation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scriptId, scriptContent, assetUrls, channel: "wicked-wiki" }),
+      body: JSON.stringify({ scriptId, scriptContent, segments, channel: "wicked-wiki" }),
     });
     const data = await res.json();
     if (!res.ok) {
