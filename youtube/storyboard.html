@@ -218,6 +218,7 @@
       showMsg("콘티 생성 실패: " + err.message, false);
     } finally {
       btn.disabled = false;
+      btn.textContent = segments.length ? "콘티 다시 생성" : "콘티 생성";
     }
   });
 
