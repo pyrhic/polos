@@ -13,11 +13,14 @@
   .seg-item { }
   .seg-item .seg-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
   .seg-item .seg-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-  .seg-item input { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
-  .seg-thumb { width:100%; height:140px; border-radius:3px; object-fit:cover; background:#0f0a14; margin-bottom:8px; }
-  .seg-thumb-empty { width:100%; height:70px; border-radius:3px; background:#0f0a14; margin-bottom:8px; display:flex; align-items:center; justify-content:center; color:#a89bb5; font-size:0.8rem; text-align:center; padding:8px; }
-  .seg-actions { display:flex; gap:8px; }
-  .seg-actions button, .seg-actions label { width:auto; flex:1; padding:8px 10px; font-size:0.75rem; margin:0; }
+  .seg-item input, .seg-item textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
+  .seg-script { min-height:50px; background:#17141c; color:#ffffff; }
+  .seg-thumbs { display:flex; gap:8px; overflow-x:auto; margin-bottom:8px; }
+  .seg-thumb-wrap { position:relative; flex-shrink:0; }
+  .seg-thumb { width:90px; height:90px; border-radius:3px; object-fit:cover; background:#0f0a14; display:block; }
+  .seg-thumb-del { position:absolute; top:2px; right:2px; width:18px; height:18px; padding:0; border-radius:50%; background:#3a1414; color:#ff8a80; font-size:0.65rem; line-height:1; }
+  .seg-thumb-empty { width:100%; height:50px; border-radius:3px; background:#0f0a14; margin-bottom:8px; display:flex; align-items:center; justify-content:center; color:#a89bb5; font-size:0.8rem; text-align:center; padding:8px; }
+  .seg-actions label { width:100%; padding:8px 10px; font-size:0.75rem; margin:0; display:block; }
   .seg-actions input[type="file"] { display:none; }
   .seg-file-label { background:#221a2e; }
 </style>
@@ -26,7 +29,7 @@
   <div class="wrap">
     <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
     <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">콘티</h1>
-    <p class="role">대본을 장면별로 나눠 보여줍니다. 섹션/키워드는 고쳐 쓸 수 있고, 사진·영상을 직접 올리면 그 장면엔 Pexels 대신 그 소재가 쓰입니다. 비워두면 키워드로 자동 검색됩니다.</p>
+    <p class="role">대본을 장면별로 나눠 보여줍니다. 대사/섹션/키워드는 고쳐 쓸 수 있고, 사진·영상을 직접 올리면(여러 개 가능) 그 장면엔 Pexels 대신 그 소재들이 쓰입니다. 비워두면 키워드로 자동 검색됩니다.</p>
 
     <label for="scriptSelect">대본 선택</label>
     <select id="scriptSelect">
@@ -52,6 +55,13 @@
   const jsonHeaders = { ...headers, "Content-Type": "application/json" };
   let scripts = [];
   let segments = [];
+
+  function escapeAttr(s) {
+    return String(s ?? "").replace(/"/g, "&quot;");
+  }
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  }
 
   function showMsg(text, ok) {
     const msg = document.getElementById("msg");
@@ -105,33 +115,45 @@
       list.innerHTML = '<div class="empty">아직 콘티가 없습니다. 위 "콘티 생성" 버튼을 눌러주세요.</div>';
       return;
     }
-    list.innerHTML = segments.map((seg) => `
+    list.innerHTML = segments.map((seg) => {
+      const paths = seg.asset_paths || [];
+      return `
       <div class="card-box seg-item" data-id="${seg.id}">
         <div class="seg-head"><div class="seg-no">${seg.order_no}</div></div>
-        ${seg.asset_path
-          ? (isImage(seg.asset_path)
-              ? `<img class="seg-thumb" src="${publicUrl(seg.asset_path)}" alt="">`
-              : `<video class="seg-thumb" src="${publicUrl(seg.asset_path)}" controls></video>`)
+        <label>대사</label>
+        <textarea class="seg-script" placeholder="이 장면에서 나오는 대본 문장">${escapeHtml(seg.script_text)}</textarea>
+        ${paths.length
+          ? `<div class="seg-thumbs">${paths.map((p, i) => `
+              <div class="seg-thumb-wrap" data-path="${escapeAttr(p)}">
+                ${isImage(p)
+                  ? `<img class="seg-thumb" src="${publicUrl(p)}" alt="">`
+                  : `<video class="seg-thumb" src="${publicUrl(p)}"></video>`}
+                <button type="button" class="seg-thumb-del" data-path="${escapeAttr(p)}">×</button>
+              </div>`).join("")}</div>`
           : `<div class="seg-thumb-empty">비어있음 — 키워드로 Pexels 자동 검색됨</div>`}
-        <input type="text" class="seg-section" value="${seg.section ? seg.section.replace(/"/g, "&quot;") : ""}" placeholder="장면 설명">
-        <input type="text" class="seg-keyword" value="${seg.keyword ? seg.keyword.replace(/"/g, "&quot;") : ""}" placeholder="Pexels 검색 키워드 (영어)">
+        <label>장면 설명</label>
+        <input type="text" class="seg-section" value="${escapeAttr(seg.section)}" placeholder="장면 설명">
+        <label>Pexels 검색 키워드 (영어)</label>
+        <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="Pexels 검색 키워드 (영어)">
         <div class="seg-actions">
           <label class="seg-file-label">
-            직접 올리기
-            <input type="file" class="seg-file-input" accept="image/*,video/*">
+            + 사진/영상 추가 (여러 개 선택 가능)
+            <input type="file" class="seg-file-input" accept="image/*,video/*" multiple>
           </label>
-          ${seg.asset_path ? `<button type="button" class="seg-remove-btn">소재 삭제</button>` : ""}
         </div>
       </div>
-    `).join("");
+    `;
+    }).join("");
 
     document.querySelectorAll(".seg-item").forEach((el) => {
       const id = el.dataset.id;
+      el.querySelector(".seg-script").addEventListener("change", (e) => saveField(id, "script_text", e.target.value));
       el.querySelector(".seg-section").addEventListener("change", (e) => saveField(id, "section", e.target.value));
       el.querySelector(".seg-keyword").addEventListener("change", (e) => saveField(id, "keyword", e.target.value));
-      el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAsset(id, e.target.files[0]));
-      const removeBtn = el.querySelector(".seg-remove-btn");
-      if (removeBtn) removeBtn.addEventListener("click", () => removeSegmentAsset(id));
+      el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
+      el.querySelectorAll(".seg-thumb-del").forEach((btn) =>
+        btn.addEventListener("click", () => removeSegmentAsset(id, btn.dataset.path))
+      );
     });
   }
 
@@ -145,32 +167,43 @@
     if (seg) seg[field] = value;
   }
 
-  async function uploadSegmentAsset(id, file) {
-    if (!file) return;
+  async function uploadSegmentAssets(id, fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
     const scriptId = document.getElementById("scriptSelect").value;
-    const safeName = file.name.replace(/[^\w.\-]/g, "_");
-    const path = `${scriptId}/seg${id}_${Date.now()}_${safeName}`;
-    try {
-      const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
-        method: "POST",
-        headers: { ...headers, "Content-Type": file.type || "application/octet-stream" },
-        body: file,
-      });
-      if (!upRes.ok) throw new Error(await upRes.text());
-      await saveField(id, "asset_path", path);
-      showMsg("업로드 완료.", true);
+    const seg = segments.find((s) => String(s.id) === id);
+    const paths = [...(seg.asset_paths || [])];
+
+    let uploaded = 0;
+    for (const file of files) {
+      const safeName = file.name.replace(/[^\w.\-]/g, "_");
+      const path = `${scriptId}/seg${id}_${Date.now()}_${safeName}`;
+      try {
+        const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!upRes.ok) throw new Error(await upRes.text());
+        paths.push(path);
+        uploaded++;
+      } catch (err) {
+        showMsg(`"${file.name}" 업로드 실패: ${err.message}`, false);
+      }
+    }
+    if (uploaded > 0) {
+      await saveField(id, "asset_paths", paths);
+      showMsg(`${uploaded}개 업로드 완료.`, true);
       loadSegments(scriptId);
-    } catch (err) {
-      showMsg("업로드 실패: " + err.message, false);
     }
   }
 
-  async function removeSegmentAsset(id) {
+  async function removeSegmentAsset(id, path) {
+    if (!confirm("이 소재를 삭제할까요?")) return;
     const seg = segments.find((s) => String(s.id) === id);
-    if (!seg || !seg.asset_path) return;
-    if (!confirm("이 장면의 소재를 삭제하고 Pexels 자동검색으로 되돌릴까요?")) return;
-    await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${seg.asset_path}`, { method: "DELETE", headers });
-    await saveField(id, "asset_path", null);
+    const paths = (seg.asset_paths || []).filter((p) => p !== path);
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
+    await saveField(id, "asset_paths", paths);
     loadSegments(document.getElementById("scriptSelect").value);
   }
 
@@ -180,7 +213,7 @@
     const scriptId = document.getElementById("scriptSelect").value;
     const row = scripts.find((r) => String(r.id) === scriptId);
     if (!row) return;
-    if (segments.length && !confirm("기존 콘티를 지우고 새로 만들까요?")) return;
+    if (segments.length && !confirm("기존 콘티를 지우고 새로 만들까요? (업로드해둔 소재도 함께 삭제됩니다)")) return;
 
     const btn = document.getElementById("regenBtn");
     btn.disabled = true;
@@ -195,8 +228,8 @@
       if (!res.ok) throw new Error(data.error || "콘티 생성 실패");
 
       for (const seg of segments) {
-        if (seg.asset_path) {
-          await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${seg.asset_path}`, { method: "DELETE", headers });
+        for (const path of (seg.asset_paths || [])) {
+          await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
         }
       }
       await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?script_id=eq.${scriptId}`, { method: "DELETE", headers });
@@ -205,6 +238,7 @@
         script_id: Number(scriptId),
         order_no: i + 1,
         section: seg.section,
+        script_text: seg.script_text,
         keyword: seg.keyword,
       }));
       await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {

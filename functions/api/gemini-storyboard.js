@@ -11,6 +11,8 @@ function buildPrompt(category, hook, story, closing) {
 ${body}
 
 [규칙]
+- 대본 전체 문장을 빠짐없이, 겹치지 않게 구간들에 나눠 담을 것 (이어 붙이면 원래 대본과 똑같아야 함)
+- 각 구간의 script_text는 그 구간에 해당하는 대본 원문을 한 글자도 바꾸지 말고 그대로 가져올 것
 - 각 구간의 section은 한국어로 짧게 (예: "후킹 (숨겨진 과거)")
 - 각 구간의 keyword는 Pexels 검색에 쓸 영어 단어 2~4개 (예: "vintage old photograph")
 - 실존 인물 이름이나 한국어 고유명사를 keyword에 쓰지 말 것 — 장면의 분위기/사물/상황을 묘사하는 일반 영어 단어로
@@ -48,9 +50,10 @@ export async function onRequestPost(context) {
                 type: "OBJECT",
                 properties: {
                   section: { type: "STRING" },
+                  script_text: { type: "STRING" },
                   keyword: { type: "STRING" },
                 },
-                required: ["section", "keyword"],
+                required: ["section", "script_text", "keyword"],
               },
             },
           },

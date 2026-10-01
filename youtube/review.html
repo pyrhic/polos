@@ -77,12 +77,13 @@ ${r.closing || ""}
   }
 
   async function loadSegments(scriptId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=section,keyword,asset_path&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=section,script_text,keyword,asset_paths&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
     const rows = await res.json();
     return rows.map((s) => ({
       section: s.section,
+      script_text: s.script_text,
       keyword: s.keyword,
-      asset_url: s.asset_path ? assetPublicUrl(s.asset_path) : null,
+      asset_urls: (s.asset_paths || []).map(assetPublicUrl),
     }));
   }
 

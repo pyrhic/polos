@@ -183,6 +183,7 @@ ${r.closing || ""}
         script_id: row.id,
         order_no: i + 1,
         section: seg.section,
+        script_text: seg.script_text,
         keyword: seg.keyword,
       }));
       await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
