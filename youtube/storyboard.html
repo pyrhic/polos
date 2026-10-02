@@ -192,7 +192,10 @@
         <input type="text" class="seg-section" value="${escapeAttr(seg.section)}" placeholder="장면 설명">
         <label>자료사진/영상 검색 키워드</label>
         <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="Pexels 검색 키워드 (영어)">
-        <button type="button" class="seg-save-btn">저장</button>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="seg-save-btn" style="flex:2;">저장</button>
+          <button type="button" class="seg-revert-btn" style="flex:1;background:#221a2e;">되돌리기</button>
+        </div>
       </div>
     `;
     }).join("");
@@ -217,6 +220,7 @@
         btn.addEventListener("click", () => removeSegmentAsset(id, btn.dataset.path))
       );
       saveBtn.addEventListener("click", () => saveSegmentCard(id, el));
+      el.querySelector(".seg-revert-btn").addEventListener("click", () => revertSegmentCard(id, el));
     });
 
     updateRuntimeSummary();
@@ -277,6 +281,28 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  function revertSegmentCard(id, el) {
+    const seg = segments.find((s) => String(s.id) === id);
+    if (!seg) return;
+    if (!confirm("마지막으로 저장된 상태로 되돌릴까요? 지금 수정한 내용은 사라집니다.")) return;
+
+    const scriptEl = el.querySelector(".seg-script");
+    const directionEl = el.querySelector(".seg-direction");
+    scriptEl.value = seg.script_text || "";
+    directionEl.value = seg.direction || "";
+    el.querySelector(".seg-section").value = seg.section || "";
+    el.querySelector(".seg-keyword").value = seg.keyword || "";
+    el.querySelector(".seg-target").value = seg.target_seconds ?? "";
+    autoGrow(scriptEl);
+    autoGrow(directionEl);
+
+    const saveBtn = el.querySelector(".seg-save-btn");
+    saveBtn.classList.remove("dirty");
+    saveBtn.textContent = "저장";
+    updateRuntimeSummary();
+    showMsg("마지막 저장 상태로 되돌렸습니다.", true);
   }
 
   async function uploadSegmentAssets(id, fileList) {
