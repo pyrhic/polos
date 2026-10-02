@@ -16,7 +16,6 @@
   .seg-item .seg-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .seg-item input, .seg-item textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
   .seg-script, .seg-direction { min-height:50px; background:#17141c; color:#ffffff; resize:none; overflow:hidden; }
-  .seg-keyword-line { color:#a89bb5; font-size:0.85rem; margin-bottom:10px; }
   .seg-thumbs { display:flex; gap:8px; overflow-x:auto; margin-bottom:8px; }
   .seg-thumb-wrap { position:relative; flex-shrink:0; }
   .seg-thumb { width:90px; height:90px; border-radius:3px; object-fit:cover; background:#0f0a14; display:block; }
@@ -147,7 +146,8 @@
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
         <label>장면 설명</label>
         <input type="text" class="seg-section" value="${escapeAttr(seg.section)}" placeholder="장면 설명">
-        <div class="seg-keyword-line">검색키워드 : ${escapeHtml(seg.keyword) || "-"}</div>
+        <label>검색키워드 (영어, 장면 설명을 바꾸면 이것도 같이 확인해주세요)</label>
+        <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="Pexels 검색 키워드 (영어)">
         <button type="button" class="seg-save-btn">저장</button>
       </div>
     `;
@@ -165,6 +165,7 @@
       directionEl.addEventListener("input", () => { autoGrow(directionEl); markDirty(); });
       autoGrow(directionEl);
       el.querySelector(".seg-section").addEventListener("input", markDirty);
+      el.querySelector(".seg-keyword").addEventListener("input", markDirty);
 
       el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
       el.querySelectorAll(".seg-thumb-del").forEach((btn) =>
@@ -204,6 +205,7 @@
     const scriptText = el.querySelector(".seg-script").value;
     const direction = el.querySelector(".seg-direction").value;
     const section = el.querySelector(".seg-section").value;
+    const keyword = el.querySelector(".seg-keyword").value;
 
     btn.disabled = true;
     btn.textContent = "저장 중...";
@@ -211,11 +213,11 @@
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
         method: "PATCH",
         headers: jsonHeaders,
-        body: JSON.stringify({ script_text: scriptText, direction, section }),
+        body: JSON.stringify({ script_text: scriptText, direction, section, keyword }),
       });
       if (!res.ok) throw new Error(await res.text());
       const seg = segments.find((s) => String(s.id) === id);
-      if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; }
+      if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
       btn.classList.remove("dirty");
       btn.textContent = "저장됨 ✓";
       setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "저장"; }, 1500);
