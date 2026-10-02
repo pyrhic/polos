@@ -207,6 +207,7 @@
         <input type="text" class="seg-section" value="${escapeAttr(seg.section)}" placeholder="장면 설명">
         <label>자료사진/영상 검색 키워드</label>
         <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="Pexels 검색 키워드 (영어)">
+        <button type="button" class="seg-pexels-search-btn" style="background:#221a2e;">검색 미리보기</button>
         <div class="seg-pexels-preview"></div>
         <div style="display:flex;gap:8px;">
           <button type="button" class="seg-save-btn" style="flex:2;">저장</button>
@@ -230,13 +231,16 @@
       el.querySelector(".seg-section").addEventListener("input", markDirty);
       const keywordEl = el.querySelector(".seg-keyword");
       const previewBox = el.querySelector(".seg-pexels-preview");
-      let previewTimer = null;
-      keywordEl.addEventListener("input", () => {
-        markDirty();
-        clearTimeout(previewTimer);
+      keywordEl.addEventListener("input", markDirty);
+
+      const triggerPexelsSearch = () => {
         const q = keywordEl.value.trim();
-        if (!q) { previewBox.classList.remove("open"); previewBox.innerHTML = ""; return; }
-        previewTimer = setTimeout(() => searchPexelsPreview(previewBox, q), 600);
+        if (!q) { showMsg("검색어를 먼저 입력하세요.", false); return; }
+        searchPexelsPreview(previewBox, q);
+      };
+      el.querySelector(".seg-pexels-search-btn").addEventListener("click", triggerPexelsSearch);
+      keywordEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); triggerPexelsSearch(); }
       });
 
       el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
