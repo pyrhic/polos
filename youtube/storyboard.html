@@ -32,6 +32,14 @@
   .seg-save-btn.dirty { background:#3a2f14; color:#ffd93d; }
   .runtime-summary { background:#17141c; border-radius:3px; padding:10px 14px; margin-top:14px; font-size:0.85rem; color:#7cff4a; font-weight:700; }
   .runtime-summary .note { color:#a89bb5; font-weight:400; font-size:0.75rem; display:block; margin-top:2px; }
+  .seg-pexels-preview { display:none; margin:-4px 0 10px; background:#0f0a14; border-radius:3px; padding:8px; }
+  .seg-pexels-preview.open { display:block; }
+  .seg-pexels-loading { color:#a89bb5; font-size:0.75rem; padding:4px; }
+  .seg-pexels-grid { display:flex; gap:8px; overflow-x:auto; }
+  .seg-pexels-item { flex-shrink:0; width:80px; }
+  .seg-pexels-thumb-wrap { position:relative; width:80px; height:100px; border-radius:3px; overflow:hidden; background:#221a2e; cursor:pointer; }
+  .seg-pexels-thumb-wrap img, .seg-pexels-thumb-wrap video { width:100%; height:100%; object-fit:cover; display:block; }
+  .seg-pexels-dur { position:absolute; bottom:2px; right:4px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.6rem; padding:1px 4px; border-radius:2px; }
 </style>
 </head>
 <body>
@@ -199,6 +207,7 @@
         <input type="text" class="seg-section" value="${escapeAttr(seg.section)}" placeholder="장면 설명">
         <label>자료사진/영상 검색 키워드</label>
         <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="Pexels 검색 키워드 (영어)">
+        <div class="seg-pexels-preview"></div>
         <div style="display:flex;gap:8px;">
           <button type="button" class="seg-save-btn" style="flex:2;">저장</button>
           <button type="button" class="seg-revert-btn" style="flex:1;background:#221a2e;">되돌리기</button>
@@ -219,7 +228,16 @@
       directionEl.addEventListener("input", () => { autoGrow(directionEl); markDirty(); });
       autoGrow(directionEl);
       el.querySelector(".seg-section").addEventListener("input", markDirty);
-      el.querySelector(".seg-keyword").addEventListener("input", markDirty);
+      const keywordEl = el.querySelector(".seg-keyword");
+      const previewBox = el.querySelector(".seg-pexels-preview");
+      let previewTimer = null;
+      keywordEl.addEventListener("input", () => {
+        markDirty();
+        clearTimeout(previewTimer);
+        const q = keywordEl.value.trim();
+        if (!q) { previewBox.classList.remove("open"); previewBox.innerHTML = ""; return; }
+        previewTimer = setTimeout(() => searchPexelsPreview(previewBox, q), 600);
+      });
 
       el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
       el.querySelectorAll(".seg-thumb-del").forEach((btn) =>
@@ -280,6 +298,37 @@
   function autoGrow(el) {
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
+  }
+
+  async function searchPexelsPreview(box, query) {
+    box.classList.add("open");
+    box.innerHTML = '<div class="seg-pexels-loading">Pexels에서 검색 중...</div>';
+    try {
+      const res = await fetch(`/api/pexels-search?q=${encodeURIComponent(query)}&orientation=portrait`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "검색 실패");
+      if (!data.results.length) {
+        box.innerHTML = '<div class="seg-pexels-loading">검색 결과가 없습니다.</div>';
+        return;
+      }
+      box.innerHTML = `<div class="seg-pexels-grid">${data.results.map((r) => `
+        <div class="seg-pexels-item">
+          <div class="seg-pexels-thumb-wrap" data-preview="${escapeAttr(r.preview_url)}">
+            <img src="${r.thumbnail}?w=200" alt="" loading="lazy">
+            <span class="seg-pexels-dur">${Math.round(r.duration)}s</span>
+          </div>
+        </div>
+      `).join("")}</div>`;
+      box.querySelectorAll(".seg-pexels-thumb-wrap").forEach((wrap) => {
+        wrap.addEventListener("click", () => {
+          const url = wrap.dataset.preview;
+          if (!url || wrap.querySelector("video")) return;
+          wrap.innerHTML = `<video src="${url}" autoplay muted loop playsinline></video>`;
+        });
+      });
+    } catch (err) {
+      box.innerHTML = `<div class="seg-pexels-loading">미리보기 실패: ${escapeHtml(err.message)}</div>`;
+    }
   }
 
   async function refreshSegments(scriptId) {
