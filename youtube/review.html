@@ -71,6 +71,7 @@ ${r.closing || ""}
     if (!scriptIds.length) return {};
     const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=script_id&script_id=in.(${scriptIds.join(",")})`, { headers });
     const rows = await res.json();
+    if (!res.ok) throw new Error(rows.message || "콘티 개수를 불러올 수 없습니다");
     const counts = {};
     rows.forEach((r) => { counts[r.script_id] = (counts[r.script_id] || 0) + 1; });
     return counts;
@@ -80,6 +81,7 @@ ${r.closing || ""}
     if (!scriptIds.length) return {};
     const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?select=*&script_id=in.(${scriptIds.join(",")})&order=version.desc`, { headers });
     const rows = await res.json();
+    if (!res.ok) throw new Error(rows.message || "생성된 영상 목록을 불러올 수 없습니다 (youtube_outputs 테이블이 없을 수 있음)");
     const byScript = {};
     rows.forEach((r) => { (byScript[r.script_id] ||= []).push(r); });
     return byScript;
@@ -99,8 +101,17 @@ ${r.closing || ""}
 
   async function load() {
     const list = document.getElementById("list");
+    try {
+      await loadInner(list);
+    } catch (err) {
+      list.innerHTML = '<div class="empty">불러오기 실패: ' + err.message + "</div>";
+    }
+  }
+
+  async function loadInner(list) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&order=created_at.desc`, { headers });
     const rows = await res.json();
+    if (!res.ok) throw new Error(rows.message || "대본을 불러올 수 없습니다");
     if (!rows.length) {
       list.innerHTML = '<div class="empty">승인된 대본이 없습니다. 대본 페이지에서 먼저 승인하세요.</div>';
       return;
