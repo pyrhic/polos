@@ -15,7 +15,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json();
-    const { scriptId, scriptContent, segments, channel } = body;
+    const { scriptId, scriptContent, segments, channel, version } = body;
     if (!scriptId || !scriptContent) {
       return new Response(JSON.stringify({ error: "scriptId, scriptContent가 필요합니다" }), {
         status: 400, headers: { "Content-Type": "application/json" },
@@ -43,6 +43,7 @@ export async function onRequestPost(context) {
           script_id: String(scriptId),
           script_content: scriptContent,
           segments_json: JSON.stringify({ segments }),
+          version: String(version || 1),
         },
       }),
     });

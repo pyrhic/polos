@@ -76,6 +76,15 @@ ${r.closing || ""}
     return counts;
   }
 
+  async function loadOutputsByScript(scriptIds) {
+    if (!scriptIds.length) return {};
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?select=*&script_id=in.(${scriptIds.join(",")})&order=version.desc`, { headers });
+    const rows = await res.json();
+    const byScript = {};
+    rows.forEach((r) => { (byScript[r.script_id] ||= []).push(r); });
+    return byScript;
+  }
+
   async function loadSegments(scriptId) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=section,script_text,keyword,direction,asset_paths&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
     const rows = await res.json();
@@ -97,9 +106,11 @@ ${r.closing || ""}
       return;
     }
     const segCounts = await loadSegmentCounts(rows.map((r) => r.id));
+    const outputsByScript = await loadOutputsByScript(rows.map((r) => r.id));
 
     list.innerHTML = rows.map((r) => {
       const hasSegments = (segCounts[r.id] || 0) > 0;
+      const outputs = outputsByScript[r.id] || [];
       return `
       <div class="card-box" data-id="${r.id}">
         <div class="s-meta" style="margin-bottom:6px;">
@@ -109,21 +120,27 @@ ${r.closing || ""}
         <div class="title" style="font-weight:700;margin-bottom:8px;">${escapeHtml(r.hook)}</div>
         ${hasSegments
           ? `<button type="button" class="gen-btn" data-id="${r.id}" ${r.generation_status === "running" ? "disabled" : ""}>
-              ${r.generation_status === "running" ? "생성 중..." : "생성 시작"}
+              ${r.generation_status === "running" ? "생성 중..." : outputs.length ? "새 버전(v" + (outputs[0].version + 1) + ") 생성" : "생성 시작"}
             </button>`
           : `<div class="msg err" style="display:block;">콘티가 없습니다 — <a class="accent" href="/youtube/storyboard.html">콘티 페이지</a>에서 먼저 만들어주세요.</div>`}
         <div class="video-wrap" id="video-${r.id}">
-          ${r.generation_status === "done" && r.video_url
-            ? `<video controls src="${r.video_url}"></video><a class="link-btn" style="margin-top:8px;" href="${r.video_url}" download>다운로드</a>`
-            : ""}
+          ${outputs.map((o) => `
+            <div style="margin-top:12px;">
+              <div class="s-meta" style="margin-bottom:4px;">v${o.version}</div>
+              <video controls preload="none" src="${o.video_url}"></video>
+              <a class="link-btn" style="margin-top:8px;" href="${o.video_url}" download>다운로드</a>
+            </div>
+          `).join("")}
         </div>
       </div>
     `;
     }).join("");
 
-    document.querySelectorAll(".gen-btn").forEach((btn) =>
-      btn.addEventListener("click", () => startGeneration(btn.dataset.id, rows.find((r) => String(r.id) === btn.dataset.id)))
-    );
+    document.querySelectorAll(".gen-btn").forEach((btn) => {
+      const row = rows.find((r) => String(r.id) === btn.dataset.id);
+      const nextVersion = (outputsByScript[row.id]?.[0]?.version || 0) + 1;
+      btn.addEventListener("click", () => startGeneration(btn.dataset.id, row, nextVersion));
+    });
 
     if (rows.some((r) => r.generation_status === "running")) {
       clearTimeout(pollTimer);
@@ -131,15 +148,15 @@ ${r.closing || ""}
     }
   }
 
-  async function startGeneration(scriptId, row) {
-    if (!confirm("이 대본으로 영상 생성을 시작할까요? 몇 분 정도 걸립니다.")) return;
+  async function startGeneration(scriptId, row, version) {
+    if (!confirm(`이 대본으로 v${version} 영상 생성을 시작할까요? 몇 분 정도 걸립니다. 기존 버전은 그대로 남습니다.`)) return;
     const segments = await loadSegments(scriptId);
     const scriptContent = toMarkdown(row);
 
     const res = await fetch("/api/trigger-generation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scriptId, scriptContent, segments, channel: "wicked-wiki" }),
+      body: JSON.stringify({ scriptId, scriptContent, segments, channel: "wicked-wiki", version }),
     });
     const data = await res.json();
     if (!res.ok) {
