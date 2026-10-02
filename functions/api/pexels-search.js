@@ -2,7 +2,7 @@
 // 미리 보여주기 위한 프록시 (API 키를 클라이언트에 노출하지 않기 위함).
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const apiKey = env.PEXELS_API_KEY;
+  const apiKey = (env.PEXELS_API_KEY || "").trim();
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "PEXELS_API_KEY 환경변수가 설정되지 않았습니다" }), {
       status: 500, headers: { "Content-Type": "application/json" },
