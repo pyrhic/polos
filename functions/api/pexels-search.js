@@ -2,7 +2,9 @@
 // 미리 보여주기 위한 프록시 (API 키를 클라이언트에 노출하지 않기 위함).
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const apiKey = (env.PEXELS_API_KEY || "").trim();
+  const rawKey = env.PEXELS_API_KEY || "";
+  // 공백/개행/탭 등 헤더에 쓸 수 없는 문자를 전부 제거 (복사 과정에서 섞여 들어가는 경우 방지)
+  const apiKey = rawKey.replace(/[\r\n\t\s]/g, "");
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "PEXELS_API_KEY 환경변수가 설정되지 않았습니다" }), {
       status: 500, headers: { "Content-Type": "application/json" },
@@ -44,7 +46,11 @@ export async function onRequestGet(context) {
       status: 200, headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({
+      error: err.message,
+      // 값 자체는 안 보여주고, 길이/문자 구성만 진단용으로 남김
+      diagnostic: { rawLength: rawKey.length, cleanedLength: apiKey.length },
+    }), {
       status: 500, headers: { "Content-Type": "application/json" },
     });
   }
