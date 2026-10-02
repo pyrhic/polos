@@ -10,7 +10,8 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
-  .seg-item { }
+  .seg-item { border:2px solid transparent; }
+  .seg-item:focus-within { border-color:#7cff4a; }
   .seg-item .seg-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
   .seg-item .seg-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .seg-item input, .seg-item textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
@@ -119,7 +120,7 @@
     list.innerHTML = segments.map((seg) => {
       const paths = seg.asset_paths || [];
       return `
-      <div class="card-box seg-item" data-id="${seg.id}">
+      <div class="card-box seg-item" data-id="${seg.id}" tabindex="0">
         <div class="seg-head"><div class="seg-no">${seg.order_no}</div></div>
         ${paths.length
           ? `<div class="seg-thumbs">${paths.map((p, i) => `
@@ -130,12 +131,13 @@
                 <button type="button" class="seg-thumb-del" data-path="${escapeAttr(p)}">×</button>
               </div>`).join("")}</div>`
           : `<div class="seg-thumb-empty">비어있음 — 키워드로 자동 검색됨</div>`}
-        <div class="seg-actions" style="margin-bottom:10px;">
+        <div class="seg-actions" style="margin-bottom:4px;">
           <label class="seg-file-label">
             + 사진/영상 추가 (여러 개 선택 가능)
             <input type="file" class="seg-file-input" accept="image/*,video/*" multiple>
           </label>
         </div>
+        <div style="color:#a89bb5;font-size:0.75rem;margin-bottom:10px;">이 카드 아무 곳이나 클릭한 뒤 Ctrl+V로도 이미지를 붙여넣을 수 있어요.</div>
         <label>대사</label>
         <textarea class="seg-script" placeholder="이 장면에서 나오는 대본 문장">${escapeHtml(seg.script_text)}</textarea>
         <label>ACTION (연출 지시 — 예: 천천히 줌인 / 좌에서 우로 패닝 / 카메라 틸트업)</label>
@@ -189,7 +191,8 @@
 
     let uploaded = 0;
     for (const file of files) {
-      const safeName = file.name.replace(/[^\w.\-]/g, "_");
+      const rawName = file.name || `pasted_${Date.now()}.${(file.type.split("/")[1] || "png")}`;
+      const safeName = rawName.replace(/[^\w.\-]/g, "_");
       const path = `${scriptId}/seg${id}_${Date.now()}_${safeName}`;
       try {
         const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
@@ -221,6 +224,22 @@
   }
 
   document.getElementById("scriptSelect").addEventListener("change", (e) => loadSegments(e.target.value));
+
+  document.addEventListener("paste", (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    const files = Array.from(items)
+      .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+      .map((it) => it.getAsFile())
+      .filter(Boolean);
+    if (!files.length) return;
+
+    const segEl = document.activeElement && document.activeElement.closest(".seg-item");
+    if (!segEl) return;
+
+    e.preventDefault();
+    uploadSegmentAssets(segEl.dataset.id, files);
+  });
 
   document.getElementById("regenBtn").addEventListener("click", async () => {
     const scriptId = document.getElementById("scriptSelect").value;
