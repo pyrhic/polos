@@ -14,7 +14,7 @@
   .seg-item .seg-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
   .seg-item .seg-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .seg-item input, .seg-item textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
-  .seg-script { min-height:50px; background:#17141c; color:#ffffff; }
+  .seg-script { min-height:50px; background:#17141c; color:#ffffff; resize:none; overflow:hidden; }
   .seg-thumbs { display:flex; gap:8px; overflow-x:auto; margin-bottom:8px; }
   .seg-thumb-wrap { position:relative; flex-shrink:0; }
   .seg-thumb { width:90px; height:90px; border-radius:3px; object-fit:cover; background:#0f0a14; display:block; }
@@ -147,7 +147,10 @@
 
     document.querySelectorAll(".seg-item").forEach((el) => {
       const id = el.dataset.id;
-      el.querySelector(".seg-script").addEventListener("change", (e) => saveField(id, "script_text", e.target.value));
+      const scriptEl = el.querySelector(".seg-script");
+      scriptEl.addEventListener("change", (e) => saveField(id, "script_text", e.target.value));
+      scriptEl.addEventListener("input", () => autoGrow(scriptEl));
+      autoGrow(scriptEl);
       el.querySelector(".seg-section").addEventListener("change", (e) => saveField(id, "section", e.target.value));
       el.querySelector(".seg-keyword").addEventListener("change", (e) => saveField(id, "keyword", e.target.value));
       el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
@@ -155,6 +158,11 @@
         btn.addEventListener("click", () => removeSegmentAsset(id, btn.dataset.path))
       );
     });
+  }
+
+  function autoGrow(el) {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
   }
 
   async function saveField(id, field, value) {
