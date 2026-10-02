@@ -25,6 +25,8 @@
   .seg-actions label { width:100%; padding:8px 10px; font-size:0.75rem; margin:0; display:block; }
   .seg-actions input[type="file"] { display:none; }
   .seg-file-label { background:#221a2e; }
+  .seg-save-btn { margin-top:4px; }
+  .seg-save-btn.dirty { background:#3a2f14; color:#ffd93d; }
 </style>
 </head>
 <body>
@@ -146,25 +148,29 @@
         <label>장면 설명</label>
         <input type="text" class="seg-section" value="${escapeAttr(seg.section)}" placeholder="장면 설명">
         <div class="seg-keyword-line">검색키워드 : ${escapeHtml(seg.keyword) || "-"}</div>
+        <button type="button" class="seg-save-btn">저장</button>
       </div>
     `;
     }).join("");
 
     document.querySelectorAll(".seg-item").forEach((el) => {
       const id = el.dataset.id;
+      const saveBtn = el.querySelector(".seg-save-btn");
+      const markDirty = () => { saveBtn.classList.add("dirty"); saveBtn.textContent = "저장 (수정됨)"; };
+
       const scriptEl = el.querySelector(".seg-script");
-      scriptEl.addEventListener("change", (e) => saveField(id, "script_text", e.target.value));
-      scriptEl.addEventListener("input", () => autoGrow(scriptEl));
+      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); });
       autoGrow(scriptEl);
       const directionEl = el.querySelector(".seg-direction");
-      directionEl.addEventListener("change", (e) => saveField(id, "direction", e.target.value));
-      directionEl.addEventListener("input", () => autoGrow(directionEl));
+      directionEl.addEventListener("input", () => { autoGrow(directionEl); markDirty(); });
       autoGrow(directionEl);
-      el.querySelector(".seg-section").addEventListener("change", (e) => saveField(id, "section", e.target.value));
+      el.querySelector(".seg-section").addEventListener("input", markDirty);
+
       el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
       el.querySelectorAll(".seg-thumb-del").forEach((btn) =>
         btn.addEventListener("click", () => removeSegmentAsset(id, btn.dataset.path))
       );
+      saveBtn.addEventListener("click", () => saveSegmentCard(id, el));
     });
   }
 
@@ -183,13 +189,43 @@
   }
 
   async function saveField(id, field, value) {
-    await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
       method: "PATCH",
       headers: jsonHeaders,
       body: JSON.stringify({ [field]: value }),
     });
+    if (!res.ok) throw new Error(await res.text());
     const seg = segments.find((s) => String(s.id) === id);
     if (seg) seg[field] = value;
+  }
+
+  async function saveSegmentCard(id, el) {
+    const btn = el.querySelector(".seg-save-btn");
+    const scriptText = el.querySelector(".seg-script").value;
+    const direction = el.querySelector(".seg-direction").value;
+    const section = el.querySelector(".seg-section").value;
+
+    btn.disabled = true;
+    btn.textContent = "저장 중...";
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
+        method: "PATCH",
+        headers: jsonHeaders,
+        body: JSON.stringify({ script_text: scriptText, direction, section }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const seg = segments.find((s) => String(s.id) === id);
+      if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; }
+      btn.classList.remove("dirty");
+      btn.textContent = "저장됨 ✓";
+      setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "저장"; }, 1500);
+    } catch (err) {
+      showMsg("저장 실패: " + err.message, false);
+      btn.classList.add("dirty");
+      btn.textContent = "저장 (수정됨)";
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   async function uploadSegmentAssets(id, fileList) {
@@ -233,7 +269,22 @@
     refreshSegments(document.getElementById("scriptSelect").value);
   }
 
-  document.getElementById("scriptSelect").addEventListener("change", (e) => loadSegments(e.target.value));
+  let lastScriptId = "";
+  document.getElementById("scriptSelect").addEventListener("change", (e) => {
+    if (document.querySelector(".seg-save-btn.dirty") && !confirm("저장 안 한 수정사항이 있습니다. 그래도 넘어갈까요?")) {
+      e.target.value = lastScriptId;
+      return;
+    }
+    lastScriptId = e.target.value;
+    loadSegments(e.target.value);
+  });
+
+  window.addEventListener("beforeunload", (e) => {
+    if (document.querySelector(".seg-save-btn.dirty")) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
 
   document.getElementById("addSegBtn").addEventListener("click", async () => {
     const scriptId = document.getElementById("scriptSelect").value;
