@@ -40,6 +40,7 @@
 
     <div id="regenWrap" style="display:none;margin-top:10px;">
       <button type="button" id="regenBtn">콘티 (다시) 생성</button>
+      <button type="button" id="addSegBtn" style="margin-top:8px;background:#221a2e;">+ 장면 추가</button>
     </div>
     <div class="msg" id="msg"></div>
 
@@ -172,6 +173,15 @@
     el.style.height = el.scrollHeight + "px";
   }
 
+  async function refreshSegments(scriptId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=*&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
+    segments = await res.json();
+    document.getElementById("regenBtn").textContent = segments.length ? "콘티 다시 생성" : "콘티 생성";
+    const scrollY = window.scrollY;
+    render();
+    window.scrollTo(0, scrollY);
+  }
+
   async function saveField(id, field, value) {
     await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
       method: "PATCH",
@@ -210,7 +220,7 @@
     if (uploaded > 0) {
       await saveField(id, "asset_paths", paths);
       showMsg(`${uploaded}개 업로드 완료.`, true);
-      loadSegments(scriptId);
+      refreshSegments(scriptId);
     }
   }
 
@@ -220,10 +230,33 @@
     const paths = (seg.asset_paths || []).filter((p) => p !== path);
     await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
     await saveField(id, "asset_paths", paths);
-    loadSegments(document.getElementById("scriptSelect").value);
+    refreshSegments(document.getElementById("scriptSelect").value);
   }
 
   document.getElementById("scriptSelect").addEventListener("change", (e) => loadSegments(e.target.value));
+
+  document.getElementById("addSegBtn").addEventListener("click", async () => {
+    const scriptId = document.getElementById("scriptSelect").value;
+    if (!scriptId) return;
+    const nextOrder = segments.length ? Math.max(...segments.map((s) => s.order_no)) + 1 : 1;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          script_id: Number(scriptId), order_no: nextOrder,
+          section: "", script_text: "", keyword: "", direction: "", asset_paths: [],
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showMsg("장면을 추가했습니다.", true);
+      await refreshSegments(scriptId);
+      const list = document.getElementById("segList");
+      list.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (err) {
+      showMsg("장면 추가 실패: " + err.message, false);
+    }
+  });
 
   document.addEventListener("paste", (e) => {
     const items = e.clipboardData && e.clipboardData.items;
