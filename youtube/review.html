@@ -87,14 +87,22 @@ ${r.closing || ""}
     return byScript;
   }
 
+  // 콘티 페이지와 같은 기준(초당 4.3자) — 노출 시간을 직접 안 정했으면 대사 길이로 추정.
+  const CHARS_PER_SEC = 4.3;
+  function estimateSeconds(text) {
+    const len = (text || "").replace(/\s+/g, "").length;
+    return Math.max(1, len / CHARS_PER_SEC);
+  }
+
   async function loadSegments(scriptId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=section,script_text,keyword,direction,asset_paths&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=section,script_text,keyword,direction,target_seconds,asset_paths&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
     const rows = await res.json();
     return rows.map((s) => ({
       section: s.section,
       script_text: s.script_text,
       keyword: s.keyword,
       direction: s.direction,
+      weight_seconds: s.target_seconds > 0 ? Number(s.target_seconds) : estimateSeconds(s.script_text),
       asset_urls: (s.asset_paths || []).map(assetPublicUrl),
     }));
   }

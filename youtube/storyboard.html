@@ -26,6 +26,9 @@
   .seg-file-label { background:#221a2e; }
   .seg-save-btn { margin-top:4px; }
   .seg-save-btn.dirty { background:#3a2f14; color:#ffd93d; }
+  .seg-estimate { color:#a89bb5; font-size:0.75rem; margin:-4px 0 8px; }
+  .runtime-summary { background:#17141c; border-radius:3px; padding:10px 14px; margin-top:14px; font-size:0.85rem; color:#7cff4a; font-weight:700; }
+  .runtime-summary .note { color:#a89bb5; font-weight:400; font-size:0.75rem; display:block; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -44,6 +47,8 @@
       <button type="button" id="addSegBtn" style="margin-top:8px;background:#221a2e;">+ 장면 추가</button>
     </div>
     <div class="msg" id="msg"></div>
+
+    <div class="runtime-summary" id="runtimeSummary" style="display:none;"></div>
 
     <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
   </div>
@@ -79,6 +84,42 @@
 
   function isImage(path) {
     return /\.(jpe?g|png|gif|webp)$/i.test(path);
+  }
+
+  // 한국어 내레이션 기준 대략적인 발화 속도 추정치(초당 글자 수) — 정확한 값은
+  // 실제 TTS가 돌아야 알 수 있어서, 어디까지나 대략적인 예측용.
+  const CHARS_PER_SEC = 4.3;
+
+  function estimateSeconds(text) {
+    const len = (text || "").replace(/\s+/g, "").length;
+    return Math.max(1, len / CHARS_PER_SEC);
+  }
+
+  function segWeightSeconds(el) {
+    const override = parseFloat(el.querySelector(".seg-target").value);
+    if (override > 0) return override;
+    return estimateSeconds(el.querySelector(".seg-script").value);
+  }
+
+  function updateRuntimeSummary() {
+    const box = document.getElementById("runtimeSummary");
+    const cards = document.querySelectorAll(".seg-item");
+    if (!cards.length) { box.style.display = "none"; return; }
+    let total = 0;
+    cards.forEach((el) => {
+      const seconds = segWeightSeconds(el);
+      total += seconds;
+      const estEl = el.querySelector(".seg-estimate");
+      if (estEl) {
+        const overridden = parseFloat(el.querySelector(".seg-target").value) > 0;
+        estEl.textContent = overridden
+          ? `노출 시간 ${seconds.toFixed(1)}초 (직접 지정)`
+          : `예상 노출 시간 약 ${seconds.toFixed(1)}초 (대사 길이 기준 자동계산)`;
+      }
+    });
+    box.style.display = "block";
+    box.innerHTML = `전체 예상 길이: 약 ${total.toFixed(1)}초 (${(total / 60).toFixed(1)}분)` +
+      `<span class="note">대사 기준 추정치이며, 실제 음성 속도에 따라 달라질 수 있습니다. 노출 시간을 직접 입력하면 그 값을 우선 씁니다.</span>`;
   }
 
   async function loadScripts() {
@@ -142,6 +183,9 @@
         <div style="color:#a89bb5;font-size:0.75rem;margin-bottom:10px;">이 카드 아무 곳이나 클릭한 뒤 Ctrl+V로도 이미지를 붙여넣을 수 있어요.</div>
         <label>대사</label>
         <textarea class="seg-script" placeholder="이 장면에서 나오는 대본 문장">${escapeHtml(seg.script_text)}</textarea>
+        <div class="seg-estimate"></div>
+        <label>화면 노출 시간 (초, 비워두면 대사 길이로 자동 계산)</label>
+        <input type="number" step="0.1" min="0" class="seg-target" value="${seg.target_seconds ?? ""}" placeholder="자동">
         <label>ACTION (연출 지시 — 예: 천천히 줌인 / 좌에서 우로 패닝 / 카메라 틸트업)</label>
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
         <label>장면 설명</label>
@@ -159,13 +203,14 @@
       const markDirty = () => { saveBtn.classList.add("dirty"); saveBtn.textContent = "저장 (수정됨)"; };
 
       const scriptEl = el.querySelector(".seg-script");
-      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); });
+      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); });
       autoGrow(scriptEl);
       const directionEl = el.querySelector(".seg-direction");
       directionEl.addEventListener("input", () => { autoGrow(directionEl); markDirty(); });
       autoGrow(directionEl);
       el.querySelector(".seg-section").addEventListener("input", markDirty);
       el.querySelector(".seg-keyword").addEventListener("input", markDirty);
+      el.querySelector(".seg-target").addEventListener("input", () => { markDirty(); updateRuntimeSummary(); });
 
       el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
       el.querySelectorAll(".seg-thumb-del").forEach((btn) =>
@@ -173,6 +218,8 @@
       );
       saveBtn.addEventListener("click", () => saveSegmentCard(id, el));
     });
+
+    updateRuntimeSummary();
   }
 
   function autoGrow(el) {
@@ -206,6 +253,8 @@
     const direction = el.querySelector(".seg-direction").value;
     const section = el.querySelector(".seg-section").value;
     const keyword = el.querySelector(".seg-keyword").value;
+    const targetRaw = el.querySelector(".seg-target").value;
+    const targetSeconds = targetRaw === "" ? null : parseFloat(targetRaw);
 
     btn.disabled = true;
     btn.textContent = "저장 중...";
@@ -213,11 +262,11 @@
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
         method: "PATCH",
         headers: jsonHeaders,
-        body: JSON.stringify({ script_text: scriptText, direction, section, keyword }),
+        body: JSON.stringify({ script_text: scriptText, direction, section, keyword, target_seconds: targetSeconds }),
       });
       if (!res.ok) throw new Error(await res.text());
       const seg = segments.find((s) => String(s.id) === id);
-      if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
+      if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; seg.target_seconds = targetSeconds; }
       btn.classList.remove("dirty");
       btn.textContent = "저장됨 ✓";
       setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "저장"; }, 1500);
