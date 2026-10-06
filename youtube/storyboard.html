@@ -83,6 +83,9 @@
     <div class="card-box settings-card" id="settingsCard" style="display:none;margin-top:20px;">
       <div class="settings-title">전체 설정<span>콘티 전반(영상 전체)에 적용</span></div>
 
+      <label>콘티 이름 (영상 제목에 "이름 v1, v2…"로 붙습니다)</label>
+      <input type="text" id="convName" placeholder="예: 폐건물 극장식 레스토랑">
+
       <label>자막 크기 <b id="capSizeVal"></b></label>
       <input type="range" id="capSize" min="40" max="140" step="2">
       <div class="cap-preview" id="capPreview">
@@ -237,7 +240,7 @@
   ];
   const DEFAULT_SETTINGS = {
     caption_font_size: 80, bgm_path: null, bgm_volume: 0.15, mood: "neutral", mood_note: "", transition: "cut",
-    tts_voice: "ko-KR-InJoonNeural", tts_rate: -3, tts_pitch: -5,
+    tts_voice: "ko-KR-InJoonNeural", tts_rate: -3, tts_pitch: -5, name: "",
   };
   const VOICES = [
     { id: "ko-KR-InJoonNeural", label: "인준 (남성) — 현재 기본" },
@@ -287,6 +290,9 @@
     if (!row) { card.style.display = "none"; return; }
     currentSettings = { ...DEFAULT_SETTINGS, ...(row.video_settings || {}) };
     savedBgmPath = currentSettings.bgm_path || null;
+    // 이름을 따로 안 정했으면 대본 후킹 앞부분을 기본 이름으로 제안
+    currentSettings.name = currentSettings.name || (row.hook || "").slice(0, 20);
+    $("convName").value = currentSettings.name;
     $("capSize").value = currentSettings.caption_font_size;
     $("bgmVol").value = Math.round(currentSettings.bgm_volume * 100);
     $("bgmVolVal").textContent = $("bgmVol").value + "%";
@@ -363,6 +369,7 @@
 
   MOODS.forEach((m) => $("moodSel").add(new Option(m.label, m.id)));
   VOICES.forEach((v) => $("voiceSel").add(new Option(v.label, v.id)));
+  $("convName").addEventListener("input", () => { currentSettings.name = $("convName").value; markSettingsDirty(); });
   $("voiceSel").addEventListener("change", () => {
     currentSettings.tts_voice = $("voiceSel").value;
     $("voiceSample").src = `/youtube/voices/${currentSettings.tts_voice}.mp3`;

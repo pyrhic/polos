@@ -36,6 +36,14 @@
     return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
 
+  // 콘티 이름 (전체 설정에서 정한 이름, 없으면 후킹 앞부분)
+  function videoName(r) {
+    return (r.video_settings && r.video_settings.name) || (r.hook || "").slice(0, 20);
+  }
+  function downloadUrl(url, name, version) {
+    return `${url}?download=${encodeURIComponent(`${name} v${version}.mp4`)}`;
+  }
+
   function assetPublicUrl(path) {
     if (/^https?:\/\//.test(path)) return path;
     return `${SUPABASE_URL}/storage/v1/object/public/youtube-assets/${path}`;
@@ -147,11 +155,11 @@ ${r.closing || ""}
           ${outputs.map((o) => `
             <div style="margin-top:12px;">
               <div class="s-meta" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                <span>v${o.version}</span>
+                <span>${escapeHtml(videoName(r))} v${o.version}</span>
                 <button type="button" class="out-del-btn" data-id="${o.id}" data-path="${escapeHtml(o.storage_path)}" data-version="${o.version}" style="width:auto;padding:3px 10px;font-size:0.7rem;background:#3a1414;color:#ff8a80;">삭제</button>
               </div>
               <video controls preload="none" src="${o.video_url}"></video>
-              <a class="link-btn" style="margin-top:8px;" href="${o.video_url}" download>다운로드</a>
+              <a class="link-btn" style="margin-top:8px;" href="${downloadUrl(o.video_url, videoName(r), o.version)}" download>다운로드</a>
             </div>
           `).join("")}
         </div>
