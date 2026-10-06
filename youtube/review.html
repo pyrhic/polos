@@ -172,11 +172,19 @@ ${r.closing || ""}
     if (!confirm(`이 대본으로 v${version} 영상 생성을 시작할까요? 몇 분 정도 걸립니다. 기존 버전은 그대로 남습니다.`)) return;
     const segments = await loadSegments(scriptId);
     const scriptContent = toMarkdown(row);
+    const vs = row.video_settings || {};
+    const settings = {
+      caption_font_size: vs.caption_font_size,
+      bgm_url: vs.bgm_path ? assetPublicUrl(vs.bgm_path) : null,
+      bgm_volume: vs.bgm_volume,
+      mood: vs.mood,
+      transition: vs.transition,
+    };
 
     const res = await fetch("/api/trigger-generation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scriptId, scriptContent, segments, channel: "wicked-wiki", version }),
+      body: JSON.stringify({ scriptId, scriptContent, segments, settings, channel: "wicked-wiki", version }),
     });
     const data = await res.json();
     if (!res.ok) {

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>콘티 — Wicked Wiki</title>
 <link rel="stylesheet" href="/youtube/style.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@300&display=swap">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0f0a14">
 <link rel="apple-touch-icon" href="/icon-192.png">
@@ -39,6 +40,21 @@
   .seg-pexels-item { flex-shrink:0; width:80px; }
   .seg-pexels-thumb-wrap { position:relative; width:80px; height:100px; border-radius:3px; overflow:hidden; background:#221a2e; cursor:pointer; }
   .seg-pexels-thumb-wrap img, .seg-pexels-thumb-wrap video { width:100%; height:100%; object-fit:cover; display:block; }
+  .settings-card { border:2px solid #3a2f14; }
+  .settings-title { font-weight:800; margin-bottom:6px; }
+  .settings-title span { color:#a89bb5; font-weight:400; font-size:0.75rem; margin-left:6px; }
+  .settings-card input[type="range"] { padding:0; margin:4px 0 8px; accent-color:#7cff4a; }
+  .settings-card select, .settings-card textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
+  .settings-card input[type="file"] { display:none; }
+  .settings-note { color:#a89bb5; font-size:0.75rem; margin-bottom:10px; }
+  .cap-preview { position:relative; width:270px; max-width:100%; height:480px; margin:6px auto 4px; background:#000 center/cover no-repeat; border-radius:4px; overflow:hidden; }
+  .cap-lines { position:absolute; left:4px; right:4px; bottom:35px; text-align:center; line-height:1.25; }
+  .cap-normal { font-family:'IBM Plex Sans KR',sans-serif; font-weight:300; color:#fff; text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000; }
+  .cap-emph { font-family:'Black Han Sans',sans-serif; color:#ffff00; margin-top:6px; text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000; }
+  .bgm-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .bgm-row audio { flex:1; height:32px; min-width:0; }
+  .bgm-row button { width:auto; padding:4px 10px; font-size:0.7rem; margin:0; flex-shrink:0; }
+  #settingsSaveBtn.dirty { background:#3a2f14; color:#ffd93d; }
   .seg-pexels-pick { width:80px; margin-top:4px; padding:5px 0; font-size:0.7rem; }
   .seg-pexels-dur { position:absolute; bottom:2px; right:4px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.6rem; padding:1px 4px; border-radius:2px; }
 </style>
@@ -61,6 +77,40 @@
     <div class="msg" id="msg"></div>
 
     <div class="runtime-summary" id="runtimeSummary" style="display:none;"></div>
+
+    <div class="card-box settings-card" id="settingsCard" style="display:none;margin-top:20px;">
+      <div class="settings-title">전체 설정<span>콘티 전반(영상 전체)에 적용</span></div>
+
+      <label>자막 크기 <b id="capSizeVal"></b></label>
+      <input type="range" id="capSize" min="40" max="140" step="2">
+      <div class="cap-preview" id="capPreview">
+        <div class="cap-lines">
+          <div class="cap-normal" id="capNormal">일반 자막은 이렇게 보여요</div>
+          <div class="cap-emph" id="capEmph">강조 123억</div>
+        </div>
+      </div>
+      <div class="settings-note">위: 일반 자막 / 아래: 강조 자막. 첫 장면 사진이 있으면 그 위에, 없으면 검은 화면에 보입니다. 실제 영상과 조금 다를 수 있어요.</div>
+
+      <label>배경음악 (사용이 허락된 음원만 올려주세요)</label>
+      <div class="bgm-row" id="bgmRow"></div>
+      <div class="seg-actions" style="margin-bottom:8px;">
+        <label class="seg-file-label">+ 음악 파일 올리기<input type="file" id="bgmFile" accept="audio/*"></label>
+      </div>
+      <label>배경음악 볼륨 <b id="bgmVolVal"></b></label>
+      <input type="range" id="bgmVol" min="0" max="100" step="1">
+
+      <label>영상 분위기</label>
+      <select id="moodSel"></select>
+      <textarea id="moodNote" style="min-height:50px;" placeholder="예: 긴장감 있게, 어두운 톤으로..."></textarea>
+
+      <label>화면 전환</label>
+      <select id="transSel">
+        <option value="cut">컷 (바로 전환)</option>
+        <option value="fade">페이드 (장면이 바뀔 때 어두워졌다 밝아짐)</option>
+      </select>
+
+      <button type="button" id="settingsSaveBtn">전체 설정 저장</button>
+    </div>
 
     <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
   </div>
@@ -131,6 +181,7 @@
     if (!el || !seg) return;
     el.querySelector(".seg-thumbs-area").innerHTML = thumbsHtml(seg);
     bindThumbDeletes(el, id);
+    updateSettingsPreview();
   }
 
   // 한국어 내레이션 기준 대략적인 발화 속도 추정치(초당 글자 수) — 정확한 값은
@@ -168,6 +219,139 @@
       `<span class="note">대사 기준 추정치이며, 실제 음성 속도에 따라 달라질 수 있습니다. 장면 번호 옆 "수정"으로 노출 시간을 직접 바꿀 수 있어요.</span>`;
   }
 
+  // ───── 전체 설정 카드 (자막 크기 / 배경음악 / 분위기 / 화면 전환) ─────
+  const MOODS = [
+    { id: "neutral", label: "기본", desc: "" },
+    { id: "mystery", label: "어둡고 미스터리", desc: "어둡고 긴장감 있는 미스터리 분위기" },
+    { id: "bright", label: "밝고 경쾌", desc: "밝고 경쾌한 분위기" },
+    { id: "calm", label: "차분한 다큐", desc: "차분하고 담담한 다큐멘터리 분위기" },
+  ];
+  const DEFAULT_SETTINGS = {
+    caption_font_size: 80, bgm_path: null, bgm_volume: 0.15, mood: "neutral", mood_note: "", transition: "cut",
+  };
+  let currentSettings = { ...DEFAULT_SETTINGS };
+  let savedBgmPath = null;
+  const $ = (id) => document.getElementById(id);
+
+  function hasDirty() {
+    return !!document.querySelector(".seg-save-btn.dirty, #settingsSaveBtn.dirty");
+  }
+
+  function markSettingsDirty() {
+    const b = $("settingsSaveBtn");
+    b.classList.add("dirty");
+    b.textContent = "전체 설정 저장 (수정됨)";
+  }
+
+  function updateSettingsPreview() {
+    const size = Number($("capSize").value);
+    $("capSizeVal").textContent = size;
+    // 영상 폭 1080px 기준을 미리보기 폭 270px로 줄인 비율(0.25)로 표시
+    $("capNormal").style.fontSize = (size * 0.25) + "px";
+    $("capEmph").style.fontSize = (size * 1.15 * 0.25) + "px";
+    const firstImg = segments[0] && (segments[0].asset_paths || []).find((p) => isImage(p));
+    $("capPreview").style.backgroundImage = firstImg ? `url("${assetUrl(firstImg)}")` : "none";
+  }
+
+  function renderBgm() {
+    const row = $("bgmRow");
+    const p = currentSettings.bgm_path;
+    if (!p) { row.innerHTML = '<span class="settings-note" style="margin:0;">배경음악 없음</span>'; return; }
+    row.innerHTML = `<audio controls preload="none" src="${assetUrl(p)}"></audio>
+      <button type="button" id="bgmRemove" style="background:#3a1414;color:#ff8a80;">삭제</button>`;
+    $("bgmRemove").addEventListener("click", () => {
+      currentSettings.bgm_path = null;
+      renderBgm();
+      markSettingsDirty();
+    });
+  }
+
+  function loadSettingsCard(scriptId) {
+    const card = $("settingsCard");
+    const row = scripts.find((r) => String(r.id) === String(scriptId));
+    if (!row) { card.style.display = "none"; return; }
+    currentSettings = { ...DEFAULT_SETTINGS, ...(row.video_settings || {}) };
+    savedBgmPath = currentSettings.bgm_path || null;
+    $("capSize").value = currentSettings.caption_font_size;
+    $("bgmVol").value = Math.round(currentSettings.bgm_volume * 100);
+    $("bgmVolVal").textContent = $("bgmVol").value + "%";
+    $("moodSel").value = currentSettings.mood;
+    $("moodNote").value = currentSettings.mood_note || "";
+    $("transSel").value = currentSettings.transition;
+    const b = $("settingsSaveBtn");
+    b.classList.remove("dirty");
+    b.textContent = "전체 설정 저장";
+    card.style.display = "block";
+    renderBgm();
+    updateSettingsPreview();
+  }
+
+  async function uploadBgm(file) {
+    const scriptId = $("scriptSelect").value;
+    const safeName = file.name.replace(/[^\w.\-]/g, "_");
+    const path = `${scriptId}/bgm_${Date.now()}_${safeName}`;
+    try {
+      const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": file.type || "audio/mpeg" },
+        body: file,
+      });
+      if (!upRes.ok) throw new Error(await upRes.text());
+      currentSettings.bgm_path = path;
+      renderBgm();
+      markSettingsDirty();
+      showMsg("음악을 올렸습니다. '전체 설정 저장'을 눌러야 적용됩니다.", true);
+    } catch (err) {
+      showMsg("음악 업로드 실패: " + err.message, false);
+    }
+  }
+
+  async function saveSettings() {
+    const btn = $("settingsSaveBtn");
+    const scriptId = $("scriptSelect").value;
+    btn.disabled = true;
+    btn.textContent = "저장 중...";
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${scriptId}`, {
+        method: "PATCH", headers: jsonHeaders,
+        body: JSON.stringify({ video_settings: currentSettings }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const row = scripts.find((r) => String(r.id) === String(scriptId));
+      if (row) row.video_settings = { ...currentSettings };
+      if (savedBgmPath && savedBgmPath !== currentSettings.bgm_path && !isExternalUrl(savedBgmPath)) {
+        await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${savedBgmPath}`, { method: "DELETE", headers });
+      }
+      savedBgmPath = currentSettings.bgm_path || null;
+      btn.classList.remove("dirty");
+      btn.textContent = "저장됨 ✓";
+      setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "전체 설정 저장"; }, 1500);
+    } catch (err) {
+      showMsg("전체 설정 저장 실패: " + err.message, false);
+      btn.classList.add("dirty");
+      btn.textContent = "전체 설정 저장 (수정됨)";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  MOODS.forEach((m) => $("moodSel").add(new Option(m.label, m.id)));
+  $("capSize").addEventListener("input", () => {
+    currentSettings.caption_font_size = Number($("capSize").value);
+    updateSettingsPreview();
+    markSettingsDirty();
+  });
+  $("bgmVol").addEventListener("input", () => {
+    currentSettings.bgm_volume = Number($("bgmVol").value) / 100;
+    $("bgmVolVal").textContent = $("bgmVol").value + "%";
+    markSettingsDirty();
+  });
+  $("moodSel").addEventListener("change", () => { currentSettings.mood = $("moodSel").value; markSettingsDirty(); });
+  $("moodNote").addEventListener("input", () => { currentSettings.mood_note = $("moodNote").value; markSettingsDirty(); });
+  $("transSel").addEventListener("change", () => { currentSettings.transition = $("transSel").value; markSettingsDirty(); });
+  $("bgmFile").addEventListener("change", (e) => { if (e.target.files[0]) uploadBgm(e.target.files[0]); e.target.value = ""; });
+  $("settingsSaveBtn").addEventListener("click", saveSettings);
+
   async function loadScripts() {
     const sel = document.getElementById("scriptSelect");
     try {
@@ -198,6 +382,7 @@
     regenWrap.style.display = "block";
     document.getElementById("regenBtn").textContent = segments.length ? "콘티 다시 생성" : "콘티 생성";
     render();
+    updateSettingsPreview();
   }
 
   function render() {
@@ -394,6 +579,7 @@
     document.getElementById("regenBtn").textContent = segments.length ? "콘티 다시 생성" : "콘티 생성";
     const scrollY = window.scrollY;
     render();
+    updateSettingsPreview();
     window.scrollTo(0, scrollY);
   }
 
@@ -541,16 +727,17 @@
 
   let lastScriptId = "";
   document.getElementById("scriptSelect").addEventListener("change", (e) => {
-    if (document.querySelector(".seg-save-btn.dirty") && !confirm("저장 안 한 수정사항이 있습니다. 그래도 넘어갈까요?")) {
+    if (hasDirty() && !confirm("저장 안 한 수정사항이 있습니다. 그래도 넘어갈까요?")) {
       e.target.value = lastScriptId;
       return;
     }
     lastScriptId = e.target.value;
+    loadSettingsCard(e.target.value);
     loadSegments(e.target.value);
   });
 
   window.addEventListener("beforeunload", (e) => {
-    if (document.querySelector(".seg-save-btn.dirty")) {
+    if (hasDirty()) {
       e.preventDefault();
       e.returnValue = "";
     }
@@ -608,7 +795,11 @@
       const res = await fetch("/api/gemini-storyboard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: row.category, hook: row.hook, story: row.story, closing: row.closing }),
+        body: JSON.stringify({
+          category: row.category, hook: row.hook, story: row.story, closing: row.closing,
+          mood: (MOODS.find((m) => m.id === currentSettings.mood) || {}).desc || "",
+          moodNote: currentSettings.mood_note || "",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "콘티 생성 실패");
@@ -626,6 +817,7 @@
         section: seg.section,
         script_text: seg.script_text,
         keyword: seg.keyword,
+        direction: seg.direction,
       }));
       await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
         method: "POST",
