@@ -37,6 +37,7 @@
   }
 
   function assetPublicUrl(path) {
+    if (/^https?:\/\//.test(path)) return path;
     return `${SUPABASE_URL}/storage/v1/object/public/youtube-assets/${path}`;
   }
 

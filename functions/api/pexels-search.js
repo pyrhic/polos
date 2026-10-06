@@ -32,14 +32,17 @@ export async function onRequestGet(context) {
     }
     const data = await pexelsRes.json();
     const results = (data.videos || []).map((v) => {
-      const preview = (v.video_files || [])
-        .filter((f) => f.file_type === "video/mp4")
-        .sort((a, b) => (a.width || 0) - (b.width || 0))[0];
+      const mp4s = (v.video_files || []).filter((f) => f.file_type === "video/mp4");
+      const preview = [...mp4s].sort((a, b) => (a.width || 0) - (b.width || 0))[0];
+      // 실제 영상 제작에 쓸 HD 파일 (세로면 높이 1280 이상 중 가장 작은 것, 없으면 가장 큰 것)
+      const byHeight = [...mp4s].sort((a, b) => (a.height || 0) - (b.height || 0));
+      const hd = byHeight.find((f) => (f.height || 0) >= 1280) || byHeight[byHeight.length - 1];
       return {
         id: v.id,
         duration: v.duration,
         thumbnail: v.image,
         preview_url: preview ? preview.link : null,
+        hd_url: hd ? hd.link : null,
       };
     });
     return new Response(JSON.stringify({ results }), {

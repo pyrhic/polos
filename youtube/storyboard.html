@@ -39,6 +39,7 @@
   .seg-pexels-item { flex-shrink:0; width:80px; }
   .seg-pexels-thumb-wrap { position:relative; width:80px; height:100px; border-radius:3px; overflow:hidden; background:#221a2e; cursor:pointer; }
   .seg-pexels-thumb-wrap img, .seg-pexels-thumb-wrap video { width:100%; height:100%; object-fit:cover; display:block; }
+  .seg-pexels-pick { width:80px; margin-top:4px; padding:5px 0; font-size:0.7rem; }
   .seg-pexels-dur { position:absolute; bottom:2px; right:4px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.6rem; padding:1px 4px; border-radius:2px; }
 </style>
 </head>
@@ -95,6 +96,41 @@
 
   function isImage(path) {
     return /\.(jpe?g|png|gif|webp)$/i.test(path);
+  }
+
+  // asset_paths에는 직접 올린 파일의 스토리지 경로 또는 Pexels에서 고른 영상의 전체 URL이 섞여 들어간다.
+  function isExternalUrl(path) {
+    return /^https?:\/\//.test(path);
+  }
+  function assetUrl(path) {
+    return isExternalUrl(path) ? path : publicUrl(path);
+  }
+
+  function thumbsHtml(seg) {
+    const paths = seg.asset_paths || [];
+    if (!paths.length) return '<div class="seg-thumb-empty">비어있음 — 키워드로 자동 검색됨</div>';
+    return `<div class="seg-thumbs">${paths.map((p) => `
+      <div class="seg-thumb-wrap" data-path="${escapeAttr(p)}">
+        ${isImage(p)
+          ? `<img class="seg-thumb" src="${assetUrl(p)}" alt="">`
+          : `<video class="seg-thumb" src="${assetUrl(p)}" muted preload="metadata"></video>`}
+        <button type="button" class="seg-thumb-del" data-path="${escapeAttr(p)}">×</button>
+      </div>`).join("")}</div>`;
+  }
+
+  function bindThumbDeletes(el, id) {
+    el.querySelectorAll(".seg-thumb-del").forEach((btn) =>
+      btn.addEventListener("click", () => removeSegmentAsset(id, btn.dataset.path))
+    );
+  }
+
+  // 다른 칸에 입력 중이던 내용을 날리지 않도록, 소재 영역만 다시 그린다.
+  function refreshThumbs(id) {
+    const el = document.querySelector(`.seg-item[data-id="${id}"]`);
+    const seg = segments.find((s) => String(s.id) === id);
+    if (!el || !seg) return;
+    el.querySelector(".seg-thumbs-area").innerHTML = thumbsHtml(seg);
+    bindThumbDeletes(el, id);
   }
 
   // 한국어 내레이션 기준 대략적인 발화 속도 추정치(초당 글자 수) — 정확한 값은
@@ -171,7 +207,6 @@
       return;
     }
     list.innerHTML = segments.map((seg) => {
-      const paths = seg.asset_paths || [];
       return `
       <div class="card-box seg-item" data-id="${seg.id}" tabindex="0">
         <div class="seg-head">
@@ -183,15 +218,7 @@
             <button type="button" class="seg-duration-save" style="display:none;">저장</button>
           </div>
         </div>
-        ${paths.length
-          ? `<div class="seg-thumbs">${paths.map((p, i) => `
-              <div class="seg-thumb-wrap" data-path="${escapeAttr(p)}">
-                ${isImage(p)
-                  ? `<img class="seg-thumb" src="${publicUrl(p)}" alt="">`
-                  : `<video class="seg-thumb" src="${publicUrl(p)}"></video>`}
-                <button type="button" class="seg-thumb-del" data-path="${escapeAttr(p)}">×</button>
-              </div>`).join("")}</div>`
-          : `<div class="seg-thumb-empty">비어있음 — 키워드로 자동 검색됨</div>`}
+        <div class="seg-thumbs-area">${thumbsHtml(seg)}</div>
         <div class="seg-actions" style="margin-bottom:4px;">
           <label class="seg-file-label">
             + 사진/영상 추가 (여러 개 선택 가능)
@@ -236,7 +263,7 @@
       const triggerPexelsSearch = () => {
         const q = keywordEl.value.trim();
         if (!q) { showMsg("검색어를 먼저 입력하세요.", false); return; }
-        searchPexelsPreview(previewBox, q);
+        searchPexelsPreview(previewBox, q, id);
       };
       el.querySelector(".seg-pexels-search-btn").addEventListener("click", triggerPexelsSearch);
       keywordEl.addEventListener("keydown", (e) => {
@@ -244,9 +271,7 @@
       });
 
       el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
-      el.querySelectorAll(".seg-thumb-del").forEach((btn) =>
-        btn.addEventListener("click", () => removeSegmentAsset(id, btn.dataset.path))
-      );
+      bindThumbDeletes(el, id);
       saveBtn.addEventListener("click", () => saveSegmentCard(id, el));
       el.querySelector(".seg-revert-btn").addEventListener("click", () => revertSegmentCard(id, el));
 
@@ -304,7 +329,24 @@
     el.style.height = el.scrollHeight + "px";
   }
 
-  async function searchPexelsPreview(box, query) {
+  async function selectPexelsResult(id, hdUrl, btn) {
+    const seg = segments.find((s) => String(s.id) === id);
+    if (!seg || !hdUrl) return;
+    const paths = seg.asset_paths || [];
+    if (paths.includes(hdUrl)) { showMsg("이미 이 장면에 추가된 영상입니다.", false); return; }
+    btn.disabled = true;
+    try {
+      await saveField(id, "asset_paths", [...paths, hdUrl]);
+      refreshThumbs(id);
+      btn.textContent = "추가됨 ✓";
+      showMsg("선택한 영상을 이 장면 소재로 추가했습니다.", true);
+    } catch (err) {
+      btn.disabled = false;
+      showMsg("영상 추가 실패: " + err.message, false);
+    }
+  }
+
+  async function searchPexelsPreview(box, query, id) {
     box.classList.add("open");
     box.innerHTML = '<div class="seg-pexels-loading">Pexels에서 검색 중...</div>';
     try {
@@ -315,14 +357,20 @@
         box.innerHTML = '<div class="seg-pexels-loading">검색 결과가 없습니다.</div>';
         return;
       }
+      const seg = segments.find((s) => String(s.id) === id);
+      const already = new Set((seg && seg.asset_paths) || []);
       box.innerHTML = `<div class="seg-pexels-grid">${data.results.map((r) => `
         <div class="seg-pexels-item">
           <div class="seg-pexels-thumb-wrap" data-preview="${escapeAttr(r.preview_url)}">
             <img src="${r.thumbnail}?w=200" alt="" loading="lazy">
             <span class="seg-pexels-dur">${Math.round(r.duration)}s</span>
           </div>
+          <button type="button" class="seg-pexels-pick" data-hd="${escapeAttr(r.hd_url)}" ${already.has(r.hd_url) ? "disabled" : ""}>
+            ${already.has(r.hd_url) ? "추가됨 ✓" : "선택"}
+          </button>
         </div>
-      `).join("")}</div>`;
+      `).join("")}</div>
+      <div class="seg-pexels-loading">썸네일을 누르면 미리 재생, "선택"을 누르면 이 장면 소재로 추가됩니다.</div>`;
       box.querySelectorAll(".seg-pexels-thumb-wrap").forEach((wrap) => {
         wrap.addEventListener("click", () => {
           const url = wrap.dataset.preview;
@@ -330,6 +378,9 @@
           wrap.innerHTML = `<video src="${url}" autoplay muted loop playsinline></video>`;
         });
       });
+      box.querySelectorAll(".seg-pexels-pick").forEach((btn) =>
+        btn.addEventListener("click", () => selectPexelsResult(id, btn.dataset.hd, btn))
+      );
     } catch (err) {
       box.innerHTML = `<div class="seg-pexels-loading">미리보기 실패: ${escapeHtml(err.message)}</div>`;
     }
@@ -434,7 +485,7 @@
     if (uploaded > 0) {
       await saveField(id, "asset_paths", paths);
       showMsg(`${uploaded}개 업로드 완료.`, true);
-      refreshSegments(scriptId);
+      refreshThumbs(id);
     }
   }
 
@@ -442,9 +493,11 @@
     if (!confirm("이 소재를 삭제할까요?")) return;
     const seg = segments.find((s) => String(s.id) === id);
     const paths = (seg.asset_paths || []).filter((p) => p !== path);
-    await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
+    if (!isExternalUrl(path)) {
+      await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
+    }
     await saveField(id, "asset_paths", paths);
-    refreshSegments(document.getElementById("scriptSelect").value);
+    refreshThumbs(id);
   }
 
   let lastScriptId = "";
@@ -522,7 +575,7 @@
       if (!res.ok) throw new Error(data.error || "콘티 생성 실패");
 
       for (const seg of segments) {
-        for (const path of (seg.asset_paths || [])) {
+        for (const path of (seg.asset_paths || []).filter((p) => !isExternalUrl(p))) {
           await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
         }
       }
