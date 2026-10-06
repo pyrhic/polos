@@ -49,14 +49,28 @@
     return `${SUPABASE_URL}/storage/v1/object/public/youtube-assets/${path}`;
   }
 
-  function toMarkdown(r) {
+  // 콘티에서 대사를 고쳤을 수 있으므로, 콘티(장면)의 대사를 이어붙인 것이 실제 음성/자막의 원본이 된다.
+  // 콘티 대사에서 **글자**로 표시한 부분은 강조 자막(emphasize_terms)이 된다.
+  function toMarkdown(r, segments) {
+    const baseTerms = (r.emphasize_terms || "").split(",").map((s) => s.trim()).filter(Boolean);
+    const markedTerms = [];
+    const lines = (segments || [])
+      .map((s) => (s.script_text || "").trim())
+      .filter(Boolean)
+      .map((t) => t.replace(/\*\*(.+?)\*\*/g, (_, term) => { markedTerms.push(term.trim()); return term; }));
+    const terms = [...new Set([...baseTerms, ...markedTerms])];
+
+    const body = lines.length
+      ? `## 스토리\n${lines.join("\n")}`
+      : `## 후킹 (0~2초)\n${r.hook}\n\n## 스토리 (2~40초)\n${r.story}\n\n## 클로징 (짧게, 2~5초)\n${r.closing || ""}`;
+
     return `---
 category: "${r.category}"
 format: shorts
 fact_sources:
 ${(r.fact_sources || "").split("\n").filter(Boolean).map((s) => `  - "${s.trim()}"`).join("\n")}
 is_conspiracy_or_unverified: ${r.is_conspiracy_or_unverified}
-emphasize_terms: [${(r.emphasize_terms || "").split(",").filter(Boolean).map((s) => `"${s.trim()}"`).join(", ")}]
+emphasize_terms: [${terms.map((s) => `"${s.replace(/"/g, "")}"`).join(", ")}]
 keep_together_terms: [${(r.keep_together_terms || "").split(",").filter(Boolean).map((s) => `"${s.trim()}"`).join(", ")}]
 status: approved
 revision_log:
@@ -65,14 +79,7 @@ revision_log:
 
 # 대본
 
-## 후킹 (0~2초)
-${r.hook}
-
-## 스토리 (2~40초)
-${r.story}
-
-## 클로징 (짧게, 2~5초)
-${r.closing || ""}
+${body}
 `;
   }
 
@@ -99,7 +106,7 @@ ${r.closing || ""}
   // 콘티 페이지와 같은 기준(초당 4.3자) — 노출 시간을 직접 안 정했으면 대사 길이로 추정.
   const CHARS_PER_SEC = 4.3;
   function estimateSeconds(text) {
-    const len = (text || "").replace(/\s+/g, "").length;
+    const len = (text || "").replace(/\*\*/g, "").replace(/\s+/g, "").length;
     return Math.max(1, len / CHARS_PER_SEC);
   }
 
@@ -199,7 +206,7 @@ ${r.closing || ""}
   async function startGeneration(scriptId, row, version) {
     if (!confirm(`이 대본으로 v${version} 영상 생성을 시작할까요? 몇 분 정도 걸립니다. 기존 버전은 그대로 남습니다.`)) return;
     const segments = await loadSegments(scriptId);
-    const scriptContent = toMarkdown(row);
+    const scriptContent = toMarkdown(row, segments);
     const vs = row.video_settings || {};
     const settings = {
       caption_font_size: vs.caption_font_size,

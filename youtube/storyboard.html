@@ -201,7 +201,7 @@
   const CHARS_PER_SEC = 4.3;
 
   function estimateSeconds(text) {
-    const len = (text || "").replace(/\s+/g, "").length;
+    const len = (text || "").replace(/\*\*/g, "").replace(/\s+/g, "").length;
     return Math.max(1, len / CHARS_PER_SEC);
   }
 
@@ -464,9 +464,13 @@
           </label>
         </div>
         <div style="color:#a89bb5;font-size:0.75rem;margin-bottom:10px;">이 카드 아무 곳이나 클릭한 뒤 Ctrl+V로도 이미지를 붙여넣을 수 있어요.</div>
-        <label>대사</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:14px 0 6px;color:#a89bb5;font-size:0.9rem;font-weight:600;">
+          <span>대사 (영상의 음성·자막이 이 내용으로 만들어집니다)</span>
+          <button type="button" class="seg-emph-btn" style="width:auto;padding:3px 10px;font-size:0.7rem;margin:0;background:#221a2e;flex-shrink:0;">선택한 글자 강조</button>
+        </div>
         <textarea class="seg-script" placeholder="이 장면에서 나오는 대본 문장">${escapeHtml(seg.script_text)}</textarea>
-        <label>ACTION (연출 지시 — 예: 천천히 줌인 / 좌에서 우로 패닝 / 카메라 틸트업)</label>
+        <div class="settings-note" style="margin:-4px 0 8px;">강조할 글자를 드래그해서 선택한 뒤 "선택한 글자 강조"를 누르면 <b>**글자**</b>로 표시되고, 자막에서 노란색으로 튀어 보입니다. (다시 누르면 해제)</div>
+        <label>ACTION (사진의 카메라 연출만 해당 — 줌인 / 줌아웃 / 좌에서 우로 패닝 / 틸트업 등. 글자 강조는 위 대사에서)</label>
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
         <label>장면 설명</label>
         <input type="text" class="seg-section" value="${escapeAttr(seg.section)}" placeholder="장면 설명">
@@ -491,6 +495,23 @@
       const scriptEl = el.querySelector(".seg-script");
       scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); });
       autoGrow(scriptEl);
+      el.querySelector(".seg-emph-btn").addEventListener("click", (e) => {
+        e.preventDefault();
+        const start = scriptEl.selectionStart, end = scriptEl.selectionEnd;
+        if (start === end) { showMsg("먼저 대사에서 강조할 글자를 드래그해서 선택하세요.", false); return; }
+        const v = scriptEl.value;
+        const selected = v.slice(start, end);
+        const wrapped = /^\*\*.+\*\*$/.test(selected) ? selected.slice(2, -2)
+          : (v.slice(start - 2, start) === "**" && v.slice(end, end + 2) === "**")
+            ? null : `**${selected}**`;
+        if (wrapped === null) {
+          // 이미 강조된 글자 안쪽을 선택한 경우: 바깥 ** 를 제거
+          scriptEl.value = v.slice(0, start - 2) + selected + v.slice(end + 2);
+        } else {
+          scriptEl.value = v.slice(0, start) + wrapped + v.slice(end);
+        }
+        scriptEl.dispatchEvent(new Event("input", { bubbles: true }));
+      });
       const directionEl = el.querySelector(".seg-direction");
       directionEl.addEventListener("input", () => { autoGrow(directionEl); markDirty(); });
       autoGrow(directionEl);
