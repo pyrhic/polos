@@ -93,6 +93,15 @@
       </div>
       <div class="settings-note">위: 일반 자막 / 아래: 강조 자막. 첫 장면 사진이 있으면 그 위에, 없으면 검은 화면에 보입니다. 실제 영상과 조금 다를 수 있어요.</div>
 
+      <label>성우 목소리</label>
+      <select id="voiceSel"></select>
+      <div class="bgm-row"><audio id="voiceSample" controls preload="none"></audio></div>
+      <label>말하기 속도 <b id="ttsRateVal"></b></label>
+      <input type="range" id="ttsRate" min="-30" max="30" step="1">
+      <label>목소리 높낮이 <b id="ttsPitchVal"></b></label>
+      <input type="range" id="ttsPitch" min="-20" max="20" step="1">
+      <div class="settings-note">샘플은 기본 속도·높이로 만든 것이라, 속도는 재생 속도로 대략만 확인되고 높낮이는 샘플에 반영되지 않습니다. 실제 영상은 이 설정값으로 새로 음성을 만듭니다. (현재 기본: 인준 / 속도 -3% / 높낮이 -5Hz)</div>
+
       <label>배경음악 (사용이 허락된 음원만 올려주세요)</label>
       <div class="bgm-row" id="bgmRow"></div>
       <div class="seg-actions" style="margin-bottom:8px;">
@@ -228,7 +237,13 @@
   ];
   const DEFAULT_SETTINGS = {
     caption_font_size: 80, bgm_path: null, bgm_volume: 0.15, mood: "neutral", mood_note: "", transition: "cut",
+    tts_voice: "ko-KR-InJoonNeural", tts_rate: -3, tts_pitch: -5,
   };
+  const VOICES = [
+    { id: "ko-KR-InJoonNeural", label: "인준 (남성) — 현재 기본" },
+    { id: "ko-KR-HyunsuMultilingualNeural", label: "현수 (남성)" },
+    { id: "ko-KR-SunHiNeural", label: "선희 (여성)" },
+  ];
   let currentSettings = { ...DEFAULT_SETTINGS };
   let savedBgmPath = null;
   const $ = (id) => document.getElementById(id);
@@ -278,12 +293,23 @@
     $("moodSel").value = currentSettings.mood;
     $("moodNote").value = currentSettings.mood_note || "";
     $("transSel").value = currentSettings.transition;
+    $("voiceSel").value = currentSettings.tts_voice;
+    $("voiceSample").src = `/youtube/voices/${currentSettings.tts_voice}.mp3`;
+    $("ttsRate").value = currentSettings.tts_rate;
+    $("ttsPitch").value = currentSettings.tts_pitch;
+    updateVoiceLabels();
     const b = $("settingsSaveBtn");
     b.classList.remove("dirty");
     b.textContent = "전체 설정 저장";
     card.style.display = "block";
     renderBgm();
     updateSettingsPreview();
+  }
+
+  function updateVoiceLabels() {
+    const r = Number($("ttsRate").value), p = Number($("ttsPitch").value);
+    $("ttsRateVal").textContent = `${r > 0 ? "+" : ""}${r}%`;
+    $("ttsPitchVal").textContent = `${p > 0 ? "+" : ""}${p}Hz`;
   }
 
   async function uploadBgm(file) {
@@ -336,6 +362,26 @@
   }
 
   MOODS.forEach((m) => $("moodSel").add(new Option(m.label, m.id)));
+  VOICES.forEach((v) => $("voiceSel").add(new Option(v.label, v.id)));
+  $("voiceSel").addEventListener("change", () => {
+    currentSettings.tts_voice = $("voiceSel").value;
+    $("voiceSample").src = `/youtube/voices/${currentSettings.tts_voice}.mp3`;
+    markSettingsDirty();
+  });
+  $("ttsRate").addEventListener("input", () => {
+    currentSettings.tts_rate = Number($("ttsRate").value);
+    $("voiceSample").playbackRate = 1 + currentSettings.tts_rate / 100;
+    updateVoiceLabels();
+    markSettingsDirty();
+  });
+  $("ttsPitch").addEventListener("input", () => {
+    currentSettings.tts_pitch = Number($("ttsPitch").value);
+    updateVoiceLabels();
+    markSettingsDirty();
+  });
+  $("voiceSample").addEventListener("play", () => {
+    $("voiceSample").playbackRate = 1 + currentSettings.tts_rate / 100;
+  });
   $("capSize").addEventListener("input", () => {
     currentSettings.caption_font_size = Number($("capSize").value);
     updateSettingsPreview();

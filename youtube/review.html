@@ -179,6 +179,9 @@ ${r.closing || ""}
       bgm_volume: vs.bgm_volume,
       mood: vs.mood,
       transition: vs.transition,
+      tts_voice: vs.tts_voice,
+      tts_rate: vs.tts_rate,
+      tts_pitch: vs.tts_pitch,
     };
 
     const res = await fetch("/api/trigger-generation", {
