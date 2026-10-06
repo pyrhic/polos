@@ -87,7 +87,10 @@
         <div class="title" style="font-weight:700;margin-bottom:4px;">${escapeHtml(r.hook)}</div>
         ${outputs.map((o) => `
           <div style="margin-top:12px;">
-            <div class="s-meta" style="margin-bottom:4px;">v${o.version}</div>
+            <div class="s-meta" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span>v${o.version}</span>
+              <button type="button" class="out-del-btn" data-id="${o.id}" data-path="${escapeHtml(o.storage_path)}" data-version="${o.version}" style="width:auto;padding:3px 10px;font-size:0.7rem;background:#3a1414;color:#ff8a80;">삭제</button>
+            </div>
             <video controls preload="none" src="${o.video_url}"></video>
             <a class="link-btn" style="margin-top:8px;" href="${o.video_url}" download>다운로드</a>
           </div>
@@ -95,6 +98,23 @@
       </div>
     `;
     }).join("");
+
+    document.querySelectorAll(".out-del-btn").forEach((btn) =>
+      btn.addEventListener("click", () => deleteOutput(btn.dataset.id, btn.dataset.path, btn.dataset.version))
+    );
+  }
+
+  async function deleteOutput(id, path, version) {
+    if (!confirm(`v${version} 영상을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    try {
+      const sres = await fetch(`${SUPABASE_URL}/storage/v1/object/youtube-outputs/${path}`, { method: "DELETE", headers });
+      if (!sres.ok && sres.status !== 404) throw new Error(await sres.text());
+      const rres = await fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?id=eq.${id}`, { method: "DELETE", headers });
+      if (!rres.ok) throw new Error(await rres.text());
+      load();
+    } catch (err) {
+      alert("삭제 실패: " + err.message);
+    }
   }
 
   document.querySelectorAll(".filter-btn").forEach((btn) =>
