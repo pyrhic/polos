@@ -239,6 +239,7 @@
         <div style="display:flex;gap:8px;">
           <button type="button" class="seg-save-btn" style="flex:2;">저장</button>
           <button type="button" class="seg-revert-btn" style="flex:1;background:#221a2e;">되돌리기</button>
+          <button type="button" class="seg-delete-btn" style="flex:1;background:#3a1414;color:#ff8a80;">삭제</button>
         </div>
       </div>
     `;
@@ -274,6 +275,7 @@
       bindThumbDeletes(el, id);
       saveBtn.addEventListener("click", () => saveSegmentCard(id, el));
       el.querySelector(".seg-revert-btn").addEventListener("click", () => revertSegmentCard(id, el));
+      el.querySelector(".seg-delete-btn").addEventListener("click", () => deleteSegmentCard(id, el));
 
       const durDisplay = el.querySelector(".seg-duration-display");
       const durInput = el.querySelector(".seg-duration-input");
@@ -433,6 +435,43 @@
       btn.textContent = "저장 (수정됨)";
     } finally {
       btn.disabled = false;
+    }
+  }
+
+  async function deleteSegmentCard(id, el) {
+    const seg = segments.find((s) => String(s.id) === id);
+    if (!seg) return;
+    if (!confirm(`${seg.order_no}번 장면을 삭제할까요? 직접 올린 사진/영상도 함께 지워집니다.`)) return;
+
+    try {
+      for (const path of (seg.asset_paths || []).filter((p) => !isExternalUrl(p))) {
+        await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
+      }
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, { method: "DELETE", headers });
+      if (!res.ok) throw new Error(await res.text());
+
+      segments = segments.filter((s) => String(s.id) !== id);
+      el.remove();
+
+      // 번호 빈틈이 생기지 않게 1부터 다시 매긴다 (다른 카드의 입력 중 내용은 건드리지 않고 번호만 갱신)
+      for (let i = 0; i < segments.length; i++) {
+        const s = segments[i];
+        if (s.order_no === i + 1) continue;
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${s.id}`, {
+          method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ order_no: i + 1 }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        s.order_no = i + 1;
+        const card = document.querySelector(`.seg-item[data-id="${s.id}"]`);
+        if (card) card.querySelector(".seg-no").textContent = i + 1;
+      }
+
+      if (!segments.length) render();
+      document.getElementById("regenBtn").textContent = segments.length ? "콘티 다시 생성" : "콘티 생성";
+      updateRuntimeSummary();
+      showMsg("장면을 삭제했습니다.", true);
+    } catch (err) {
+      showMsg("장면 삭제 실패: " + err.message, false);
     }
   }
 
