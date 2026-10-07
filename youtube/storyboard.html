@@ -67,6 +67,37 @@
   #settingsBody.open { display:block; }
   .settings-card input[type="range"] { padding:0; margin:4px 0 8px; accent-color:#0f0a14; border:none; }
   .settings-card select, .settings-card textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
+  /* 요약 줄에서 바로 고치기 */
+  .sr-list { margin:6px 0 0; }
+  .sr { display:grid; grid-template-columns:76px 1fr; gap:2px 10px; align-items:center; padding:5px 0; font-size:0.85rem; border-bottom:1px solid rgba(15,10,20,0.12); }
+  .sr:last-child { border-bottom:none; }
+  .sr .k { color:#1d4a0c; font-weight:600; font-size:0.8rem; }
+  .sr .v { font-weight:700; min-width:0; }
+  .settings-card .tok { display:inline; text-transform:none; letter-spacing:0; text-align:left; line-height:1.9; background:none; color:#0f0a14; border:none; border-bottom:1.5px dashed #1d4a0c; border-radius:0; padding:1px 1px; margin:0; width:auto; font-size:0.85rem; font-weight:800; cursor:pointer; }
+  .settings-card .tok:hover { background:rgba(255,255,255,0.45); color:#0f0a14; }
+  .settings-card .tok.on { background:#0f0a14; color:#7cff4a; border-bottom-color:#0f0a14; }
+  .settings-card .tok-btn { border:1.5px solid #0f0a14; border-radius:10px; padding:1px 8px; margin-left:4px; font-size:0.75rem; }
+  .settings-card .tok-del { color:#8a1c1c; border-bottom-color:#8a1c1c; }
+  .settings-card .sr-input { background:transparent; border:none; border-bottom:1.5px dashed #1d4a0c; border-radius:0; padding:2px 0; margin:0; font-size:0.85rem; font-weight:800; color:#0f0a14; width:100%; }
+  .settings-card .sr-input::placeholder { color:#3f7a28; font-weight:400; }
+  .settings-card .sr-input:focus { outline:none; background:rgba(255,255,255,0.55); border-bottom-style:solid; }
+  .sr-framed { display:none; }
+  .sr-framed.show { display:grid; }
+  /* 굴러가는 선택 휠 */
+  .wheel-wrap { position:relative; margin:4px 0 8px; }
+  .wheel { height:132px; overflow-y:auto; scroll-snap-type:y mandatory; background:#0f0a14; border-radius:6px; padding:44px 0; scrollbar-width:none; -webkit-mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+  .wheel::-webkit-scrollbar { display:none; }
+  .wheel-item { height:44px; line-height:44px; text-align:center; scroll-snap-align:center; color:#7d7189; font-size:0.95rem; cursor:pointer; user-select:none; }
+  .wheel-item.sel { color:#7cff4a; font-weight:800; font-size:1.05rem; }
+  .wheel-band { position:absolute; left:6px; right:6px; top:44px; height:44px; border-top:1px solid #7cff4a; border-bottom:1px solid #7cff4a; pointer-events:none; }
+  /* 자막 팝업 */
+  .cap-modal { display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.78); align-items:center; justify-content:center; padding:12px; overflow-y:auto; }
+  .cap-modal.open { display:flex; }
+  .cap-modal-box { background:#221a2e; border-radius:6px; padding:14px; width:100%; max-width:320px; margin:auto; }
+  .cap-modal-hint { color:#a89bb5; font-size:0.72rem; text-align:center; margin-bottom:6px; }
+  .cap-modal-val { text-align:center; font-weight:800; color:#7cff4a; font-size:0.85rem; margin:6px 0 10px; }
+  .cap-modal .cap-preview { touch-action:none; cursor:grab; user-select:none; }
+  .cap-modal .cap-lines { cursor:grab; }
   /* 콘티 목록 */
   .conti-item { display:block; width:100%; text-align:left; cursor:pointer; background:#221a2e; color:#fff; border:2px solid transparent; border-radius:3px; padding:14px 16px; margin-bottom:10px; font:inherit; }
   .conti-item:hover, .conti-item:focus-visible { border-color:#7cff4a; background:#221a2e; color:#fff; }
@@ -138,77 +169,75 @@
 
     <div class="card-box settings-card" id="settingsCard" style="display:none;margin-top:14px;">
       <div class="settings-head">
-        <div class="settings-title">전체 설정<span>영상 전체에 적용</span></div>
-        <span class="settings-dirty-badge" id="settingsDirtyBadge">저장 안 됨</span>
+        <div class="settings-title">전체 설정<span>값을 눌러 바로 바꿉니다</span></div>
+        <span class="settings-dirty-badge" id="settingsDirtyBadge"></span>
       </div>
-      <dl class="settings-summary" id="settingsSummary"></dl>
-      <button type="button" class="settings-toggle" id="settingsToggle">수정하기</button>
+      <div class="sr-list" id="settingsSummary">
+        <div class="sr"><span class="k">콘티 이름</span><span class="v"><input class="sr-input" id="srName" placeholder="콘티 이름 (영상 제목에 v1, v2…로 붙음)"></span></div>
+        <div class="sr"><span class="k">화면 구성</span><span class="v"><button type="button" class="tok" data-wheel="layout" id="tokLayout"></button></span></div>
+        <div class="sr sr-framed"><span class="k">제목 1줄</span><span class="v"><input class="sr-input" id="srT1" maxlength="20" placeholder="노란색, 10자 안팎"></span></div>
+        <div class="sr sr-framed"><span class="k">제목 2줄</span><span class="v"><input class="sr-input" id="srT2" maxlength="20" placeholder="흰색"></span></div>
+        <div class="sr sr-framed"><span class="k">출처 문구</span><span class="v"><input class="sr-input" id="srSrc" maxlength="60" placeholder="영상 아래 작은 글씨"></span></div>
+        <div class="sr"><span class="k">자막</span><span class="v">
+          <button type="button" class="tok" id="tokSize"></button> ·
+          <button type="button" class="tok" id="tokWeight"></button> ·
+          <button type="button" class="tok" id="tokPos"></button></span></div>
+        <div class="sr"><span class="k">목소리</span><span class="v">
+          <button type="button" class="tok" data-wheel="voice" id="tokVoice"></button> ·
+          <button type="button" class="tok" data-wheel="rate" id="tokRate"></button> ·
+          <button type="button" class="tok" data-wheel="pitch" id="tokPitch"></button>
+          <button type="button" class="tok tok-btn" id="tokSample">▶ 샘플</button></span></div>
+        <div class="sr"><span class="k">배경음악</span><span class="v">
+          <button type="button" class="tok" id="tokBgm"></button>
+          <span id="bgmExtra">
+            · <button type="button" class="tok" data-wheel="bgmVol" id="tokBgmVol"></button>
+            · <button type="button" class="tok" id="tokBgmUp">교체</button>
+            · <button type="button" class="tok tok-del" id="tokBgmDel">삭제</button>
+          </span></span></div>
+        <div class="sr"><span class="k">분위기</span><span class="v"><button type="button" class="tok" data-wheel="mood" id="tokMood"></button></span></div>
+        <div class="sr"><span class="k"></span><span class="v"><input class="sr-input" id="srMoodNote" placeholder="분위기 메모 (예: 긴장감 있게)"></span></div>
+        <div class="sr"><span class="k">화면 전환</span><span class="v"><button type="button" class="tok" data-wheel="trans" id="tokTrans"></button></span></div>
+      </div>
+      <button type="button" id="settingsSaveBtn" style="display:none;margin-top:12px;">전체 설정 저장</button>
 
+      <!-- 아래 입력들은 화면에 보이지 않는 실제 값 저장소. 위 요약 줄들이 이 값을 읽고 바꾼다 -->
       <div id="settingsBody">
-
-      <label>콘티 이름 (영상 제목에 "이름 v1, v2…"로 붙습니다)</label>
-      <input type="text" id="convName" placeholder="예: 폐건물 극장식 레스토랑">
-
-      <label>화면 구성</label>
-      <select id="layoutSel">
-        <option value="full">전체 화면 (영상이 화면 전체)</option>
-        <option value="framed">제목 + 영상 + 출처 (위 제목 2줄 / 가운데 영상 / 아래 출처)</option>
-      </select>
-      <div id="framedFields" style="display:none;">
-        <label>제목 1줄 (노란색, 한 줄에 10자 안팎)</label>
-        <input type="text" id="title1" maxlength="20" placeholder="예: 직업이 많다는 김민">
-        <label>제목 2줄 (흰색)</label>
-        <input type="text" id="title2" maxlength="20" placeholder="예: 배우 말고 또 하는 일">
-        <label>출처 문구 (영상 아래 작은 글씨)</label>
-        <input type="text" id="sourceText" maxlength="60" placeholder="예: 출처: 〇〇〇">
+        <input type="text" id="convName">
+        <select id="layoutSel"><option value="full">full</option><option value="framed">framed</option></select>
+        <input type="text" id="title1"><input type="text" id="title2"><input type="text" id="sourceText">
+        <input type="range" id="capSize" min="40" max="140" step="2">
+        <input type="range" id="capWeight" min="0" max="4" step="1">
+        <input type="range" id="capPos" min="3" max="70" step="1">
+        <b id="capSizeVal"></b><b id="capWeightVal"></b><b id="capPosVal"></b>
+        <select id="voiceSel"></select>
+        <audio id="voiceSample" preload="none"></audio>
+        <input type="range" id="ttsRate" min="-30" max="30" step="1"><b id="ttsRateVal"></b>
+        <input type="range" id="ttsPitch" min="-20" max="20" step="1"><b id="ttsPitchVal"></b>
+        <div id="bgmRow"></div>
+        <input type="file" id="bgmFile" accept="audio/*">
+        <input type="range" id="bgmVol" min="0" max="100" step="1"><b id="bgmVolVal"></b>
+        <select id="moodSel"></select>
+        <textarea id="moodNote"></textarea>
+        <select id="transSel"><option value="cut">cut</option><option value="fade">fade</option></select>
       </div>
+    </div>
 
-      <label>자막 크기 <b id="capSizeVal"></b></label>
-      <input type="range" id="capSize" min="40" max="140" step="2">
-      <label>자막 굵기 <b id="capWeightVal"></b></label>
-      <input type="range" id="capWeight" min="0" max="4" step="1">
-      <label>자막 위치 <b id="capPosVal"></b> <span style="font-weight:400;">(화면 아래에서 띄우는 높이)</span></label>
-      <input type="range" id="capPos" min="3" max="70" step="1">
-      <div class="cap-preview" id="capPreview">
-        <div class="cap-media" id="capMedia"></div>
-        <div class="cap-t1" id="capT1"></div>
-        <div class="cap-t2" id="capT2"></div>
-        <div class="cap-src" id="capSrc"></div>
-        <div class="cap-lines" id="capLines">
-          <div class="cap-normal" id="capNormal">일반 자막은 이렇게 보여요</div>
-          <div class="cap-emph" id="capEmph">강조 123억</div>
+    <!-- 자막 예시 화면 팝업: 글자를 끌어 위치, 마우스 휠/두 손가락으로 크기, 톡 누르면 굵기 -->
+    <div class="cap-modal" id="capModal">
+      <div class="cap-modal-box">
+        <div class="cap-modal-hint">글자를 끌면 위치 · 휠/두 손가락 벌리기로 크기 · 글자를 톡 누르면 굵기</div>
+        <div class="cap-preview" id="capPreview">
+          <div class="cap-media" id="capMedia"></div>
+          <div class="cap-t1" id="capT1"></div>
+          <div class="cap-t2" id="capT2"></div>
+          <div class="cap-src" id="capSrc"></div>
+          <div class="cap-lines" id="capLines">
+            <div class="cap-normal" id="capNormal">일반 자막은 이렇게 보여요</div>
+            <div class="cap-emph" id="capEmph">강조 123억</div>
+          </div>
         </div>
-      </div>
-      <div class="settings-note">위: 일반 자막 / 아래: 강조 자막. 첫 장면 사진이 있으면 그 위에, 없으면 검은 화면에 보입니다. 실제 영상과 조금 다를 수 있어요.</div>
-
-      <label>성우 목소리</label>
-      <select id="voiceSel"></select>
-      <div class="bgm-row"><audio id="voiceSample" controls preload="none"></audio></div>
-      <label>말하기 속도 <b id="ttsRateVal"></b></label>
-      <input type="range" id="ttsRate" min="-30" max="30" step="1">
-      <label>목소리 높낮이 <b id="ttsPitchVal"></b></label>
-      <input type="range" id="ttsPitch" min="-20" max="20" step="1">
-      <div class="settings-note">샘플은 기본 속도·높이로 만든 것이라, 속도는 재생 속도로 대략만 확인되고 높낮이는 샘플에 반영되지 않습니다. 실제 영상은 이 설정값으로 새로 음성을 만듭니다. (현재 기본: 인준 / 속도 -3% / 높낮이 -5Hz)</div>
-
-      <label>배경음악 (사용이 허락된 음원만 올려주세요)</label>
-      <div class="bgm-row" id="bgmRow"></div>
-      <div class="seg-actions" style="margin-bottom:8px;">
-        <label class="seg-file-label">+ 음악 파일 올리기<input type="file" id="bgmFile" accept="audio/*"></label>
-      </div>
-      <label>배경음악 볼륨 <b id="bgmVolVal"></b></label>
-      <input type="range" id="bgmVol" min="0" max="100" step="1">
-
-      <label>영상 분위기</label>
-      <select id="moodSel"></select>
-      <textarea id="moodNote" style="min-height:50px;" placeholder="예: 긴장감 있게, 어두운 톤으로..."></textarea>
-
-      <label>화면 전환</label>
-      <select id="transSel">
-        <option value="cut">컷 (바로 전환)</option>
-        <option value="fade">페이드 (장면이 바뀔 때 어두워졌다 밝아짐)</option>
-      </select>
-
-      <button type="button" id="settingsSaveBtn">전체 설정 저장</button>
+        <div class="cap-modal-val" id="capModalVal"></div>
+        <button type="button" id="capModalClose">완료</button>
       </div>
     </div>
 
@@ -370,31 +399,208 @@
     updateSettingsSummary();
   }
 
-  // 접힌 상태에서 보이는 현재 설정값 요약
-  function updateSettingsSummary() {
-    const voice = (VOICES.find((v) => v.id === $("voiceSel").value) || {}).label || "";
-    const mood = (MOODS.find((m) => m.id === $("moodSel").value) || {}).label || "";
-    const framed = $("layoutSel").value === "framed";
-    const w = WEIGHTS[Number($("capWeight").value)];
-    const rate = Number($("ttsRate").value), pitch = Number($("ttsPitch").value);
-    const bgm = currentSettings.bgm_path ? `있음 (볼륨 ${$("bgmVol").value}%)` : "없음";
-    const rows = [
-      ["콘티 이름", $("convName").value.trim() || "(이름 없음)"],
-      ["화면 구성", framed ? "제목 + 영상 + 출처" : "전체 화면"],
-      ["자막", `크기 ${$("capSize").value} · ${w.label} · 위치 ${$("capPos").value}%`],
-      ["목소리", `${voice.replace(/ — .*/, "")} · 속도 ${rate > 0 ? "+" : ""}${rate}% · 높낮이 ${pitch > 0 ? "+" : ""}${pitch}Hz`],
-      ["배경음악", bgm],
-      ["분위기", mood + ($("moodNote").value.trim() ? " + 메모" : "")],
-      ["화면 전환", $("transSel").value === "fade" ? "페이드" : "컷"],
-    ];
-    $("settingsSummary").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${escapeHtml(v)}</dd>`).join("");
-    $("settingsDirtyBadge").style.display = $("settingsSaveBtn").classList.contains("dirty") ? "inline-block" : "none";
+  // ───── 요약 줄에서 바로 고치기 ─────
+  // 실제 값은 화면 밖 입력들(#settingsBody)이 들고 있고, 요약 줄은 그 값을 읽어 보여 주고 바꿀 때 같은 이벤트를 쏜다.
+  function range(a, b, step) { const o = []; for (let n = a; n <= b; n += step) o.push(n); return o; }
+  const WHEELS = {
+    layout: { ctl: "layoutSel", opts: () => [["full", "전체 화면"], ["framed", "제목 + 영상 + 출처"]] },
+    voice: { ctl: "voiceSel", opts: () => VOICES.map((v) => [v.id, v.label.replace(/ — .*/, "")]) },
+    rate: { ctl: "ttsRate", opts: () => range(-30, 30, 1).map((n) => [String(n), `속도 ${n > 0 ? "+" : ""}${n}%`]) },
+    pitch: { ctl: "ttsPitch", opts: () => range(-20, 20, 1).map((n) => [String(n), `높낮이 ${n > 0 ? "+" : ""}${n}Hz`]) },
+    bgmVol: { ctl: "bgmVol", opts: () => range(0, 100, 5).map((n) => [String(n), `볼륨 ${n}%`]) },
+    mood: { ctl: "moodSel", opts: () => MOODS.map((m) => [m.id, m.label]) },
+    trans: { ctl: "transSel", opts: () => [["cut", "컷 (바로 전환)"], ["fade", "페이드 (어두워졌다 밝아짐)"]] },
+  };
+
+  function fireCtl(el) {
+    el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
   }
 
-  function setSettingsOpen(open) {
-    $("settingsBody").classList.toggle("open", open);
-    $("settingsToggle").textContent = open ? "접기" : "수정하기";
+  let openWheel = null; // { key, tok, wrap }
+  function closeWheel() {
+    if (!openWheel) return;
+    openWheel.wrap.remove();
+    openWheel.tok.classList.remove("on");
+    openWheel = null;
   }
+  function openWheelFor(tok) {
+    const key = tok.dataset.wheel;
+    if (openWheel && openWheel.key === key) { closeWheel(); return; }
+    closeWheel();
+    const cfg = WHEELS[key];
+    const ctl = $(cfg.ctl);
+    const opts = cfg.opts();
+    // 숫자 목록은 현재 값에 가장 가까운 칸, 문자 목록은 같은 값의 칸을 고른다
+    const numeric = !Number.isNaN(Number(ctl.value)) && ctl.value !== "";
+    let idx = numeric
+      ? opts.reduce((best, o, i) => Math.abs(Number(o[0]) - Number(ctl.value)) < Math.abs(Number(opts[best][0]) - Number(ctl.value)) ? i : best, 0)
+      : opts.findIndex((o) => o[0] === ctl.value);
+    if (idx < 0) idx = 0;
+    const wrap = document.createElement("div");
+    wrap.className = "wheel-wrap";
+    wrap.innerHTML = `<div class="wheel">${opts.map((o, i) => `<div class="wheel-item" data-i="${i}">${escapeHtml(o[1])}</div>`).join("")}</div><div class="wheel-band"></div>`;
+    tok.closest(".sr").after(wrap);
+    tok.classList.add("on");
+    openWheel = { key, tok, wrap };
+    const wheel = wrap.querySelector(".wheel");
+    const mark = (i) => wheel.querySelectorAll(".wheel-item").forEach((el, n) => el.classList.toggle("sel", n === i));
+    mark(idx);
+    wheel.scrollTop = idx * 44;
+    let timer = null, lastIdx = idx;
+    wheel.addEventListener("scroll", () => {
+      const i = Math.max(0, Math.min(opts.length - 1, Math.round(wheel.scrollTop / 44)));
+      mark(i);
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (i === lastIdx) return;
+        lastIdx = i;
+        ctl.value = opts[i][0];
+        fireCtl(ctl);
+      }, 90);
+    });
+    wheel.addEventListener("click", (e) => {
+      const it = e.target.closest(".wheel-item");
+      if (!it) return;
+      const i = Number(it.dataset.i);
+      if (i === Math.round(wheel.scrollTop / 44)) { closeWheel(); return; } // 가운데 칸을 다시 누르면 닫기
+      wheel.scrollTo({ top: i * 44, behavior: "smooth" });
+    });
+  }
+
+  function cycleWeight() {
+    const el = $("capWeight");
+    el.value = (Number(el.value) + 1) % WEIGHTS.length;
+    fireCtl(el);
+  }
+
+  let settingsJustSaved = false;
+  let bgmPlayer = null;
+  function stopBgmPlayer() { if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer = null; } }
+
+  function updateSettingsSummary() {
+    const mirror = (srId, ctlId) => { const el = $(srId); if (document.activeElement !== el) el.value = $(ctlId).value; };
+    mirror("srName", "convName"); mirror("srT1", "title1"); mirror("srT2", "title2"); mirror("srSrc", "sourceText"); mirror("srMoodNote", "moodNote");
+    const label = (key) => {
+      const cfg = WHEELS[key], v = $(cfg.ctl).value;
+      const hit = cfg.opts().find((o) => o[0] === v);
+      return hit ? hit[1] : v;
+    };
+    const framed = $("layoutSel").value === "framed";
+    document.querySelectorAll(".sr-framed").forEach((el) => el.classList.toggle("show", framed));
+    $("tokLayout").textContent = label("layout");
+    $("tokSize").textContent = `크기 ${$("capSize").value}`;
+    $("tokWeight").textContent = WEIGHTS[Number($("capWeight").value)].label;
+    $("tokPos").textContent = `위치 ${$("capPos").value}%`;
+    $("tokVoice").textContent = label("voice");
+    const r = Number($("ttsRate").value), p = Number($("ttsPitch").value);
+    $("tokRate").textContent = `속도 ${r > 0 ? "+" : ""}${r}%`;
+    $("tokPitch").textContent = `높낮이 ${p > 0 ? "+" : ""}${p}Hz`;
+    const hasBgm = !!currentSettings.bgm_path;
+    $("tokBgm").textContent = hasBgm ? (bgmPlayer && !bgmPlayer.paused ? "■ 정지" : "▶ 듣기") : "+ 음악 올리기";
+    $("bgmExtra").style.display = hasBgm ? "inline" : "none";
+    $("tokBgmVol").textContent = `볼륨 ${$("bgmVol").value}%`;
+    $("tokMood").textContent = label("mood");
+    $("tokTrans").textContent = label("trans");
+    $("capModalVal").textContent = `크기 ${$("capSize").value} · ${WEIGHTS[Number($("capWeight").value)].label} · 위치 ${$("capPos").value}%`;
+    const dirty = $("settingsSaveBtn").classList.contains("dirty");
+    $("settingsSaveBtn").style.display = dirty || $("settingsSaveBtn").disabled ? "block" : "none";
+    const badge = $("settingsDirtyBadge");
+    badge.textContent = dirty ? "저장 안 됨" : (settingsJustSaved ? "저장됨 ✓" : "");
+    badge.style.display = badge.textContent ? "inline-block" : "none";
+  }
+
+  // 자막 예시 팝업
+  function openCapModal() {
+    closeWheel();
+    $("capModal").classList.add("open");
+    updateSettingsPreview();
+    updateSettingsSummary();
+  }
+  function closeCapModal() { $("capModal").classList.remove("open"); }
+
+  (function initCapModal() {
+    const pv = $("capPreview");
+    const pointers = new Map();
+    let drag = null, pinch = null;
+    pv.addEventListener("pointerdown", (e) => {
+      pv.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), size: Number($("capSize").value) };
+        drag = null;
+      } else {
+        drag = { y: e.clientY, pos: Number($("capPos").value), moved: false, t: Date.now(), onText: !!e.target.closest(".cap-lines") };
+      }
+    });
+    pv.addEventListener("pointermove", (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const size = Math.round(pinch.size * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d / 2) * 2;
+        $("capSize").value = Math.max(40, Math.min(140, size));
+        fireCtl($("capSize"));
+      } else if (drag) {
+        const dy = e.clientY - drag.y;
+        if (Math.abs(dy) > 4) drag.moved = true;
+        if (drag.moved) {
+          // 미리보기 높이 480px 기준, 자막 위치는 화면 아래에서 띄운 비율
+          $("capPos").value = Math.max(3, Math.min(70, Math.round(drag.pos - dy / 480 * 100)));
+          fireCtl($("capPos"));
+        }
+      }
+    });
+    const end = (e) => {
+      if (drag && !drag.moved && drag.onText && Date.now() - drag.t < 400 && pointers.size === 1) cycleWeight();
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (!pointers.size) drag = null;
+    };
+    pv.addEventListener("pointerup", end);
+    pv.addEventListener("pointercancel", end);
+    pv.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const el = $("capSize");
+      el.value = Math.max(40, Math.min(140, Number(el.value) + (e.deltaY < 0 ? 2 : -2)));
+      fireCtl(el);
+    }, { passive: false });
+    $("capModalClose").addEventListener("click", closeCapModal);
+    $("capModal").addEventListener("click", (e) => { if (e.target === $("capModal")) closeCapModal(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeCapModal(); closeWheel(); } });
+  })();
+
+  document.querySelectorAll(".tok[data-wheel]").forEach((t) => t.addEventListener("click", () => openWheelFor(t)));
+  $("tokSize").addEventListener("click", openCapModal);
+  $("tokPos").addEventListener("click", openCapModal);
+  $("tokWeight").addEventListener("click", cycleWeight);
+  $("tokSample").addEventListener("click", () => {
+    const a = $("voiceSample");
+    if (!a.paused) { a.pause(); return; }
+    a.currentTime = 0;
+    a.play().catch(() => showMsg("샘플을 재생할 수 없습니다.", false));
+  });
+  $("tokBgm").addEventListener("click", () => {
+    if (!currentSettings.bgm_path) { $("bgmFile").click(); return; }
+    if (bgmPlayer && !bgmPlayer.paused) { stopBgmPlayer(); updateSettingsSummary(); return; }
+    bgmPlayer = new Audio(assetUrl(currentSettings.bgm_path));
+    bgmPlayer.addEventListener("ended", () => { stopBgmPlayer(); updateSettingsSummary(); });
+    bgmPlayer.play().then(updateSettingsSummary).catch(() => showMsg("음악을 재생할 수 없습니다.", false));
+  });
+  $("tokBgmUp").addEventListener("click", () => $("bgmFile").click());
+  $("tokBgmDel").addEventListener("click", () => {
+    stopBgmPlayer();
+    currentSettings.bgm_path = null;
+    renderBgm();
+    markSettingsDirty();
+  });
+  [["srName", "convName"], ["srT1", "title1"], ["srT2", "title2"], ["srSrc", "sourceText"], ["srMoodNote", "moodNote"]].forEach(([sr, ctl]) => {
+    $(sr).addEventListener("input", () => { $(ctl).value = $(sr).value; fireCtl($(ctl)); });
+  });
+  // 바깥을 누르면 열린 휠을 닫는다
+  document.addEventListener("click", (e) => {
+    if (openWheel && !e.target.closest(".wheel-wrap") && !e.target.closest(".tok[data-wheel]")) closeWheel();
+  });
 
   function updateSettingsPreview() {
     const size = Number($("capSize").value);
@@ -412,7 +618,6 @@
     const firstImg = segments[0] && (segments[0].asset_paths || []).find((p) => isImage(p));
     const bg = firstImg ? `url("${assetUrl(firstImg)}")` : "none";
     const framed = $("layoutSel").value === "framed";
-    $("framedFields").style.display = framed ? "block" : "none";
     $("capMedia").style.display = framed ? "block" : "none";
     $("capMedia").style.backgroundImage = bg;
     $("capPreview").style.backgroundImage = framed ? "none" : bg;
@@ -465,7 +670,8 @@
     b.classList.remove("dirty");
     b.textContent = "전체 설정 저장";
     card.style.display = "block";
-    setSettingsOpen(false);
+    closeWheel();
+    stopBgmPlayer();
     renderBgm();
     updateSettingsPreview();
     updateSettingsSummary();
@@ -515,7 +721,9 @@
       }
       savedBgmPath = currentSettings.bgm_path || null;
       btn.classList.remove("dirty");
-      btn.textContent = "저장됨 ✓";
+      btn.textContent = "전체 설정 저장";
+      settingsJustSaved = true;
+      setTimeout(() => { settingsJustSaved = false; updateSettingsSummary(); }, 1800);
       updateSettingsSummary();
       setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "전체 설정 저장"; }, 1500);
     } catch (err) {
@@ -528,7 +736,6 @@
     }
   }
 
-  $("settingsToggle").addEventListener("click", () => setSettingsOpen(!$("settingsBody").classList.contains("open")));
   // 어떤 설정을 바꿔도(다른 핸들러가 값을 갱신한 뒤) 요약을 새로 그린다
   $("settingsBody").addEventListener("input", () => setTimeout(updateSettingsSummary, 0));
   $("settingsBody").addEventListener("change", () => setTimeout(updateSettingsSummary, 0));
@@ -1030,7 +1237,9 @@
       const seg = segments.find((s) => String(s.id) === id);
       if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
       btn.classList.remove("dirty");
-      btn.textContent = "저장됨 ✓";
+      btn.textContent = "전체 설정 저장";
+      settingsJustSaved = true;
+      setTimeout(() => { settingsJustSaved = false; updateSettingsSummary(); }, 1800);
       updateSettingsSummary();
       setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "저장"; }, 1500);
     } catch (err) {
