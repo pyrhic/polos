@@ -9,6 +9,18 @@ function ytDefaultDescription(row) {
     .filter(Boolean).join("\n\n");
 }
 
+// 웹페이지는 PC 터미널을 직접 실행할 수 없으므로, 명령을 복사해주는 버튼으로 대신한다.
+// 슬래시 경로라서 명령 프롬프트/PowerShell/Git Bash 어디서든 그대로 붙여넣어 실행된다.
+const YT_REAUTH_CMD = "python C:/Users/PC/youtube-automation/core/reauth_youtube.py";
+
+function ytReauthHelpHtml() {
+  return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:#17141c;border-radius:3px;font-size:0.78rem;color:#a89bb5;">
+    <div style="color:#ffd93d;font-weight:700;margin-bottom:4px;">⚠ 프로그래밍 폴더가 있는 PC에서 실행해주세요</div>
+    유튜브 인증이 만료되면(7일마다) 업로드가 실패합니다. 아래 버튼으로 명령을 복사해 PC 터미널에 붙여넣고 Enter를 누른 뒤, 브라우저에서 "허용"만 누르면 됩니다. (폰에서는 실행할 수 없습니다)
+    <button type="button" class="yt-reauth-copy" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사</button>
+  </div>`;
+}
+
 function uploadBlockHtml(o, row) {
   if (o.youtube_status === "done" && o.youtube_video_id) {
     return `<div class="yt-block" style="margin-top:8px;font-size:0.85rem;">
@@ -19,7 +31,7 @@ function uploadBlockHtml(o, row) {
     return `<div class="yt-block" style="margin-top:8px;font-size:0.85rem;color:#4fc3f7;">유튜브 업로드 중... (몇 분 걸릴 수 있어요)</div>`;
   }
   const errorNote = o.youtube_status === "error"
-    ? `<div class="msg err" style="display:block;font-size:0.8rem;">업로드 실패: ${escapeHtml(o.youtube_error || "알 수 없는 오류")}</div>` : "";
+    ? `<div class="msg err" style="display:block;font-size:0.8rem;">업로드 실패: ${escapeHtml(o.youtube_error || "알 수 없는 오류")}</div>${ytReauthHelpHtml()}` : "";
   return `<div class="yt-block" data-output-id="${o.id}" data-video-url="${escapeHtml(o.video_url)}" style="margin-top:8px;">
     ${errorNote}
     <button type="button" class="yt-open-btn" style="background:#221a2e;">${o.youtube_status === "error" ? "다시 업로드" : "유튜브에 업로드"}</button>
@@ -31,6 +43,7 @@ function uploadBlockHtml(o, row) {
       <label>태그 (콤마로 구분, 선택)</label>
       <input type="text" class="yt-tags" placeholder="예: 미스터리, 이슈">
       <div style="color:#a89bb5;font-size:0.75rem;margin:6px 0;">비공개로 올라갑니다. 공개 전환은 유튜브 스튜디오에서 직접 하세요.</div>
+      ${o.youtube_status === "error" ? "" : `<details style="margin:6px 0;"><summary style="color:#a89bb5;font-size:0.78rem;cursor:pointer;">업로드가 실패하거나 유튜브 인증이 만료됐나요?</summary>${ytReauthHelpHtml()}</details>`}
       <div style="display:flex;gap:8px;">
         <button type="button" class="yt-start-btn" style="flex:2;">업로드 시작</button>
         <button type="button" class="yt-cancel-btn" style="flex:1;background:#221a2e;">취소</button>
@@ -40,6 +53,18 @@ function uploadBlockHtml(o, row) {
 }
 
 function bindUploadBlocks(reload) {
+  document.querySelectorAll(".yt-reauth-copy").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(YT_REAUTH_CMD);
+        btn.textContent = "복사됨 ✓ — PC 터미널에 붙여넣고 Enter";
+        setTimeout(() => { btn.textContent = "재로그인 명령 복사"; }, 3500);
+      } catch {
+        prompt("이 명령을 복사해서 PC 터미널에서 실행하세요:", YT_REAUTH_CMD);
+      }
+    })
+  );
+
   document.querySelectorAll(".yt-block[data-output-id]").forEach((block) => {
     const form = block.querySelector(".yt-form");
     const openBtn = block.querySelector(".yt-open-btn");
