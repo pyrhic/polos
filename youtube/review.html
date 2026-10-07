@@ -212,6 +212,8 @@ ${body}
     const vs = row.video_settings || {};
     const settings = {
       caption_font_size: vs.caption_font_size,
+      caption_weight: vs.caption_weight,
+      caption_position_pct: vs.caption_position_pct,
       bgm_url: vs.bgm_path ? assetPublicUrl(vs.bgm_path) : null,
       bgm_volume: vs.bgm_volume,
       mood: vs.mood,

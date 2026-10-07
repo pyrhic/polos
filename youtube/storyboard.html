@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>콘티 — Wicked Wiki</title>
 <link rel="stylesheet" href="/youtube/style.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@300&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@300;400;500;700&display=swap">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0f0a14">
 <link rel="apple-touch-icon" href="/icon-192.png">
@@ -88,8 +88,12 @@
 
       <label>자막 크기 <b id="capSizeVal"></b></label>
       <input type="range" id="capSize" min="40" max="140" step="2">
+      <label>자막 굵기 <b id="capWeightVal"></b></label>
+      <input type="range" id="capWeight" min="0" max="4" step="1">
+      <label>자막 위치 <b id="capPosVal"></b> <span style="font-weight:400;">(화면 아래에서 띄우는 높이)</span></label>
+      <input type="range" id="capPos" min="3" max="70" step="1">
       <div class="cap-preview" id="capPreview">
-        <div class="cap-lines">
+        <div class="cap-lines" id="capLines">
           <div class="cap-normal" id="capNormal">일반 자막은 이렇게 보여요</div>
           <div class="cap-emph" id="capEmph">강조 123억</div>
         </div>
@@ -241,7 +245,16 @@
   const DEFAULT_SETTINGS = {
     caption_font_size: 80, bgm_path: null, bgm_volume: 0.15, mood: "neutral", mood_note: "", transition: "cut",
     tts_voice: "ko-KR-InJoonNeural", tts_rate: -3, tts_pitch: -5, name: "",
+    caption_weight: 0, caption_position_pct: 7,
   };
+  // 폰트 두께 단계 (영상 쪽 02_tts.py의 WEIGHT_FONTS와 같은 순서)
+  const WEIGHTS = [
+    { label: "가늘게", family: "'IBM Plex Sans KR'", weight: 300 },
+    { label: "보통", family: "'IBM Plex Sans KR'", weight: 400 },
+    { label: "중간", family: "'IBM Plex Sans KR'", weight: 500 },
+    { label: "굵게", family: "'IBM Plex Sans KR'", weight: 700 },
+    { label: "아주 굵게", family: "'Black Han Sans'", weight: 400 },
+  ];
   const VOICES = [
     { id: "ko-KR-InJoonNeural", label: "인준 (남성) — 현재 기본" },
     { id: "ko-KR-HyunsuMultilingualNeural", label: "현수 (남성)" },
@@ -267,6 +280,13 @@
     // 영상 폭 1080px 기준을 미리보기 폭 270px로 줄인 비율(0.25)로 표시
     $("capNormal").style.fontSize = (size * 0.25) + "px";
     $("capEmph").style.fontSize = (size * 1.15 * 0.25) + "px";
+    const wt = WEIGHTS[Number($("capWeight").value)];
+    $("capNormal").style.fontFamily = `${wt.family}, sans-serif`;
+    $("capNormal").style.fontWeight = wt.weight;
+    $("capWeightVal").textContent = wt.label;
+    const pos = Number($("capPos").value);
+    $("capPosVal").textContent = pos + "%";
+    $("capLines").style.bottom = (pos / 100 * 480) + "px";
     const firstImg = segments[0] && (segments[0].asset_paths || []).find((p) => isImage(p));
     $("capPreview").style.backgroundImage = firstImg ? `url("${assetUrl(firstImg)}")` : "none";
   }
@@ -294,6 +314,8 @@
     currentSettings.name = currentSettings.name || (row.hook || "").slice(0, 20);
     $("convName").value = currentSettings.name;
     $("capSize").value = currentSettings.caption_font_size;
+    $("capWeight").value = currentSettings.caption_weight;
+    $("capPos").value = currentSettings.caption_position_pct;
     $("bgmVol").value = Math.round(currentSettings.bgm_volume * 100);
     $("bgmVolVal").textContent = $("bgmVol").value + "%";
     $("moodSel").value = currentSettings.mood;
@@ -391,6 +413,16 @@
   });
   $("capSize").addEventListener("input", () => {
     currentSettings.caption_font_size = Number($("capSize").value);
+    updateSettingsPreview();
+    markSettingsDirty();
+  });
+  $("capWeight").addEventListener("input", () => {
+    currentSettings.caption_weight = Number($("capWeight").value);
+    updateSettingsPreview();
+    markSettingsDirty();
+  });
+  $("capPos").addEventListener("input", () => {
+    currentSettings.caption_position_pct = Number($("capPos").value);
     updateSettingsPreview();
     markSettingsDirty();
   });
