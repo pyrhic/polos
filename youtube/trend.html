@@ -21,6 +21,7 @@
   .t-news a { color:#cfc6d8; text-decoration:none; }
   .t-news a:hover { color:#7cff4a; }
   .t-news .src { color:#a89bb5; }
+  .t-make { margin:10px 0 0 38px; width:auto; padding:7px 14px; font-size:0.8rem; background:#221a2e; border:1px solid #3a2f14; }
   .t-first { border:2px solid #7cff4a; }
   .t-first .t-title { font-size:1.25rem; color:#7cff4a; }
   .t-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px; }
@@ -109,7 +110,7 @@
         list.innerHTML = '<div class="empty">지금 표시할 검색어가 없습니다.</div>';
         return;
       }
-      list.innerHTML = data.items.map((it) => `
+      list.innerHTML = data.items.map((it, idx) => `
         <div class="card-box t-item ${it.rank === 1 ? "t-first" : ""}">
           <div class="t-top">
             <div class="t-rank">${it.rank}</div>
@@ -122,8 +123,19 @@
           ${it.news.length ? `<ul class="t-news">${it.news.map((n) => `
             <li><a href="${escapeHtml(safeUrl(n.url))}" target="_blank" rel="noopener">${escapeHtml(n.title)}</a>
               <span class="src">— ${escapeHtml(n.source)}</span></li>`).join("")}</ul>` : ""}
+          <button type="button" class="t-make" data-i="${idx}">이 주제로 대본·콘티 만들기</button>
         </div>
       `).join("");
+
+      list.querySelectorAll(".t-make").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const it = data.items[Number(btn.dataset.i)];
+          try {
+            sessionStorage.setItem("trendDraft", JSON.stringify({ topic: it.title, geo: currentGeo(), articles: it.news }));
+          } catch {}
+          location.href = "/youtube/storyboard.html?new=1";
+        })
+      );
     } catch (err) {
       const msg = document.getElementById("msg");
       msg.className = "msg err";

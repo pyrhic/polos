@@ -1,5 +1,5 @@
 // 승인된 대본을 제미나이로 3~5개 장면 구간으로 나누고, 구간마다 Pexels 영어 검색
-// 키워드를 뽑아준다 (콘티 페이지에서 사용). gemini-script.js와 같은 쿼터(하루 20회)를 공유한다.
+// 키워드를 뽑아준다 (콘티 페이지의 "콘티 다시 생성"에서 사용). gemini-draft.js와 같은 쿼터(하루 20회)를 공유한다.
 function buildPrompt(category, hook, story, closing, mood, moodNote) {
   const body = `${hook}\n\n${story}\n\n${closing || ""}`.trim();
   const moodLines = [mood ? `[영상 분위기] ${mood}` : "", moodNote ? `[분위기 메모] ${moodNote}` : ""]

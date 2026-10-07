@@ -22,7 +22,7 @@
   <div class="wrap">
     <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
     <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">영상 점검</h1>
-    <p class="role">승인된 대본을 골라 생성을 시작하세요. 업로드해둔 소재가 있으면 그걸 쓰고, 없으면 Pexels 무료 영상으로 자동 채워집니다.</p>
+    <p class="role">콘티를 골라 영상 생성을 시작하세요. 업로드해둔 소재가 있으면 그걸 쓰고, 없으면 Pexels 무료 영상으로 자동 채워집니다.</p>
     <div id="list"><div class="empty">불러오는 중...</div></div>
   </div>
 
@@ -137,7 +137,7 @@ ${body}
     const rows = await res.json();
     if (!res.ok) throw new Error(rows.message || "대본을 불러올 수 없습니다");
     if (!rows.length) {
-      list.innerHTML = '<div class="empty">승인된 대본이 없습니다. 대본 페이지에서 먼저 승인하세요.</div>';
+      list.innerHTML = '<div class="empty">아직 콘티가 없습니다. Trend에서 주제를 골라 콘티를 먼저 만들어주세요.</div>';
       return;
     }
     const segCounts = await loadSegmentCounts(rows.map((r) => r.id));
