@@ -131,7 +131,7 @@
         btn.addEventListener("click", () => {
           const it = data.items[Number(btn.dataset.i)];
           try {
-            sessionStorage.setItem("trendDraft", JSON.stringify({ topic: it.title, geo: currentGeo(), articles: it.news }));
+            sessionStorage.setItem("trendDraft", JSON.stringify({ topic: it.title, geo: currentGeo(), traffic: it.traffic || "", articles: it.news }));
           } catch {}
           location.href = "/youtube/storyboard.html?new=1";
         })

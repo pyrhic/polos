@@ -81,6 +81,9 @@
       <input type="text" id="draftTopic" maxlength="100" placeholder="Trend에서 고르거나 직접 입력">
       <label>참고 기사 (체크한 기사의 사실만 바탕으로 새로 씁니다)</label>
       <div id="draftArticles" style="margin-bottom:8px;"><div class="settings-note">Trend 탭에서 주제를 고르면 관련 기사가 여기에 담깁니다. 기사 없이 만들면 사실이 부정확할 수 있어요.</div></div>
+      <label for="draftNote">방향 메모 (선택)</label>
+      <input type="text" id="draftNote" maxlength="300" placeholder="예: 정치 논란 쪽보다 경제 영향 위주로 / 찬반 입장 균형 있게">
+      <div class="settings-note">대본은 ① 트렌드 요약 ② 이슈 설명 ③ 관점 정리(검색으로 조사) ④ 내 의견(직접 작성, 빈칸) ⑤ 마무리 순서로 만들어집니다. 제미나이를 2번 호출합니다 (하루 20회 무료).</div>
       <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:400;color:#cfc6d8;">
         <input type="checkbox" id="draftImages" checked style="width:auto;margin-top:3px;">
         <span style="font-size:0.82rem;line-height:1.4;">체크한 기사의 사진도 장면에 가져오기 — 뉴스 사진은 저작권이 있을 수 있으니, 장면에 붙은 출처를 보고 직접 확인해서 문제 있는 사진은 × 로 삭제하세요.</span>
@@ -533,6 +536,7 @@
 
   // ───── 새 콘티 만들기: 주제 + 기사 -> 제미나이가 대본과 장면을 한 번에 생성 -> 저장 후 바로 열기 ─────
   let draftCandidates = [];
+  let draftTraffic = "";
 
   function showDraftMsg(text, ok) {
     const m = $("draftMsg");
@@ -558,6 +562,7 @@
     } catch {}
     if (!saved || !saved.topic) return;
     $("draftTopic").value = saved.topic;
+    draftTraffic = saved.traffic || "";
     draftCandidates = (saved.articles || []).filter((a) => a && a.title);
     renderDraftArticles();
     $("newDraft").open = true;
@@ -609,12 +614,12 @@
     const btn = $("draftBtn");
     btn.disabled = true;
     btn.textContent = "대본과 콘티를 만드는 중... (10~30초)";
-    showDraftMsg("기사를 읽고 대본을 쓰는 중입니다.", true);
+    showDraftMsg("기사를 읽고, 배경·관점을 검색한 뒤 대본을 쓰는 중입니다.", true);
     try {
       const res = await fetch("/api/gemini-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, articles }),
+        body: JSON.stringify({ topic, articles, note: $("draftNote").value.trim(), traffic: draftTraffic }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "생성 실패");
@@ -629,7 +634,10 @@
           hook: texts[0],
           story: texts.slice(1).join("\n") || texts[0],
           closing: "",
-          fact_sources: articles.map((a) => a.url).filter(Boolean).join("\n"),
+          fact_sources: [
+            ...articles.map((a) => a.url).filter(Boolean),
+            ...((data.research && data.research.sources) || []).slice(0, 4).map((s) => `${s.title} — ${s.url}`),
+          ].join("\n"),
           status: "approved",
           slug: `${new Date().toISOString().slice(0, 10)}_${topic.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20)}`,
           video_settings: { name: (data.name || topic).slice(0, 40) },
@@ -654,7 +662,10 @@
         imageNote = await importArticleImages(created.id, createdSegs, data.images.slice(0, 8), btn);
       }
 
-      const doneText = `"${data.name}" 콘티가 만들어졌습니다. 아래에서 장면별로 확인·수정하세요.${imageNote}`;
+      const researchNote = data.research && data.research.ok
+        ? ` 관점 자료는 구글 검색 출처 ${data.research.sources.length}건을 참고했습니다.`
+        : " 검색 조사에 실패해 관점 정리 없이 기사 중심으로 썼습니다.";
+      const doneText = `"${data.name}" 콘티가 만들어졌습니다. '내 의견' 장면은 비어 있으니 직접 써 넣으세요.${researchNote}${imageNote}`;
       showDraftMsg(doneText, true);
       showMsg(doneText, true);
       $("newDraft").open = false;
@@ -718,7 +729,7 @@
           <span>대사 (영상의 음성·자막이 이 내용으로 만들어집니다)</span>
           <button type="button" class="seg-emph-btn" style="width:auto;padding:3px 10px;font-size:0.7rem;margin:0;background:#221a2e;flex-shrink:0;">선택한 글자 강조</button>
         </div>
-        <textarea class="seg-script" placeholder="이 장면에서 나오는 대본 문장">${escapeHtml(seg.script_text)}</textarea>
+        <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 비워두면 이 장면은 거의 나오지 않습니다 (노출 시간 1초 기준)' : '이 장면에서 나오는 대본 문장'}">${escapeHtml(seg.script_text)}</textarea>
         <div class="settings-note" style="margin:-4px 0 8px;">강조할 글자를 드래그해서 선택한 뒤 "선택한 글자 강조"를 누르면 <b>**글자**</b>로 표시되고, 자막에서 노란색으로 튀어 보입니다. (다시 누르면 해제)</div>
         <label>ACTION (사진의 카메라 연출만 해당 — 줌인 / 줌아웃 / 좌에서 우로 패닝 / 틸트업 등. 글자 강조는 위 대사에서)</label>
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
