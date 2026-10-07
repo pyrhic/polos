@@ -88,14 +88,18 @@
     return scope === "domestic" ? "대한민국" : document.getElementById("countrySel").selectedOptions[0].textContent;
   }
 
+  let loadSeq = 0;
+
   async function load() {
     const list = document.getElementById("list");
     const btn = document.getElementById("refreshBtn");
+    const mySeq = ++loadSeq;
     btn.disabled = true;
     list.innerHTML = '<div class="empty">불러오는 중...</div>';
     try {
       const res = await fetch(`/api/trends?geo=${currentGeo()}`);
       const data = await res.json();
+      if (mySeq !== loadSeq) return; // 그 사이 다른 지역으로 바꿨으면 이 응답은 버린다
       if (!res.ok) throw new Error(data.error || "불러오기 실패");
       document.getElementById("msg").className = "msg";
       document.getElementById("meta").textContent =
