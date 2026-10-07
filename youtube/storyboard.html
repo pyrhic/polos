@@ -42,30 +42,41 @@
   .seg-pexels-item { flex-shrink:0; width:80px; }
   .seg-pexels-thumb-wrap { position:relative; width:80px; height:100px; border-radius:3px; overflow:hidden; background:#221a2e; cursor:pointer; }
   .seg-pexels-thumb-wrap img, .seg-pexels-thumb-wrap video { width:100%; height:100%; object-fit:cover; display:block; }
-  /* 전체 설정 카드: 다른 박스(어두운 배경)와 구분되도록 색을 반전 — 밝은 배경 + 어두운 글자 */
-  .settings-card { background:#efe9f6; color:#1c1426; border:none; }
-  .settings-card label { color:#4a3d5c; }
-  .settings-card input, .settings-card select, .settings-card textarea { border:1px solid #cbbfdc; }
-  .settings-card .settings-note { color:#6b5d7b; }
+  /* 전체 설정 카드: 다른 박스(어두운 배경)와 구분되도록 색을 반전 — 초록 배경 + 어두운 글자 */
+  .settings-card { background:#7cff4a; color:#0f0a14; border:none; }
+  .settings-card label { color:#1d4a0c; }
+  .settings-card input, .settings-card select, .settings-card textarea { border:1px solid #4fb82a; }
+  .settings-card .settings-note { color:#1d4a0c; }
   .settings-card .bgm-row .settings-note { margin:0; }
-  .settings-card button { background:#1c1426; color:#7cff4a; }
-  .settings-card button:hover { background:#7cff4a; color:#1c1426; }
-  .settings-card button:disabled { background:#cbbfdc; color:#6b5d7b; }
-  .settings-card #settingsSaveBtn.dirty { background:#ffd93d; color:#1c1426; }
+  .settings-card button { background:#0f0a14; color:#7cff4a; }
+  .settings-card button:hover { background:#ffffff; color:#0f0a14; }
+  .settings-card button:disabled { background:#4fb82a; color:#1d4a0c; }
+  .settings-card #settingsSaveBtn.dirty { background:#ffd93d; color:#0f0a14; }
   .settings-card #bgmRemove { background:#f6d4d4; color:#8a1c1c; }
-  .settings-card .seg-file-label { background:#1c1426; color:#7cff4a; }
+  .settings-card .seg-file-label { background:#0f0a14; color:#7cff4a; }
   .settings-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .settings-title { font-weight:800; margin-bottom:6px; }
-  .settings-title span { color:#6b5d7b; font-weight:400; font-size:0.75rem; margin-left:6px; }
-  .settings-dirty-badge { display:none; background:#ffd93d; color:#1c1426; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; }
+  .settings-title span { color:#1d4a0c; font-weight:400; font-size:0.75rem; margin-left:6px; }
+  .settings-dirty-badge { display:none; background:#0f0a14; color:#ffd93d; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; }
   .settings-summary { display:grid; grid-template-columns:auto 1fr; gap:3px 12px; font-size:0.8rem; margin:4px 0 10px; }
-  .settings-summary dt { color:#6b5d7b; font-weight:600; }
+  .settings-summary dt { color:#1d4a0c; font-weight:600; }
   .settings-summary dd { margin:0; font-weight:700; word-break:break-all; }
   .settings-toggle { margin-top:0; padding:8px 10px; font-size:0.85rem; }
-  #settingsBody { display:none; margin-top:12px; padding-top:4px; border-top:1px solid #cbbfdc; }
+  #settingsBody { display:none; margin-top:12px; padding-top:4px; border-top:1px solid #4fb82a; }
   #settingsBody.open { display:block; }
-  .settings-card input[type="range"] { padding:0; margin:4px 0 8px; accent-color:#1c1426; border:none; }
+  .settings-card input[type="range"] { padding:0; margin:4px 0 8px; accent-color:#0f0a14; border:none; }
   .settings-card select, .settings-card textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
+  /* 콘티 목록 */
+  .conti-item { display:block; width:100%; text-align:left; cursor:pointer; background:#221a2e; color:#fff; border:2px solid transparent; border-radius:3px; padding:14px 16px; margin-bottom:10px; font:inherit; }
+  .conti-item:hover, .conti-item:focus-visible { border-color:#7cff4a; background:#221a2e; color:#fff; }
+  .conti-item .title { font-weight:800; font-size:1rem; margin-bottom:4px; }
+  .conti-item .meta { color:#a89bb5; font-size:0.8rem; }
+  #newDraft > summary { list-style:none; cursor:pointer; text-align:center; font-weight:800; background:#7cff4a; color:#0f0a14; border-radius:3px; padding:12px; margin:-16px -18px 0; }
+  #newDraft > summary::-webkit-details-marker { display:none; }
+  #newDraft[open] > summary { margin-bottom:6px; }
+  #newDraft:not([open]) { padding:0; background:none; }
+  #newDraft:not([open]) > summary { margin:0; }
+  #newDraft[open] { padding:16px 18px; }
   .settings-card input[type="file"] { display:none; }
   .settings-note { color:#a89bb5; font-size:0.75rem; margin-bottom:10px; }
   .cap-preview { position:relative; width:270px; max-width:100%; height:480px; margin:6px auto 4px; background:#000 center/cover no-repeat; border-radius:4px; overflow:hidden; }
@@ -92,30 +103,32 @@
   <div class="wrap">
     <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
     <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">콘티</h1>
-    <p class="role">Trend에서 주제를 골라 대본과 장면(콘티)을 한 번에 만들고, 장면별로 고쳐 쓰는 곳입니다. 사진·영상을 직접 올리면(여러 개 가능) 그 장면엔 자동검색 대신 그 소재들이 쓰입니다.</p>
+    <div id="listView">
+      <div id="contiList"><div class="empty">불러오는 중...</div></div>
 
-    <details id="newDraft" class="card-box" style="margin:0 0 16px;">
-      <summary style="cursor:pointer;font-weight:800;">+ 새 콘티 만들기 <span style="color:#a89bb5;font-weight:400;font-size:0.78rem;">(주제와 기사로 대본·콘티 자동 생성)</span></summary>
-      <label for="draftTopic">주제</label>
-      <input type="text" id="draftTopic" maxlength="100" placeholder="Trend에서 고르거나 직접 입력">
-      <label>참고 기사 (체크한 기사의 사실만 바탕으로 새로 씁니다)</label>
-      <div id="draftArticles" style="margin-bottom:8px;"><div class="settings-note">Trend 탭에서 주제를 고르면 관련 기사가 여기에 담깁니다. 기사 없이 만들면 사실이 부정확할 수 있어요.</div></div>
-      <label for="draftNote">방향 메모 (선택)</label>
-      <input type="text" id="draftNote" maxlength="300" placeholder="예: 정치 논란 쪽보다 경제 영향 위주로 / 찬반 입장 균형 있게">
-      <div class="settings-note">대본은 ① 트렌드 요약 ② 이슈 설명 ③ 관점 정리(검색으로 조사) ④ 내 의견(직접 작성, 빈칸) ⑤ 마무리 순서로 만들어집니다. 제미나이를 2번 호출합니다 (하루 20회 무료).</div>
-      <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:400;color:#cfc6d8;">
-        <input type="checkbox" id="draftImages" checked style="width:auto;margin-top:3px;">
-        <span style="font-size:0.82rem;line-height:1.4;">체크한 기사의 사진도 장면에 가져오기 — 뉴스 사진은 저작권이 있을 수 있으니, 장면에 붙은 출처를 보고 직접 확인해서 문제 있는 사진은 × 로 삭제하세요.</span>
-      </label>
-      <button type="button" id="draftBtn">대본 + 콘티 생성</button>
-      <div class="msg" id="draftMsg"></div>
-    </details>
+      <details id="newDraft" class="card-box" style="margin:14px 0 0;">
+        <summary>+ 새 콘티 만들기</summary>
+        <label for="draftTopic">주제</label>
+        <input type="text" id="draftTopic" maxlength="100" placeholder="Trend에서 고르거나 직접 입력">
+        <div id="draftArticlesWrap" style="display:none;">
+          <label>참고 기사</label>
+          <div id="draftArticles" style="margin-bottom:8px;"></div>
+        </div>
+        <label for="draftNote">방향 메모 (선택)</label>
+        <input type="text" id="draftNote" maxlength="300" placeholder="예: 경제 영향 위주로 / 찬반 입장 균형 있게">
+        <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:400;color:#cfc6d8;">
+          <input type="checkbox" id="draftImages" checked style="width:auto;margin-top:3px;">
+          <span style="font-size:0.82rem;line-height:1.4;">기사 사진도 장면에 가져오기</span>
+        </label>
+        <button type="button" id="draftBtn">대본 + 콘티 생성</button>
+        <div class="msg" id="draftMsg"></div>
+      </details>
+    </div>
 
-    <label for="scriptSelect">콘티 선택</label>
-    <select id="scriptSelect">
-      <option value="">불러오는 중...</option>
-    </select>
+    <select id="scriptSelect" style="display:none;"><option value="">불러오는 중...</option></select>
 
+    <div id="detailView" style="display:none;">
+    <button type="button" id="backToList" style="width:auto;padding:6px 14px;font-size:0.8rem;background:#221a2e;margin-bottom:12px;">← 콘티 목록</button>
     <div id="regenWrap" style="display:none;margin-top:10px;">
       <button type="button" id="regenBtn">콘티 (다시) 생성</button>
       <button type="button" id="addSegBtn" style="margin-top:8px;background:#221a2e;">+ 장면 추가</button>
@@ -201,6 +214,7 @@
     <div class="runtime-summary" id="runtimeSummary" style="display:none;"></div>
 
     <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
+    </div>
 
   </div>
 
@@ -586,14 +600,18 @@
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&order=created_at.desc`, { headers });
       scripts = await res.json();
-      if (!scripts.length) {
-        sel.innerHTML = '<option value="">아직 콘티가 없습니다 — 위에서 새로 만들어보세요</option>';
-        return;
-      }
+      const nameOf = (r) => (r.video_settings && r.video_settings.name) || (r.hook || "").slice(0, 30) || "(이름 없음)";
       sel.innerHTML = '<option value="">선택하세요</option>' +
-        scripts.map((r) => `<option value="${r.id}">${escapeHtml((r.video_settings && r.video_settings.name) || (r.hook || "").slice(0, 30))}</option>`).join("");
+        scripts.map((r) => `<option value="${r.id}">${escapeHtml(nameOf(r))}</option>`).join("");
+      $("contiList").innerHTML = scripts.length
+        ? scripts.map((r) => `<button type="button" class="conti-item" data-id="${r.id}">
+            <div class="title">${escapeHtml(nameOf(r))}</div>
+            <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>
+          </button>`).join("")
+        : '<div class="empty" style="margin:20px 0;">아직 콘티가 없습니다</div>';
     } catch (err) {
       sel.innerHTML = '<option value="">불러오기 실패</option>';
+      $("contiList").innerHTML = '<div class="empty" style="margin:20px 0;">불러오기 실패</div>';
     }
   }
 
@@ -610,6 +628,7 @@
   function renderDraftArticles() {
     const box = $("draftArticles");
     if (!draftCandidates.length) return;
+    $("draftArticlesWrap").style.display = "block";
     box.innerHTML = draftCandidates.map((a, i) => `
       <label style="display:flex;gap:8px;align-items:flex-start;margin:6px 0;font-weight:400;color:#cfc6d8;">
         <input type="checkbox" class="draft-art" data-i="${i}" checked style="width:auto;margin-top:3px;">
@@ -629,6 +648,7 @@
     draftCandidates = (saved.articles || []).filter((a) => a && a.title);
     renderDraftArticles();
     $("newDraft").open = true;
+    $("newDraft").scrollIntoView({ block: "start" });
   }
 
   // 기사 사진을 장면에 돌아가며 나눠 담는다. 출처는 asset_notes에 같이 저장해 장면에서 확인/삭제할 수 있게 한다.
@@ -733,9 +753,7 @@
       showMsg(doneText, true);
       $("newDraft").open = false;
       await loadScripts();
-      $("scriptSelect").value = String(created.id);
-      $("scriptSelect").dispatchEvent(new Event("change", { bubbles: true }));
-      $("scriptSelect").scrollIntoView({ behavior: "smooth", block: "start" });
+      openConti(created.id);
     } catch (err) {
       showDraftMsg("생성 실패: " + err.message, false);
     } finally {
@@ -796,8 +814,7 @@
         <div class="settings-note" style="margin:-4px 0 8px;">강조할 글자를 드래그해서 선택한 뒤 "선택한 글자 강조"를 누르면 <b>**글자**</b>로 표시되고, 자막에서 노란색으로 튀어 보입니다. (다시 누르면 해제)</div>
         <label>ACTION (사진의 카메라 연출만 해당 — 줌인 / 줌아웃 / 좌에서 우로 패닝 / 틸트업 등. 글자 강조는 위 대사에서)</label>
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
-        <label>장면 설명</label>
-        <input type="text" class="seg-section" value="${escapeAttr(seg.section)}" placeholder="장면 설명">
+        <input type="hidden" class="seg-section" value="${escapeAttr(seg.section)}">
         <label>자료사진/영상 검색 키워드</label>
         <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="Pexels 검색 키워드 (영어)">
         <button type="button" class="seg-pexels-search-btn" style="background:#221a2e;">검색 미리보기</button>
@@ -1135,9 +1152,23 @@
       return;
     }
     lastScriptId = e.target.value;
+    const inDetail = !!e.target.value;
+    $("listView").style.display = inDetail ? "none" : "block";
+    $("detailView").style.display = inDetail ? "block" : "none";
+    if (inDetail) window.scrollTo(0, 0);
     loadSettingsCard(e.target.value);
     loadSegments(e.target.value);
   });
+  function openConti(id) {
+    const sel = $("scriptSelect");
+    sel.value = String(id);
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  $("contiList").addEventListener("click", (e) => {
+    const item = e.target.closest(".conti-item");
+    if (item) openConti(item.dataset.id);
+  });
+  $("backToList").addEventListener("click", () => openConti(""));
 
   window.addEventListener("beforeunload", (e) => {
     if (hasDirty()) {
