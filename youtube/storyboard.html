@@ -42,10 +42,29 @@
   .seg-pexels-item { flex-shrink:0; width:80px; }
   .seg-pexels-thumb-wrap { position:relative; width:80px; height:100px; border-radius:3px; overflow:hidden; background:#221a2e; cursor:pointer; }
   .seg-pexels-thumb-wrap img, .seg-pexels-thumb-wrap video { width:100%; height:100%; object-fit:cover; display:block; }
-  .settings-card { border:2px solid #3a2f14; }
+  /* 전체 설정 카드: 다른 박스(어두운 배경)와 구분되도록 색을 반전 — 밝은 배경 + 어두운 글자 */
+  .settings-card { background:#efe9f6; color:#1c1426; border:none; }
+  .settings-card label { color:#4a3d5c; }
+  .settings-card input, .settings-card select, .settings-card textarea { border:1px solid #cbbfdc; }
+  .settings-card .settings-note { color:#6b5d7b; }
+  .settings-card .bgm-row .settings-note { margin:0; }
+  .settings-card button { background:#1c1426; color:#7cff4a; }
+  .settings-card button:hover { background:#7cff4a; color:#1c1426; }
+  .settings-card button:disabled { background:#cbbfdc; color:#6b5d7b; }
+  .settings-card #settingsSaveBtn.dirty { background:#ffd93d; color:#1c1426; }
+  .settings-card #bgmRemove { background:#f6d4d4; color:#8a1c1c; }
+  .settings-card .seg-file-label { background:#1c1426; color:#7cff4a; }
+  .settings-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .settings-title { font-weight:800; margin-bottom:6px; }
-  .settings-title span { color:#a89bb5; font-weight:400; font-size:0.75rem; margin-left:6px; }
-  .settings-card input[type="range"] { padding:0; margin:4px 0 8px; accent-color:#7cff4a; }
+  .settings-title span { color:#6b5d7b; font-weight:400; font-size:0.75rem; margin-left:6px; }
+  .settings-dirty-badge { display:none; background:#ffd93d; color:#1c1426; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; }
+  .settings-summary { display:grid; grid-template-columns:auto 1fr; gap:3px 12px; font-size:0.8rem; margin:4px 0 10px; }
+  .settings-summary dt { color:#6b5d7b; font-weight:600; }
+  .settings-summary dd { margin:0; font-weight:700; word-break:break-all; }
+  .settings-toggle { margin-top:0; padding:8px 10px; font-size:0.85rem; }
+  #settingsBody { display:none; margin-top:12px; padding-top:4px; border-top:1px solid #cbbfdc; }
+  #settingsBody.open { display:block; }
+  .settings-card input[type="range"] { padding:0; margin:4px 0 8px; accent-color:#1c1426; border:none; }
   .settings-card select, .settings-card textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
   .settings-card input[type="file"] { display:none; }
   .settings-note { color:#a89bb5; font-size:0.75rem; margin-bottom:10px; }
@@ -103,12 +122,15 @@
     </div>
     <div class="msg" id="msg"></div>
 
-    <div class="runtime-summary" id="runtimeSummary" style="display:none;"></div>
+    <div class="card-box settings-card" id="settingsCard" style="display:none;margin-top:14px;">
+      <div class="settings-head">
+        <div class="settings-title">전체 설정<span>영상 전체에 적용</span></div>
+        <span class="settings-dirty-badge" id="settingsDirtyBadge">저장 안 됨</span>
+      </div>
+      <dl class="settings-summary" id="settingsSummary"></dl>
+      <button type="button" class="settings-toggle" id="settingsToggle">수정하기</button>
 
-    <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
-
-    <div class="card-box settings-card" id="settingsCard" style="display:none;margin-top:20px;">
-      <div class="settings-title">전체 설정<span>콘티 전반(영상 전체)에 적용</span></div>
+      <div id="settingsBody">
 
       <label>콘티 이름 (영상 제목에 "이름 v1, v2…"로 붙습니다)</label>
       <input type="text" id="convName" placeholder="예: 폐건물 극장식 레스토랑">
@@ -173,7 +195,13 @@
       </select>
 
       <button type="button" id="settingsSaveBtn">전체 설정 저장</button>
+      </div>
     </div>
+
+    <div class="runtime-summary" id="runtimeSummary" style="display:none;"></div>
+
+    <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
+
   </div>
 
 <script>
@@ -324,6 +352,33 @@
     const b = $("settingsSaveBtn");
     b.classList.add("dirty");
     b.textContent = "전체 설정 저장 (수정됨)";
+    updateSettingsSummary();
+  }
+
+  // 접힌 상태에서 보이는 현재 설정값 요약
+  function updateSettingsSummary() {
+    const voice = (VOICES.find((v) => v.id === $("voiceSel").value) || {}).label || "";
+    const mood = (MOODS.find((m) => m.id === $("moodSel").value) || {}).label || "";
+    const framed = $("layoutSel").value === "framed";
+    const w = WEIGHTS[Number($("capWeight").value)];
+    const rate = Number($("ttsRate").value), pitch = Number($("ttsPitch").value);
+    const bgm = currentSettings.bgm_path ? `있음 (볼륨 ${$("bgmVol").value}%)` : "없음";
+    const rows = [
+      ["콘티 이름", $("convName").value.trim() || "(이름 없음)"],
+      ["화면 구성", framed ? "제목 + 영상 + 출처" : "전체 화면"],
+      ["자막", `크기 ${$("capSize").value} · ${w.label} · 위치 ${$("capPos").value}%`],
+      ["목소리", `${voice.replace(/ — .*/, "")} · 속도 ${rate > 0 ? "+" : ""}${rate}% · 높낮이 ${pitch > 0 ? "+" : ""}${pitch}Hz`],
+      ["배경음악", bgm],
+      ["분위기", mood + ($("moodNote").value.trim() ? " + 메모" : "")],
+      ["화면 전환", $("transSel").value === "fade" ? "페이드" : "컷"],
+    ];
+    $("settingsSummary").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${escapeHtml(v)}</dd>`).join("");
+    $("settingsDirtyBadge").style.display = $("settingsSaveBtn").classList.contains("dirty") ? "inline-block" : "none";
+  }
+
+  function setSettingsOpen(open) {
+    $("settingsBody").classList.toggle("open", open);
+    $("settingsToggle").textContent = open ? "접기" : "수정하기";
   }
 
   function updateSettingsPreview() {
@@ -395,8 +450,10 @@
     b.classList.remove("dirty");
     b.textContent = "전체 설정 저장";
     card.style.display = "block";
+    setSettingsOpen(false);
     renderBgm();
     updateSettingsPreview();
+    updateSettingsSummary();
   }
 
   function updateVoiceLabels() {
@@ -444,16 +501,22 @@
       savedBgmPath = currentSettings.bgm_path || null;
       btn.classList.remove("dirty");
       btn.textContent = "저장됨 ✓";
+      updateSettingsSummary();
       setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "전체 설정 저장"; }, 1500);
     } catch (err) {
       showMsg("전체 설정 저장 실패: " + err.message, false);
       btn.classList.add("dirty");
       btn.textContent = "전체 설정 저장 (수정됨)";
+      updateSettingsSummary();
     } finally {
       btn.disabled = false;
     }
   }
 
+  $("settingsToggle").addEventListener("click", () => setSettingsOpen(!$("settingsBody").classList.contains("open")));
+  // 어떤 설정을 바꿔도(다른 핸들러가 값을 갱신한 뒤) 요약을 새로 그린다
+  $("settingsBody").addEventListener("input", () => setTimeout(updateSettingsSummary, 0));
+  $("settingsBody").addEventListener("change", () => setTimeout(updateSettingsSummary, 0));
   MOODS.forEach((m) => $("moodSel").add(new Option(m.label, m.id)));
   VOICES.forEach((v) => $("voiceSel").add(new Option(v.label, v.id)));
   $("convName").addEventListener("input", () => { currentSettings.name = $("convName").value; markSettingsDirty(); });
@@ -949,6 +1012,7 @@
       if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
       btn.classList.remove("dirty");
       btn.textContent = "저장됨 ✓";
+      updateSettingsSummary();
       setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "저장"; }, 1500);
     } catch (err) {
       showMsg("저장 실패: " + err.message, false);
