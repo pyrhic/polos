@@ -25,6 +25,12 @@
   .t-first .t-title { font-size:1.25rem; color:#7cff4a; }
   .t-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px; }
   .t-head button { width:auto; padding:6px 14px; font-size:0.8rem; }
+  .t-tabs { display:flex; gap:8px; align-items:center; margin-bottom:14px; }
+  .t-tab { width:auto; padding:8px 20px; font-size:0.9rem; }
+  .t-tab.active { background:#7cff4a; color:#0f0a14; }
+  .t-tabs select { width:auto; padding:8px 12px; font-size:0.9rem; }
+  .t-tr { color:#a89bb5; font-size:0.72rem; margin-left:8px; text-decoration:none; font-weight:400; white-space:nowrap; }
+  .t-tr:hover { color:#7cff4a; }
 </style>
 </head>
 <body>
@@ -34,7 +40,23 @@
       <h1 style="font-size:1.4rem;margin:0;">Trend</h1>
       <button type="button" id="refreshBtn">새로고침</button>
     </div>
-    <p class="role" style="text-align:left;margin-bottom:1rem;">구글 트렌드에서 한국의 지금 급상승 검색어를 검색량 높은 순으로 보여줍니다. 제목을 누르면 구글 검색으로 이동합니다.</p>
+    <p class="role" style="text-align:left;margin-bottom:1rem;">구글 트렌드의 지금 급상승 검색어를 검색량 높은 구간 순으로 보여줍니다. 제목을 누르면 구글 검색으로 이동합니다.</p>
+    <div class="t-tabs">
+      <button type="button" class="t-tab active" data-scope="domestic">국내</button>
+      <button type="button" class="t-tab" data-scope="overseas">해외</button>
+      <select id="countrySel" style="display:none;">
+        <option value="US">미국</option>
+        <option value="JP">일본</option>
+        <option value="GB">영국</option>
+        <option value="DE">독일</option>
+        <option value="FR">프랑스</option>
+        <option value="IN">인도</option>
+        <option value="BR">브라질</option>
+        <option value="AU">호주</option>
+        <option value="CA">캐나다</option>
+        <option value="TW">대만</option>
+      </select>
+    </div>
     <div class="msg" id="msg"></div>
     <div id="meta" style="color:#a89bb5;font-size:0.78rem;margin-bottom:10px;"></div>
     <div id="list"><div class="empty">불러오는 중...</div></div>
@@ -56,17 +78,28 @@
     return `${Math.floor(min / 1440)}일 전부터`;
   }
 
+  let scope = "domestic";
+
+  function currentGeo() {
+    return scope === "domestic" ? "KR" : document.getElementById("countrySel").value;
+  }
+
+  function regionName() {
+    return scope === "domestic" ? "대한민국" : document.getElementById("countrySel").selectedOptions[0].textContent;
+  }
+
   async function load() {
     const list = document.getElementById("list");
     const btn = document.getElementById("refreshBtn");
     btn.disabled = true;
+    list.innerHTML = '<div class="empty">불러오는 중...</div>';
     try {
-      const res = await fetch("/api/trends?geo=KR");
+      const res = await fetch(`/api/trends?geo=${currentGeo()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "불러오기 실패");
       document.getElementById("msg").className = "msg";
       document.getElementById("meta").textContent =
-        `대한민국 · ${data.items.length}개 · ${new Date(data.fetchedAt).toLocaleTimeString("ko-KR")} 기준`;
+        `${regionName()} · ${data.items.length}개 · ${new Date(data.fetchedAt).toLocaleTimeString("ko-KR")} 기준`;
 
       if (!data.items.length) {
         list.innerHTML = '<div class="empty">지금 표시할 검색어가 없습니다.</div>';
@@ -77,6 +110,9 @@
           <div class="t-top">
             <div class="t-rank">${it.rank}</div>
             <a class="t-title" href="https://www.google.com/search?q=${encodeURIComponent(it.title)}" target="_blank" rel="noopener">${escapeHtml(it.title)}</a>
+            ${scope === "overseas"
+              ? `<a class="t-tr" href="https://translate.google.com/?sl=auto&tl=ko&op=translate&text=${encodeURIComponent(it.title)}" target="_blank" rel="noopener">번역</a>`
+              : ""}
           </div>
           <div class="t-meta"><b>${escapeHtml(it.traffic || "-")}</b> 검색 · ${escapeHtml(timeAgo(it.pubDate))}</div>
           ${it.news.length ? `<ul class="t-news">${it.news.map((n) => `
@@ -95,6 +131,15 @@
   }
 
   document.getElementById("refreshBtn").addEventListener("click", load);
+  document.getElementById("countrySel").addEventListener("change", load);
+  document.querySelectorAll(".t-tab").forEach((tab) =>
+    tab.addEventListener("click", () => {
+      scope = tab.dataset.scope;
+      document.querySelectorAll(".t-tab").forEach((t) => t.classList.toggle("active", t === tab));
+      document.getElementById("countrySel").style.display = scope === "overseas" ? "" : "none";
+      load();
+    })
+  );
   load();
 
   if ("serviceWorker" in navigator) {
