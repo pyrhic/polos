@@ -68,23 +68,22 @@
   .settings-card input[type="range"] { padding:0; margin:4px 0 8px; accent-color:#0f0a14; border:none; }
   .settings-card select, .settings-card textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
   /* 요약 줄에서 바로 고치기 */
-  .sr-list { margin:6px 0 0; }
-  .sr { display:grid; grid-template-columns:76px 1fr; gap:2px 10px; align-items:center; padding:5px 0; font-size:0.85rem; border-bottom:1px solid rgba(15,10,20,0.12); }
-  .sr:last-child { border-bottom:none; }
+  .sr-list { margin:4px 0 0; }
+  .sr { display:grid; grid-template-columns:auto 1fr; gap:0 12px; align-items:center; padding:1px 0; font-size:0.8rem; }
   .sr .k { color:#1d4a0c; font-weight:600; font-size:0.8rem; }
   .sr .v { font-weight:700; min-width:0; }
-  .settings-card .tok { display:inline; text-transform:none; letter-spacing:0; text-align:left; line-height:1.9; background:none; color:#0f0a14; border:none; border-bottom:1.5px dashed #1d4a0c; border-radius:0; padding:1px 1px; margin:0; width:auto; font-size:0.85rem; font-weight:800; cursor:pointer; }
+  .settings-card .tok { display:inline; text-transform:none; letter-spacing:0; text-align:left; line-height:1.45; background:none; color:#0f0a14; border:none; border-bottom:1px dashed #1d4a0c; border-radius:0; padding:0; margin:0; width:auto; font-size:0.8rem; font-weight:800; cursor:pointer; }
   .settings-card .tok:hover { background:rgba(255,255,255,0.45); color:#0f0a14; }
   .settings-card .tok.on { background:#0f0a14; color:#7cff4a; border-bottom-color:#0f0a14; }
-  .settings-card .tok-btn { border:1.5px solid #0f0a14; border-radius:10px; padding:1px 8px; margin-left:4px; font-size:0.75rem; }
+  .settings-card .tok-btn { border:1px solid #0f0a14; border-radius:10px; padding:0 7px; margin-left:4px; font-size:0.72rem; }
   .settings-card .tok-del { color:#8a1c1c; border-bottom-color:#8a1c1c; }
-  .settings-card .sr-input { background:transparent; border:none; border-bottom:1.5px dashed #1d4a0c; border-radius:0; padding:2px 0; margin:0; font-size:0.85rem; font-weight:800; color:#0f0a14; width:100%; }
+  .settings-card .sr-input { background:transparent; border:none; border-bottom:1px dashed #1d4a0c; border-radius:0; padding:0; margin:0; font-size:0.8rem; font-weight:800; color:#0f0a14; width:100%; }
   .settings-card .sr-input::placeholder { color:#3f7a28; font-weight:400; }
   .settings-card .sr-input:focus { outline:none; background:rgba(255,255,255,0.55); border-bottom-style:solid; }
   .sr-framed { display:none; }
   .sr-framed.show { display:grid; }
   /* 굴러가는 선택 휠 */
-  .wheel-wrap { position:relative; margin:4px 0 8px; }
+  .wheel-wrap { position:relative; margin:0; }
   .wheel { height:132px; overflow-y:auto; scroll-snap-type:y mandatory; background:#0f0a14; border-radius:6px; padding:44px 0; scrollbar-width:none; -webkit-mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); }
   .wheel::-webkit-scrollbar { display:none; }
   .wheel-item { height:44px; line-height:44px; text-align:center; scroll-snap-align:center; color:#7d7189; font-size:0.95rem; cursor:pointer; user-select:none; }
@@ -219,6 +218,15 @@
         <select id="moodSel"></select>
         <textarea id="moodNote"></textarea>
         <select id="transSel"><option value="cut">cut</option><option value="fade">fade</option></select>
+      </div>
+    </div>
+
+    <!-- 선택 팝업: 화면 구성/목소리/분위기 등을 굴려서 고름 -->
+    <div class="cap-modal" id="pickModal">
+      <div class="cap-modal-box" style="max-width:280px;">
+        <div class="cap-modal-hint" id="pickTitle" style="font-size:0.85rem;font-weight:700;color:#fff;"></div>
+        <div id="pickHost"></div>
+        <button type="button" id="pickClose" style="margin-top:10px;">완료</button>
       </div>
     </div>
 
@@ -420,12 +428,12 @@
   function closeWheel() {
     if (!openWheel) return;
     openWheel.wrap.remove();
-    openWheel.tok.classList.remove("on");
     openWheel = null;
+    $("pickModal").classList.remove("open");
   }
+  const WHEEL_TITLES = { layout: "화면 구성", voice: "목소리", rate: "말하기 속도", pitch: "목소리 높낮이", bgmVol: "배경음악 볼륨", mood: "영상 분위기", trans: "화면 전환" };
   function openWheelFor(tok) {
     const key = tok.dataset.wheel;
-    if (openWheel && openWheel.key === key) { closeWheel(); return; }
     closeWheel();
     const cfg = WHEELS[key];
     const ctl = $(cfg.ctl);
@@ -439,9 +447,10 @@
     const wrap = document.createElement("div");
     wrap.className = "wheel-wrap";
     wrap.innerHTML = `<div class="wheel">${opts.map((o, i) => `<div class="wheel-item" data-i="${i}">${escapeHtml(o[1])}</div>`).join("")}</div><div class="wheel-band"></div>`;
-    tok.closest(".sr").after(wrap);
-    tok.classList.add("on");
+    $("pickHost").appendChild(wrap);
+    $("pickTitle").textContent = WHEEL_TITLES[key] || "";
     openWheel = { key, tok, wrap };
+    $("pickModal").classList.add("open"); // 보이게 한 뒤에 스크롤 위치를 맞춘다
     const wheel = wrap.querySelector(".wheel");
     const mark = (i) => wheel.querySelectorAll(".wheel-item").forEach((el, n) => el.classList.toggle("sel", n === i));
     mark(idx);
@@ -597,10 +606,8 @@
   [["srName", "convName"], ["srT1", "title1"], ["srT2", "title2"], ["srSrc", "sourceText"], ["srMoodNote", "moodNote"]].forEach(([sr, ctl]) => {
     $(sr).addEventListener("input", () => { $(ctl).value = $(sr).value; fireCtl($(ctl)); });
   });
-  // 바깥을 누르면 열린 휠을 닫는다
-  document.addEventListener("click", (e) => {
-    if (openWheel && !e.target.closest(".wheel-wrap") && !e.target.closest(".tok[data-wheel]")) closeWheel();
-  });
+  $("pickClose").addEventListener("click", closeWheel);
+  $("pickModal").addEventListener("click", (e) => { if (e.target === $("pickModal")) closeWheel(); });
 
   function updateSettingsPreview() {
     const size = Number($("capSize").value);
