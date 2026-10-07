@@ -14,6 +14,7 @@
   .seg-item { border:2px solid transparent; }
   .seg-item:focus-within { border-color:#7cff4a; }
   .seg-item .seg-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .seg-opinion-badge { background:#ffd93d; color:#0f0a14; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; flex-shrink:0; }
   .seg-item .seg-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .seg-duration { display:flex; align-items:center; gap:6px; font-size:0.8rem; color:#a89bb5; }
   .seg-duration-display { font-weight:700; color:#ffffff; }
@@ -791,6 +792,7 @@
       <div class="card-box seg-item" data-id="${seg.id}" tabindex="0">
         <div class="seg-head">
           <div class="seg-no">${seg.order_no}</div>
+          ${/내 의견/.test(seg.section || '') ? '<span class="seg-opinion-badge">내 의견</span>' : ''}
           <div class="seg-duration">
             <span class="seg-duration-display"></span>
             <input type="number" class="seg-duration-input" step="0.1" min="0" style="display:none;">
