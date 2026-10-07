@@ -51,6 +51,14 @@
   .cap-lines { position:absolute; left:4px; right:4px; bottom:35px; text-align:center; line-height:1.25; }
   .cap-normal { font-family:'IBM Plex Sans KR',sans-serif; font-weight:300; color:#fff; text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000; }
   .cap-emph { font-family:'Black Han Sans',sans-serif; color:#ffff00; margin-top:6px; text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000; }
+  /* 미리보기는 영상 1080x1920을 0.25배(270x480)로 그린 것. 제목/출처/영상 영역 위치는 영상 쪽 값과 같은 비율 */
+  .cap-media { display:none; position:absolute; left:0; right:0; top:105px; height:275px; background:#222 center/cover no-repeat; }
+  .cap-t1, .cap-t2, .cap-src { display:none; position:absolute; left:4px; right:4px; text-align:center; line-height:1.2; }
+  .cap-t1, .cap-t2 { font-family:'Black Han Sans',sans-serif; font-size:23px; text-shadow:-1.5px -1.5px 0 #000,1.5px -1.5px 0 #000,-1.5px 1.5px 0 #000,1.5px 1.5px 0 #000; }
+  .cap-t1 { top:30px; color:#ffff00; }
+  .cap-t2 { top:61px; color:#fff; }
+  .cap-src { bottom:75px; font-size:11.5px; color:#d0d0d0; font-family:'IBM Plex Sans KR',sans-serif; font-weight:300; }
+  .cap-lines { z-index:2; }
   .bgm-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
   .bgm-row audio { flex:1; height:32px; min-width:0; }
   .bgm-row button { width:auto; padding:4px 10px; font-size:0.7rem; margin:0; flex-shrink:0; }
@@ -86,6 +94,20 @@
       <label>콘티 이름 (영상 제목에 "이름 v1, v2…"로 붙습니다)</label>
       <input type="text" id="convName" placeholder="예: 폐건물 극장식 레스토랑">
 
+      <label>화면 구성</label>
+      <select id="layoutSel">
+        <option value="full">전체 화면 (영상이 화면 전체)</option>
+        <option value="framed">제목 + 영상 + 출처 (위 제목 2줄 / 가운데 영상 / 아래 출처)</option>
+      </select>
+      <div id="framedFields" style="display:none;">
+        <label>제목 1줄 (노란색, 한 줄에 10자 안팎)</label>
+        <input type="text" id="title1" maxlength="20" placeholder="예: 직업이 많다는 김민">
+        <label>제목 2줄 (흰색)</label>
+        <input type="text" id="title2" maxlength="20" placeholder="예: 배우 말고 또 하는 일">
+        <label>출처 문구 (영상 아래 작은 글씨)</label>
+        <input type="text" id="sourceText" maxlength="60" placeholder="예: 출처: 〇〇〇">
+      </div>
+
       <label>자막 크기 <b id="capSizeVal"></b></label>
       <input type="range" id="capSize" min="40" max="140" step="2">
       <label>자막 굵기 <b id="capWeightVal"></b></label>
@@ -93,6 +115,10 @@
       <label>자막 위치 <b id="capPosVal"></b> <span style="font-weight:400;">(화면 아래에서 띄우는 높이)</span></label>
       <input type="range" id="capPos" min="3" max="70" step="1">
       <div class="cap-preview" id="capPreview">
+        <div class="cap-media" id="capMedia"></div>
+        <div class="cap-t1" id="capT1"></div>
+        <div class="cap-t2" id="capT2"></div>
+        <div class="cap-src" id="capSrc"></div>
         <div class="cap-lines" id="capLines">
           <div class="cap-normal" id="capNormal">일반 자막은 이렇게 보여요</div>
           <div class="cap-emph" id="capEmph">강조 123억</div>
@@ -246,6 +272,7 @@
     caption_font_size: 80, bgm_path: null, bgm_volume: 0.15, mood: "neutral", mood_note: "", transition: "cut",
     tts_voice: "ko-KR-InJoonNeural", tts_rate: -3, tts_pitch: -5, name: "",
     caption_weight: 0, caption_position_pct: 7,
+    layout: "full", title1: "", title2: "", source_text: "",
   };
   // 폰트 두께 단계 (영상 쪽 02_tts.py의 WEIGHT_FONTS와 같은 순서)
   const WEIGHTS = [
@@ -288,7 +315,16 @@
     $("capPosVal").textContent = pos + "%";
     $("capLines").style.bottom = (pos / 100 * 480) + "px";
     const firstImg = segments[0] && (segments[0].asset_paths || []).find((p) => isImage(p));
-    $("capPreview").style.backgroundImage = firstImg ? `url("${assetUrl(firstImg)}")` : "none";
+    const bg = firstImg ? `url("${assetUrl(firstImg)}")` : "none";
+    const framed = $("layoutSel").value === "framed";
+    $("framedFields").style.display = framed ? "block" : "none";
+    $("capMedia").style.display = framed ? "block" : "none";
+    $("capMedia").style.backgroundImage = bg;
+    $("capPreview").style.backgroundImage = framed ? "none" : bg;
+    [["capT1", "title1"], ["capT2", "title2"], ["capSrc", "sourceText"]].forEach(([el, input]) => {
+      $(el).style.display = framed && $(input).value.trim() ? "block" : "none";
+      $(el).textContent = $(input).value;
+    });
   }
 
   function renderBgm() {
@@ -314,6 +350,10 @@
     currentSettings.name = currentSettings.name || (row.hook || "").slice(0, 20);
     $("convName").value = currentSettings.name;
     $("capSize").value = currentSettings.caption_font_size;
+    $("layoutSel").value = currentSettings.layout;
+    $("title1").value = currentSettings.title1 || "";
+    $("title2").value = currentSettings.title2 || "";
+    $("sourceText").value = currentSettings.source_text || "";
     $("capWeight").value = currentSettings.caption_weight;
     $("capPos").value = currentSettings.caption_position_pct;
     $("bgmVol").value = Math.round(currentSettings.bgm_volume * 100);
@@ -415,6 +455,22 @@
     currentSettings.caption_font_size = Number($("capSize").value);
     updateSettingsPreview();
     markSettingsDirty();
+  });
+  $("layoutSel").addEventListener("change", () => {
+    currentSettings.layout = $("layoutSel").value;
+    // 제목+영상+출처 구성에서는 자막이 영상 영역 아래쪽 안에 오도록 기본 위치를 같이 바꿔준다
+    if (currentSettings.layout === "framed" && Number($("capPos").value) === 7) $("capPos").value = 22;
+    if (currentSettings.layout === "full" && Number($("capPos").value) === 22) $("capPos").value = 7;
+    currentSettings.caption_position_pct = Number($("capPos").value);
+    updateSettingsPreview();
+    markSettingsDirty();
+  });
+  [["title1", "title1"], ["title2", "title2"], ["sourceText", "source_text"]].forEach(([id, key]) => {
+    $(id).addEventListener("input", () => {
+      currentSettings[key] = $(id).value;
+      updateSettingsPreview();
+      markSettingsDirty();
+    });
   });
   $("capWeight").addEventListener("input", () => {
     currentSettings.caption_weight = Number($("capWeight").value);
