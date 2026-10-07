@@ -24,24 +24,51 @@ function isAllowedUrl(u) {
   }
 }
 
-// 기사 본문에서 문단 텍스트만 대충 뽑는다 (사실 확인용 참고 자료. 실패하면 제목만 쓴다)
-async function fetchArticleText(url) {
-  if (!isAllowedUrl(url)) return "";
+// 기사 페이지의 대표 사진(og:image)과 본문 속 사진(figure)을 찾는다. 아이콘/로고/광고로 보이는 건 거른다.
+function extractImages(rawHtml, pageUrl) {
+  const found = [];
+  const add = (src, caption) => {
+    try {
+      const u = new URL(decode(src), pageUrl).href;
+      if (!/^https?:/.test(u)) return;
+      if (/\.(svg|gif)(\?|$)/i.test(u)) return;
+      if (/logo|icon|sprite|banner|btn|button|\/ads?[\/_-]|profile|avatar|blank|pixel|emoticon/i.test(u)) return;
+      if (found.some((f) => f.url === u)) return;
+      found.push({ url: u, caption: decode(String(caption || "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 120) });
+    } catch { /* 잘못된 주소는 무시 */ }
+  };
+  const og = rawHtml.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || rawHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (og) add(og[1]);
+  const body = rawHtml.match(/<article[\s\S]*?<\/article>/i)?.[0] || rawHtml;
+  for (const m of body.matchAll(/<figure[\s\S]*?<\/figure>/gi)) {
+    const img = m[0].match(/<img[^>]+(?:data-src|src)=["']([^"']+)["']/i);
+    const cap = m[0].match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i);
+    if (img) add(img[1], cap ? cap[1] : "");
+  }
+  return found.slice(0, 3);
+}
+
+// 기사 본문에서 문단 텍스트와 사진 주소를 뽑는다 (본문은 사실 확인용 참고 자료. 실패하면 제목만 쓴다)
+async function fetchArticle(url) {
+  const empty = { text: "", images: [] };
+  if (!isAllowedUrl(url)) return empty;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 6000);
   try {
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: ctrl.signal, redirect: "follow" });
-    if (!res.ok) return "";
-    let html = await res.text();
-    html = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
+    if (!res.ok) return empty;
+    const raw = await res.text();
+    const images = extractImages(raw, res.url || url);
+    let html = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
     const article = html.match(/<article[\s\S]*?<\/article>/i);
     if (article) html = article[0];
     const paras = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
       .map((m) => decode(m[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim())
       .filter((p) => p.length > 30);
-    return paras.join("\n").slice(0, 1800);
+    return { text: paras.join("\n").slice(0, 1800), images };
   } catch {
-    return "";
+    return empty;
   } finally {
     clearTimeout(timer);
   }
@@ -86,8 +113,8 @@ export async function onRequestPost(context) {
     const picked = (Array.isArray(articles) ? articles : []).slice(0, 3).map((a) => ({
       title: String(a.title || "").slice(0, 200), url: String(a.url || ""), source: String(a.source || "").slice(0, 60),
     }));
-    const texts = await Promise.all(picked.map((a) => fetchArticleText(a.url)));
-    picked.forEach((a, i) => { a.text = texts[i]; });
+    const fetched = await Promise.all(picked.map((a) => fetchArticle(a.url)));
+    picked.forEach((a, i) => { a.text = fetched[i].text; a.images = fetched[i].images; });
 
     const requestBody = JSON.stringify({
       contents: [{ parts: [{ text: buildPrompt(String(topic).trim().slice(0, 100), picked) }] }],
@@ -145,6 +172,10 @@ export async function onRequestPost(context) {
     const parsed = JSON.parse(text);
     if (!parsed.segments || !parsed.segments.length) return json({ error: "장면이 만들어지지 않았습니다. 다시 시도해주세요" }, 502);
     parsed.usedArticles = picked.map((a) => ({ title: a.title, url: a.url, source: a.source, hadText: !!a.text }));
+    // 기사에서 찾은 사진 후보 (저작권 확인은 사용자가 콘티에서 직접 한다)
+    parsed.images = picked.flatMap((a) => a.images.map((img) => ({
+      url: img.url, caption: img.caption, source: a.source, articleUrl: a.url, articleTitle: a.title,
+    })));
     return json(parsed, 200);
   } catch (err) {
     return json({ error: err.message }, 500);
