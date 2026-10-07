@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trend — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .t-item { display:block; }
+  .t-top { display:flex; align-items:center; gap:10px; }
+  .t-rank { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.85rem; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .t-title { font-weight:800; font-size:1.05rem; flex:1; color:#fff; text-decoration:none; word-break:keep-all; }
+  .t-meta { color:#a89bb5; font-size:0.78rem; margin:6px 0 0 38px; }
+  .t-meta b { color:#ffd93d; }
+  .t-news { margin:8px 0 0 38px; padding:0; list-style:none; }
+  .t-news li { font-size:0.8rem; margin-bottom:4px; line-height:1.35; }
+  .t-news a { color:#cfc6d8; text-decoration:none; }
+  .t-news a:hover { color:#7cff4a; }
+  .t-news .src { color:#a89bb5; }
+  .t-first { border:2px solid #7cff4a; }
+  .t-first .t-title { font-size:1.25rem; color:#7cff4a; }
+  .t-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px; }
+  .t-head button { width:auto; padding:6px 14px; font-size:0.8rem; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
+    <div class="t-head">
+      <h1 style="font-size:1.4rem;margin:0;">Trend</h1>
+      <button type="button" id="refreshBtn">새로고침</button>
+    </div>
+    <p class="role" style="text-align:left;margin-bottom:1rem;">구글 트렌드에서 한국의 지금 급상승 검색어를 검색량 높은 순으로 보여줍니다. 제목을 누르면 구글 검색으로 이동합니다.</p>
+    <div class="msg" id="msg"></div>
+    <div id="meta" style="color:#a89bb5;font-size:0.78rem;margin-bottom:10px;"></div>
+    <div id="list"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+<script>
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+  function safeUrl(u) {
+    return /^https?:\/\//.test(u) ? u : "#";
+  }
+  function timeAgo(dateStr) {
+    const t = Date.parse(dateStr);
+    if (!t) return "";
+    const min = Math.max(0, Math.round((Date.now() - t) / 60000));
+    if (min < 60) return `${min}분 전부터`;
+    if (min < 60 * 24) return `${Math.floor(min / 60)}시간 전부터`;
+    return `${Math.floor(min / 1440)}일 전부터`;
+  }
+
+  async function load() {
+    const list = document.getElementById("list");
+    const btn = document.getElementById("refreshBtn");
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/trends?geo=KR");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "불러오기 실패");
+      document.getElementById("msg").className = "msg";
+      document.getElementById("meta").textContent =
+        `대한민국 · ${data.items.length}개 · ${new Date(data.fetchedAt).toLocaleTimeString("ko-KR")} 기준`;
+
+      if (!data.items.length) {
+        list.innerHTML = '<div class="empty">지금 표시할 검색어가 없습니다.</div>';
+        return;
+      }
+      list.innerHTML = data.items.map((it) => `
+        <div class="card-box t-item ${it.rank === 1 ? "t-first" : ""}">
+          <div class="t-top">
+            <div class="t-rank">${it.rank}</div>
+            <a class="t-title" href="https://www.google.com/search?q=${encodeURIComponent(it.title)}" target="_blank" rel="noopener">${escapeHtml(it.title)}</a>
+          </div>
+          <div class="t-meta"><b>${escapeHtml(it.traffic || "-")}</b> 검색 · ${escapeHtml(timeAgo(it.pubDate))}</div>
+          ${it.news.length ? `<ul class="t-news">${it.news.map((n) => `
+            <li><a href="${escapeHtml(safeUrl(n.url))}" target="_blank" rel="noopener">${escapeHtml(n.title)}</a>
+              <span class="src">— ${escapeHtml(n.source)}</span></li>`).join("")}</ul>` : ""}
+        </div>
+      `).join("");
+    } catch (err) {
+      const msg = document.getElementById("msg");
+      msg.className = "msg err";
+      msg.textContent = "트렌드를 불러오지 못했습니다: " + err.message;
+      list.innerHTML = "";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById("refreshBtn").addEventListener("click", load);
+  load();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>
