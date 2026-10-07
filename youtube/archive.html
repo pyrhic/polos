@@ -34,6 +34,7 @@
     <div id="list"><div class="empty">불러오는 중...</div></div>
   </div>
 
+<script src="/youtube/upload.js"></script>
 <script>
   const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
@@ -101,6 +102,7 @@
             </div>
             <video controls preload="none" src="${o.video_url}"></video>
             <a class="link-btn" style="margin-top:8px;" href="${downloadUrl(o.video_url, videoName(r), o.version)}" download>다운로드</a>
+            ${uploadBlockHtml(o, r)}
           </div>
         `).join("")}
       </div>
@@ -110,6 +112,8 @@
     document.querySelectorAll(".out-del-btn").forEach((btn) =>
       btn.addEventListener("click", () => deleteOutput(btn.dataset.id, btn.dataset.path, btn.dataset.version))
     );
+    bindUploadBlocks(load);
+    if (ytAnyUploading(outputsByScript)) ytSchedulePoll(load);
   }
 
   async function deleteOutput(id, path, version) {

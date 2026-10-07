@@ -26,11 +26,11 @@
     <div id="list"><div class="empty">불러오는 중...</div></div>
   </div>
 
+<script src="/youtube/upload.js"></script>
 <script>
   const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
   const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
-  let pollTimer = null;
 
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -167,6 +167,7 @@ ${body}
               </div>
               <video controls preload="none" src="${o.video_url}"></video>
               <a class="link-btn" style="margin-top:8px;" href="${downloadUrl(o.video_url, videoName(r), o.version)}" download>다운로드</a>
+              ${uploadBlockHtml(o, r)}
             </div>
           `).join("")}
         </div>
@@ -184,9 +185,10 @@ ${body}
       btn.addEventListener("click", () => deleteOutput(btn.dataset.id, btn.dataset.path, btn.dataset.version))
     );
 
-    if (rows.some((r) => r.generation_status === "running")) {
-      clearTimeout(pollTimer);
-      pollTimer = setTimeout(load, 8000);
+    bindUploadBlocks(load);
+
+    if (rows.some((r) => r.generation_status === "running") || ytAnyUploading(outputsByScript)) {
+      ytSchedulePoll(load);
     }
   }
 
