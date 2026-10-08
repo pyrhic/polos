@@ -1,3 +1,5 @@
+import { fetchArticle } from "../_lib/article.js";
+
 // Trend에서 고른 주제 + 관련 기사로 대본과 장면(콘티)을 만든다.
 // 1) 구글 검색으로 배경·관점 조사  2) 기사 + 조사 자료로 대본/장면 작성 (제미나이 2회 호출, 하루 20회 무료 쿼터 공유)
 const CLICHES = [
@@ -8,71 +10,6 @@ const CLICHES = [
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status, headers: { "Content-Type": "application/json" },
 });
-
-const decode = (s) => String(s || "")
-  .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
-  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
-
-function isAllowedUrl(u) {
-  try {
-    const url = new URL(u);
-    if (!/^https?:$/.test(url.protocol)) return false;
-    const h = url.hostname;
-    return !(h === "localhost" || /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(":") || h.endsWith(".local") || h.endsWith(".internal"));
-  } catch {
-    return false;
-  }
-}
-
-// 기사 페이지의 대표 사진(og:image)과 본문 속 사진(figure)을 찾는다. 아이콘/로고/광고로 보이는 건 거른다.
-function extractImages(rawHtml, pageUrl) {
-  const found = [];
-  const add = (src, caption) => {
-    try {
-      const u = new URL(decode(src), pageUrl).href;
-      if (!/^https?:/.test(u)) return;
-      if (/\.(svg|gif)(\?|$)/i.test(u)) return;
-      if (/logo|icon|sprite|banner|btn|button|\/ads?[\/_-]|profile|avatar|blank|pixel|emoticon/i.test(u)) return;
-      if (found.some((f) => f.url === u)) return;
-      found.push({ url: u, caption: decode(String(caption || "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 120) });
-    } catch { /* 잘못된 주소는 무시 */ }
-  };
-  const og = rawHtml.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
-    || rawHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-  if (og) add(og[1]);
-  const body = rawHtml.match(/<article[\s\S]*?<\/article>/i)?.[0] || rawHtml;
-  for (const m of body.matchAll(/<figure[\s\S]*?<\/figure>/gi)) {
-    const img = m[0].match(/<img[^>]+(?:data-src|src)=["']([^"']+)["']/i);
-    const cap = m[0].match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i);
-    if (img) add(img[1], cap ? cap[1] : "");
-  }
-  return found.slice(0, 3);
-}
-
-// 기사 본문에서 문단 텍스트와 사진 주소를 뽑는다 (본문은 사실 확인용 참고 자료. 실패하면 제목만 쓴다)
-async function fetchArticle(url) {
-  const empty = { text: "", images: [] };
-  if (!isAllowedUrl(url)) return empty;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 6000);
-  try {
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: ctrl.signal, redirect: "follow" });
-    if (!res.ok) return empty;
-    const raw = await res.text();
-    const images = extractImages(raw, res.url || url);
-    let html = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
-    const article = html.match(/<article[\s\S]*?<\/article>/i);
-    if (article) html = article[0];
-    const paras = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
-      .map((m) => decode(m[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim())
-      .filter((p) => p.length > 30);
-    return { text: paras.join("\n").slice(0, 3500), images };
-  } catch {
-    return empty;
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 const CARD_SCHEMA = {
   type: "OBJECT",
@@ -182,7 +119,7 @@ export async function onRequestPost(context) {
       title: String(a.title || "").slice(0, 200), url: String(a.url || ""), source: String(a.source || "").slice(0, 60),
     }));
     const fetched = await Promise.all(picked.map((a) => fetchArticle(a.url)));
-    picked.forEach((a, i) => { a.text = fetched[i].text; a.images = fetched[i].images; });
+    picked.forEach((a, i) => { a.text = fetched[i].text; a.media = [...fetched[i].images, ...fetched[i].videos]; a.embeds = fetched[i].embeds; });
 
     const researched = await research(apiKey, cleanTopic, picked);
     if (!researched.ok && researched.quotaExceeded) {
@@ -234,9 +171,11 @@ export async function onRequestPost(context) {
     parsed.usedArticles = picked.map((a) => ({ title: a.title, url: a.url, source: a.source, hadText: !!a.text }));
     parsed.research = { ok: researched.ok, sources: researched.sources };
     // 기사에서 찾은 사진 후보 (저작권 확인은 사용자가 콘티에서 직접 한다)
-    parsed.images = picked.flatMap((a) => a.images.map((img) => ({
-      url: img.url, caption: img.caption, source: a.source, articleUrl: a.url, articleTitle: a.title,
+    parsed.images = picked.flatMap((a) => a.media.map((m) => ({
+      type: m.type, url: m.url, caption: m.caption, source: a.source, articleUrl: a.url, articleTitle: a.title,
     })));
+    // 유튜브 등 외부 플레이어 영상은 내려받지 않고 링크만 알려준다
+    parsed.embeds = picked.flatMap((a) => a.embeds.map((link) => ({ link, source: a.source, articleUrl: a.url })));
     return json(parsed, 200);
   } catch (err) {
     return json({ error: err.message }, 500);

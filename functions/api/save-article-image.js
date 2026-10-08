@@ -1,8 +1,9 @@
-// 기사에서 찾은 사진 한 장을 내려받아 Supabase Storage(youtube-assets)에 저장하고 경로를 돌려준다.
+// 기사에서 찾은 사진(또는 mp4/webm 영상) 한 개를 내려받아 Supabase Storage(youtube-assets)에 저장하고 경로를 돌려준다.
 // 저작권 문제가 있는지는 사용자가 콘티에서 사진별 출처를 보고 직접 판단해 삭제한다.
 const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
 const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
 const MIN_BYTES = 8 * 1024; // 아이콘/픽셀 같은 너무 작은 파일은 사진이 아니므로 제외
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
@@ -20,7 +21,8 @@ function isAllowedUrl(u) {
   }
 }
 
-const EXT = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp" };
+const EXT = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm" };
+const TYPE_BY_EXT = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", mp4: "video/mp4", webm: "video/webm" };
 
 export async function onRequestPost(context) {
   try {
@@ -40,12 +42,18 @@ export async function onRequestPost(context) {
       clearTimeout(timer);
     }
     if (!res.ok) return json({ error: `사진을 받을 수 없습니다 (${res.status})` }, 502);
-    const type = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    let type = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!EXT[type]) {
+      // 서버가 형식을 제대로 안 알려주면(octet-stream 등) 주소의 확장자로 판단한다
+      const urlExt = (new URL(url).pathname.match(/\.(\w+)$/) || [])[1]?.toLowerCase();
+      if (TYPE_BY_EXT[urlExt]) type = TYPE_BY_EXT[urlExt];
+    }
     const ext = EXT[type];
-    if (!ext) return json({ error: "지원하지 않는 사진 형식입니다 (" + type + ")" }, 415);
+    if (!ext) return json({ error: "지원하지 않는 형식입니다 (" + type + ")" }, 415);
+    const isVideo = type.startsWith("video/");
 
     const bytes = await res.arrayBuffer();
-    if (bytes.byteLength > MAX_BYTES) return json({ error: "사진이 너무 큽니다" }, 413);
+    if (bytes.byteLength > (isVideo ? MAX_VIDEO_BYTES : MAX_BYTES)) return json({ error: (isVideo ? "영상" : "사진") + "이 너무 큽니다" }, 413);
     if (bytes.byteLength < MIN_BYTES) return json({ error: "너무 작은 이미지라 건너뜁니다" }, 422);
 
     const path = `${scriptId}/seg${segId}_news_${Date.now()}_${Number(n) || 0}.${ext}`;

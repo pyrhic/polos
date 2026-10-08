@@ -155,7 +155,7 @@
         <input type="text" id="draftNote" maxlength="300" placeholder="예: 경제 영향 위주로 / 찬반 입장 균형 있게">
         <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:400;color:#cfc6d8;">
           <input type="checkbox" id="draftImages" checked style="width:auto;margin-top:3px;">
-          <span style="font-size:0.82rem;line-height:1.4;">기사 사진도 장면에 가져오기</span>
+          <span style="font-size:0.82rem;line-height:1.4;">기사 사진·영상도 장면에 가져오기</span>
         </label>
         <button type="button" id="draftBtn">대본 + 콘티 생성</button>
         <div class="msg" id="draftMsg"></div>
@@ -169,6 +169,7 @@
     <div id="regenWrap" style="display:none;margin-top:10px;">
       <button type="button" id="regenBtn">콘티 (다시) 생성</button>
       <button type="button" id="addSegBtn" style="margin-top:8px;background:#221a2e;">+ 장면 추가</button>
+      <button type="button" id="addMediaBtn" style="margin-top:8px;background:#221a2e;">기사 사진·영상 가져오기</button>
     </div>
     <div class="msg" id="msg"></div>
 
@@ -873,41 +874,86 @@
     $("newDraft").scrollIntoView({ block: "start" });
   }
 
-  // 기사 사진을 장면에 돌아가며 나눠 담는다. 출처는 asset_notes에 같이 저장해 장면에서 확인/삭제할 수 있게 한다.
-  async function importArticleImages(scriptId, createdSegs, images, btn) {
+  // 기사 사진/영상을 장면에 돌아가며 나눠 담는다(이미 있는 소재는 그대로 두고 뒤에 추가).
+  // 출처는 asset_notes에 같이 저장해 장면에서 확인/삭제할 수 있게 한다.
+  async function importArticleImages(scriptId, targetSegs, items, btn) {
     const colCheck = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=asset_notes&limit=1`, { headers });
     if (!colCheck.ok) {
-      return " (기사 사진은 건너뜀: 사진 출처를 저장할 asset_notes 컬럼이 없습니다 — youtube_tables_11_asset_notes.sql 실행 필요)";
+      return " (기사 사진·영상은 건너뜀: 출처를 저장할 asset_notes 컬럼이 없습니다 — youtube_tables_11_asset_notes.sql 실행 필요)";
     }
-    const bySeg = new Map(createdSegs.map((s) => [s.id, { paths: [], notes: {} }]));
-    let ok = 0;
-    for (let i = 0; i < images.length; i++) {
-      const img = images[i];
-      const seg = createdSegs[i % createdSegs.length];
-      btn.textContent = `기사 사진 가져오는 중... (${i + 1}/${images.length})`;
+    const bySeg = new Map(targetSegs.map((sg) => [sg.id, { paths: [...(sg.asset_paths || [])], notes: { ...(sg.asset_notes || {}) }, added: 0 }]));
+    const already = new Set(targetSegs.flatMap((sg) => Object.values(sg.asset_notes || {}).map((n) => n && n.origUrl).filter(Boolean)));
+    let ok = 0, videos = 0, skipped = 0;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (already.has(it.url)) { skipped++; continue; }
+      const seg = targetSegs[i % targetSegs.length];
+      btn.textContent = `기사 사진·영상 가져오는 중... (${i + 1}/${items.length})`;
       try {
         const r = await fetch("/api/save-article-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: img.url, referer: img.articleUrl, scriptId: scriptId, segId: seg.id, n: i }),
+          body: JSON.stringify({ url: it.url, referer: it.articleUrl, scriptId: scriptId, segId: seg.id, n: i }),
         });
         const d = await r.json();
         if (!r.ok) continue;
         const entry = bySeg.get(seg.id);
         entry.paths.push(d.path);
-        entry.notes[d.path] = { source: img.source, articleUrl: img.articleUrl, articleTitle: img.articleTitle, caption: img.caption };
+        entry.notes[d.path] = { source: it.source, articleUrl: it.articleUrl, articleTitle: it.articleTitle, caption: it.caption, origUrl: it.url };
+        entry.added++;
         ok++;
-      } catch { /* 한 장 실패해도 나머지는 계속 */ }
+        if (it.type === "video") videos++;
+      } catch { /* 하나 실패해도 나머지는 계속 */ }
     }
     for (const [segId, entry] of bySeg) {
-      if (!entry.paths.length) continue;
+      if (!entry.added) continue;
       const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${segId}`, {
         method: "PATCH", headers: jsonHeaders,
         body: JSON.stringify({ asset_paths: entry.paths, asset_notes: entry.notes }),
       });
-      if (!r.ok) throw new Error("사진 연결 저장 실패: " + await r.text());
+      if (!r.ok) throw new Error("소재 연결 저장 실패: " + await r.text());
     }
-    return ` 기사 사진 ${ok}장을 장면에 가져왔습니다 — 저작권 확인 후 문제 있는 사진은 × 로 삭제하세요.`;
+    if (!ok) return skipped ? " (새로 가져올 사진·영상이 없습니다 — 이미 다 가져왔어요)" : " (기사 사진·영상을 가져오지 못했습니다)";
+    return ` 기사 사진 ${ok - videos}장${videos ? `, 영상 ${videos}개` : ""}를 장면에 가져왔습니다 — 저작권 확인 후 문제 있는 건 × 로 삭제하세요.`;
+  }
+
+  function embedNote(embeds) {
+    if (!embeds || !embeds.length) return "";
+    return ` 기사 속 유튜브 영상 ${embeds.length}개는 내려받지 않고 링크만 알려요: ${embeds.map((e) => e.link).join(" , ")}`;
+  }
+
+  // 이미 만든 콘티에도 기사 사진/영상을 가져올 수 있게: 콘티에 저장된 기사 주소(fact_sources)에서 찾는다
+  async function addArticleMedia() {
+    const scriptId = $("scriptSelect").value;
+    const row = scripts.find((r) => String(r.id) === String(scriptId));
+    if (!row || !segments.length) return;
+    if (hasDirty() && !confirm("저장 안 한 수정사항이 있습니다. 가져온 뒤 화면이 새로고침되어 사라집니다. 계속할까요?")) return;
+    const urls = (row.fact_sources || "").split("\n").map((l) => l.trim()).filter((l) => /^https?:\/\/\S+$/.test(l));
+    if (!urls.length) { showMsg("이 콘티에 저장된 기사 주소가 없습니다.", false); return; }
+    const btn = $("addMediaBtn");
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = "기사에서 사진·영상 찾는 중...";
+    try {
+      const res = await fetch("/api/article-media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articles: urls.map((u) => ({ url: u, source: new URL(u).hostname.replace(/^www\./, "") })) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "찾기 실패");
+      const items = [...data.media.filter((m) => m.type === "image").slice(0, 8), ...data.media.filter((m) => m.type === "video").slice(0, 3)];
+      let text = "";
+      if (items.length) text = await importArticleImages(Number(scriptId), segments, items, btn);
+      else text = " 기사에서 가져올 수 있는 사진·영상을 찾지 못했습니다.";
+      showMsg(text.trim() + embedNote(data.embeds), true);
+      await refreshSegments(scriptId);
+    } catch (err) {
+      showMsg("기사 사진·영상 가져오기 실패: " + err.message, false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   }
 
   async function createDraft() {
@@ -964,9 +1010,10 @@
 
       let imageNote = "";
       if ($("draftImages").checked && (data.images || []).length) {
-        imageNote = await importArticleImages(created.id, createdSegs, data.images.slice(0, 8), btn);
+        imageNote = await importArticleImages(created.id, createdSegs, [...data.images.filter((m) => m.type !== "video").slice(0, 8), ...data.images.filter((m) => m.type === "video").slice(0, 3)], btn);
       }
 
+      imageNote += embedNote(data.embeds);
       const researchNote = data.research && data.research.ok
         ? ` 관점 자료는 구글 검색 출처 ${data.research.sources.length}건을 참고했습니다.`
         : " 검색 조사에 실패해 관점 정리 없이 기사 중심으로 썼습니다.";
@@ -1439,6 +1486,8 @@
       e.returnValue = "";
     }
   });
+
+  $("addMediaBtn").addEventListener("click", addArticleMedia);
 
   document.getElementById("addSegBtn").addEventListener("click", async () => {
     const scriptId = document.getElementById("scriptSelect").value;
