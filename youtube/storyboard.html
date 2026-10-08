@@ -13,7 +13,13 @@
 <style>
   .seg-item { border:2px solid transparent; }
   .seg-item:focus-within { border-color:#7cff4a; }
-  .seg-item .seg-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .seg-item .seg-head { display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px; margin-bottom:10px; }
+  .seg-item .seg-duration { margin-left:auto; flex-shrink:0; }
+  .seg-duration-edit, .seg-duration-save { white-space:nowrap; }
+  .seg-group { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:22px 2px 8px; padding-bottom:5px; border-bottom:1px solid #3a2f14; font-weight:800; color:#7cff4a; font-size:0.95rem; }
+  .seg-group:first-child { margin-top:4px; }
+  .seg-group .cnt { color:#a89bb5; font-weight:600; font-size:0.78rem; white-space:nowrap; }
+  .seg-part { width:auto; margin:0; padding:3px 6px; font-size:0.72rem; border-radius:10px; flex-shrink:0; }
   .seg-opinion-badge { background:#ffd93d; color:#0f0a14; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; flex-shrink:0; }
   .seg-item .seg-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .seg-duration { display:flex; align-items:center; gap:6px; font-size:0.8rem; color:#a89bb5; }
@@ -362,6 +368,7 @@
     });
 
     box.style.display = "block";
+    refreshGroupHeaders();
     box.innerHTML = `전체 예상 길이: 약 ${total.toFixed(1)}초 (${(total / 60).toFixed(1)}분)` +
       `<span class="note">대사 기준 추정치이며, 실제 음성 속도에 따라 달라질 수 있습니다. 장면 번호 옆 "수정"으로 노출 시간을 직접 바꿀 수 있어요.</span>`;
   }
@@ -995,6 +1002,41 @@
     updateSettingsPreview();
   }
 
+  // 장면 구분(대본 구조). section 칸에 구분 이름을 저장하고, 옛 콘티의 "트렌드 요약 (설명)" 같은 값은 앞부분으로 묶어 본다.
+  const PARTS = ["트렌드 요약", "이슈 설명", "관점 정리", "내 의견", "마무리"];
+  function partOf(section) {
+    const t = (section || "").trim();
+    return PARTS.find((k) => t.includes(k)) || t;
+  }
+  function partOptionsHtml(section) {
+    const cur = partOf(section);
+    const list = PARTS.includes(cur) || !cur ? PARTS : [...PARTS, cur];
+    return `<option value="">구분 없음</option>` + list.map((k) => `<option value="${escapeAttr(k)}"${k === cur ? " selected" : ""}>${escapeHtml(k)}</option>`).join("");
+  }
+
+  // 이어지는 같은 구분의 카드들을 묶어서 "트렌드 요약 · 카드 2개 · 약 14초" 머리글을 카드 사이에 넣는다
+  function refreshGroupHeaders() {
+    const list = document.getElementById("segList");
+    list.querySelectorAll(".seg-group").forEach((el) => el.remove());
+    let prev = null, run = [];
+    const flush = () => {
+      if (!run.length || !prev) { run = []; return; }
+      const secs = run.reduce((sum, el) => sum + effectiveSeconds(el, segments.find((x) => String(x.id) === el.dataset.id)), 0);
+      const h = document.createElement("div");
+      h.className = "seg-group";
+      h.innerHTML = `<span>${escapeHtml(prev)}</span><span class="cnt">카드 ${run.length}개 · 약 ${secs.toFixed(0)}초</span>`;
+      run[0].before(h);
+      run = [];
+    };
+    list.querySelectorAll(".seg-item").forEach((el) => {
+      const part = partOf(el.querySelector(".seg-section").value);
+      el.querySelector(".seg-opinion-badge").style.display = part === "내 의견" ? "inline-block" : "none";
+      if (part !== prev) { flush(); prev = part; }
+      run.push(el);
+    });
+    flush();
+  }
+
   function render() {
     const list = document.getElementById("segList");
     if (!segments.length) {
@@ -1006,7 +1048,8 @@
       <div class="card-box seg-item" data-id="${seg.id}" tabindex="0">
         <div class="seg-head">
           <div class="seg-no">${seg.order_no}</div>
-          ${/내 의견/.test(seg.section || '') ? '<span class="seg-opinion-badge">내 의견</span>' : ''}
+          <select class="seg-part">${partOptionsHtml(seg.section)}</select>
+          <span class="seg-opinion-badge" style="display:${partOf(seg.section) === "내 의견" ? "inline-block" : "none"};">내 의견</span>
           <div class="seg-duration">
             <span class="seg-duration-display"></span>
             <input type="number" class="seg-duration-input" step="0.1" min="0" style="display:none;">
@@ -1072,7 +1115,11 @@
       const directionEl = el.querySelector(".seg-direction");
       directionEl.addEventListener("input", () => { autoGrow(directionEl); markDirty(); });
       autoGrow(directionEl);
-      el.querySelector(".seg-section").addEventListener("input", markDirty);
+      el.querySelector(".seg-part").addEventListener("change", (e) => {
+        el.querySelector(".seg-section").value = e.target.value;
+        markDirty();
+        refreshGroupHeaders();
+      });
       const keywordEl = el.querySelector(".seg-keyword");
       const previewBox = el.querySelector(".seg-pexels-preview");
       keywordEl.addEventListener("input", markDirty);
@@ -1244,10 +1291,7 @@
       const seg = segments.find((s) => String(s.id) === id);
       if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
       btn.classList.remove("dirty");
-      btn.textContent = "전체 설정 저장";
-      settingsJustSaved = true;
-      setTimeout(() => { settingsJustSaved = false; updateSettingsSummary(); }, 1800);
-      updateSettingsSummary();
+      btn.textContent = "저장됨 ✓";
       setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "저장"; }, 1500);
     } catch (err) {
       showMsg("저장 실패: " + err.message, false);
@@ -1305,6 +1349,7 @@
     scriptEl.value = seg.script_text || "";
     directionEl.value = seg.direction || "";
     el.querySelector(".seg-section").value = seg.section || "";
+    el.querySelector(".seg-part").innerHTML = partOptionsHtml(seg.section);
     el.querySelector(".seg-keyword").value = seg.keyword || "";
     autoGrow(scriptEl);
     autoGrow(directionEl);
