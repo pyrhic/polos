@@ -1087,7 +1087,17 @@
     flush();
   }
 
+  // 옛 콘티용 보충 버튼들: 이미 기사 사진을 가져왔거나(또는 기사 주소가 없거나), 이미 내 의견 카드가 있으면 숨긴다
+  function updateHelperButtons() {
+    const row = scripts.find((r) => String($("scriptSelect").value) === String(r.id));
+    const hasArticleUrls = !!row && (row.fact_sources || "").split("\n").some((l) => /^https?:\/\/\S+$/.test(l.trim()));
+    const hasNewsMedia = segments.some((sg) => Object.keys(sg.asset_notes || {}).length > 0);
+    $("addMediaBtn").style.display = hasArticleUrls && !hasNewsMedia && segments.length ? "block" : "none";
+    $("addOpinionBtn").style.display = segments.some((sg) => partOf(sg.section) === "내 의견") ? "none" : "block";
+  }
+
   function render() {
+    updateHelperButtons();
     const list = document.getElementById("segList");
     if (!segments.length) {
       list.innerHTML = '<div class="empty">아직 콘티가 없습니다. 위 "콘티 생성" 버튼을 눌러주세요.</div>';
