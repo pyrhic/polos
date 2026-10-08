@@ -55,6 +55,8 @@ function genBuildSegments(segRows) {
     direction: s.direction,
     weight_seconds: s.target_seconds > 0 ? Number(s.target_seconds) : genEstimateSeconds(s.script_text),
     asset_urls: (s.asset_paths || []).map(genAssetUrl),
+    // 영상/GIF 소재별 사용 구간 (소재 주소 -> {start, end})
+    asset_trims: Object.fromEntries(Object.entries(s.asset_trims || {}).map(([path, t]) => [genAssetUrl(path), t])),
   }));
 }
 
