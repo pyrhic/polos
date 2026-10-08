@@ -144,7 +144,7 @@
           ${outputs.map((o) => `
             <div style="margin-top:12px;">
               <div class="s-meta" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                <span>${escapeHtml(videoName(r))} v${o.version}</span>
+                <span>${(((r.video_settings || {}).titles || {})[o.version]) ? `v${o.version} · ${escapeHtml(r.video_settings.titles[o.version])}` : `${escapeHtml(videoName(r))} v${o.version}`}</span>
                 <button type="button" class="out-del-btn" data-id="${o.id}" data-path="${escapeHtml(o.storage_path)}" data-version="${o.version}" style="width:auto;padding:3px 10px;font-size:0.7rem;background:#3a1414;color:#ff8a80;">삭제</button>
               </div>
               <video controls preload="none" src="${o.video_url}"></video>

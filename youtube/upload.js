@@ -21,6 +21,12 @@ function ytReauthHelpHtml() {
   </div>`;
 }
 
+// 롱폼에서 만든 쇼츠는 버전마다 제목이 따로 있다 (video_settings.titles). 없으면 콘티 이름.
+function ytTitleFor(row, o) {
+  const t = ((row.video_settings || {}).titles || {})[o.version];
+  return (t || videoName(row)).slice(0, 100);
+}
+
 function uploadBlockHtml(o, row) {
   if (o.youtube_status === "done" && o.youtube_video_id) {
     return `<div class="yt-block" style="margin-top:8px;font-size:0.85rem;">
@@ -37,7 +43,7 @@ function uploadBlockHtml(o, row) {
     <button type="button" class="yt-open-btn" style="background:#221a2e;">${o.youtube_status === "error" ? "다시 업로드" : "유튜브에 업로드"}</button>
     <div class="yt-form" style="display:none;margin-top:8px;">
       <label>제목 (100자 이내)</label>
-      <input type="text" class="yt-title" maxlength="100" value="${escapeHtml(videoName(row))}">
+      <input type="text" class="yt-title" maxlength="100" value="${escapeHtml(ytTitleFor(row, o))}">
       <label>설명</label>
       <textarea class="yt-desc" style="min-height:140px;">${escapeHtml(ytDefaultDescription(row))}</textarea>
       <label>태그 (콤마로 구분, 선택)</label>
