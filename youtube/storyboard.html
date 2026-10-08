@@ -882,11 +882,13 @@
       return " (기사 사진·영상은 건너뜀: 출처를 저장할 asset_notes 컬럼이 없습니다 — youtube_tables_11_asset_notes.sql 실행 필요)";
     }
     const bySeg = new Map(targetSegs.map((sg) => [sg.id, { paths: [...(sg.asset_paths || [])], notes: { ...(sg.asset_notes || {}) }, added: 0 }]));
-    const already = new Set(targetSegs.flatMap((sg) => Object.values(sg.asset_notes || {}).map((n) => n && n.origUrl).filter(Boolean)));
+    // 같은 사진이 CDN 서버 번호(img1/img4 등)만 달라지는 경우가 있어 번호를 빼고 비교한다
+    const normUrl = (u) => String(u).replace(/^(https?:\/\/[a-z]+)\d+\./i, "$1.");
+    const already = new Set(targetSegs.flatMap((sg) => Object.values(sg.asset_notes || {}).map((n) => n && n.origUrl).filter(Boolean)).map(normUrl));
     let ok = 0, videos = 0, skipped = 0;
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
-      if (already.has(it.url)) { skipped++; continue; }
+      if (already.has(normUrl(it.url))) { skipped++; continue; }
       const seg = targetSegs[i % targetSegs.length];
       btn.textContent = `기사 사진·영상 가져오는 중... (${i + 1}/${items.length})`;
       try {
