@@ -169,6 +169,7 @@
     <div id="regenWrap" style="display:none;margin-top:10px;">
       <button type="button" id="regenBtn">콘티 (다시) 생성</button>
       <button type="button" id="addSegBtn" style="margin-top:8px;background:#221a2e;">+ 장면 추가</button>
+      <button type="button" id="addOpinionBtn" style="margin-top:8px;background:#221a2e;">+ 내 의견 카드 넣기</button>
       <button type="button" id="addMediaBtn" style="margin-top:8px;background:#221a2e;">기사 사진·영상 가져오기</button>
     </div>
     <div class="msg" id="msg"></div>
@@ -1490,6 +1491,39 @@
   });
 
   $("addMediaBtn").addEventListener("click", addArticleMedia);
+
+  // 내 의견 카드를 마무리 카드 바로 앞에 끼워 넣는다 (마무리가 없으면 맨 끝). 뒤 카드들의 번호는 하나씩 밀린다.
+  $("addOpinionBtn").addEventListener("click", async () => {
+    const scriptId = $("scriptSelect").value;
+    if (!scriptId) return;
+    if (segments.some((sg) => partOf(sg.section) === "내 의견")) { showMsg("이미 내 의견 카드가 있습니다.", false); return; }
+    if (hasDirty() && !confirm("저장 안 한 수정사항이 있습니다. 카드를 넣은 뒤 화면이 새로고침되어 사라집니다. 계속할까요?")) return;
+    const sorted = [...segments].sort((a, b) => a.order_no - b.order_no);
+    const at = sorted.findIndex((sg) => partOf(sg.section) === "마무리");
+    const insertAt = at === -1 ? sorted.length + 1 : sorted[at].order_no;
+    try {
+      // 번호 충돌이 없도록 뒤쪽 카드부터 하나씩 민다
+      for (const sg of sorted.filter((x) => x.order_no >= insertAt).reverse()) {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${sg.id}`, {
+          method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ order_no: sg.order_no + 1 }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+      }
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
+        method: "POST", headers: jsonHeaders,
+        body: JSON.stringify({
+          script_id: Number(scriptId), order_no: insertAt, section: "내 의견",
+          script_text: "", keyword: "person thinking window", direction: "천천히 줌인", asset_paths: [],
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showMsg("내 의견 카드를 넣었습니다. 대사를 직접 써 넣으세요.", true);
+      await refreshSegments(scriptId);
+    } catch (err) {
+      showMsg("내 의견 카드 넣기 실패: " + err.message, false);
+      await refreshSegments(scriptId);
+    }
+  });
 
   document.getElementById("addSegBtn").addEventListener("click", async () => {
     const scriptId = document.getElementById("scriptSelect").value;
