@@ -32,3 +32,15 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// 영상 완성 알림을 누르면 Studio 페이지를 연다
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/youtube/review.html";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window" }).then((list) => {
+      for (const c of list) { if (c.url.includes("/youtube/") && "focus" in c) { c.navigate(url); return c.focus(); } }
+      return self.clients.openWindow(url);
+    })
+  );
+});

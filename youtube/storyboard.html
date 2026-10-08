@@ -41,6 +41,9 @@
   .seg-save-btn { margin-top:4px; }
   .seg-save-btn.dirty { background:#3a2f14; color:#ffd93d; }
   .runtime-summary { background:#17141c; border-radius:3px; padding:10px 14px; margin-top:14px; font-size:0.85rem; color:#7cff4a; font-weight:700; }
+  .gen-main-btn { margin-top:10px; background:#7cff4a; color:#0f0a14; padding:12px; font-size:0.95rem; }
+  .gen-main-btn:hover { background:#ffffff; }
+  .gen-main-btn:disabled { background:#16324a; color:#4fc3f7; }
   .runtime-summary .note { color:#a89bb5; font-weight:400; font-size:0.75rem; display:block; margin-top:2px; }
   .seg-pexels-preview { display:none; margin:-4px 0 10px; background:#0f0a14; border-radius:3px; padding:8px; }
   .seg-pexels-preview.open { display:block; }
@@ -257,7 +260,10 @@
       </div>
     </div>
 
-    <div class="runtime-summary" id="runtimeSummary" style="display:none;"></div>
+    <div class="runtime-summary" id="runtimeSummary" style="display:none;">
+      <div id="runtimeText"></div>
+      <button type="button" id="genBtn" class="gen-main-btn">영상 생성</button>
+    </div>
 
     <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
     </div>
@@ -371,7 +377,7 @@
 
     box.style.display = "block";
     refreshGroupHeaders();
-    box.innerHTML = `전체 예상 길이: 약 ${total.toFixed(1)}초 (${(total / 60).toFixed(1)}분)` +
+    $("runtimeText").innerHTML = `전체 예상 길이: 약 ${total.toFixed(1)}초 (${(total / 60).toFixed(1)}분)` +
       `<span class="note">대사 기준 추정치이며, 실제 음성 속도에 따라 달라질 수 있습니다. 장면 번호 옆 "수정"으로 노출 시간을 직접 바꿀 수 있어요.</span>`;
   }
 
@@ -1481,6 +1487,7 @@
     if (inDetail) window.scrollTo(0, 0);
     loadSettingsCard(e.target.value);
     loadSegments(e.target.value);
+    if (inDetail) refreshGenState(e.target.value);
   });
   function openConti(id) {
     const sel = $("scriptSelect");
@@ -1501,6 +1508,61 @@
   });
 
   $("addMediaBtn").addEventListener("click", addArticleMedia);
+
+  // ───── 영상 생성: 시작하면 "생성 중"으로 바뀌고, 끝나면 알림. 완성 영상은 Studio에서 확인 ─────
+  const genWatch = new Map(); // scriptId -> 타이머
+  async function refreshGenState(scriptId) {
+    const btn = $("genBtn");
+    const status = await genFetchStatus(scriptId);
+    if (String($("scriptSelect").value) !== String(scriptId)) return status;
+    if (status === "running") {
+      btn.disabled = true;
+      btn.textContent = "영상 생성 중... (몇 분 걸려요)";
+      watchGeneration(scriptId);
+    } else {
+      btn.disabled = false;
+      btn.textContent = `영상 생성 (v${await genNextVersion(scriptId)})`;
+    }
+    return status;
+  }
+
+  function watchGeneration(scriptId) {
+    if (genWatch.has(String(scriptId))) return;
+    const timer = setInterval(async () => {
+      const status = await genFetchStatus(scriptId);
+      if (status === "running" || status === null) return;
+      clearInterval(timer);
+      genWatch.delete(String(scriptId));
+      const row = scripts.find((r) => String(r.id) === String(scriptId));
+      if (row) row.generation_status = status;
+      const name = row ? ((row.video_settings && row.video_settings.name) || (row.hook || "").slice(0, 20)) : "";
+      genNotify(name, status === "done");
+      if (String($("scriptSelect").value) === String(scriptId)) refreshGenState(scriptId);
+    }, 8000);
+    genWatch.set(String(scriptId), timer);
+  }
+
+  $("genBtn").addEventListener("click", async () => {
+    const scriptId = $("scriptSelect").value;
+    const row = scripts.find((r) => String(r.id) === String(scriptId));
+    if (!row) return;
+    if (hasDirty()) { showMsg("저장 안 한 수정사항이 있습니다. 먼저 저장한 뒤 영상을 생성하세요.", false); return; }
+    const btn = $("genBtn");
+    btn.disabled = true;
+    try {
+      const version = await genNextVersion(scriptId);
+      if (!confirm(`v${version} 영상 생성을 시작할까요? 몇 분 걸리고, 완성되면 알려드립니다. 영상은 Studio에서 확인하세요.`)) { btn.disabled = false; return; }
+      genRequestPermission();
+      await genStart(row, segments, version);
+      row.generation_status = "running";
+      btn.textContent = "영상 생성 중... (몇 분 걸려요)";
+      watchGeneration(scriptId);
+      showMsg("영상 생성을 시작했습니다. 완성되면 알림이 뜹니다.", true);
+    } catch (err) {
+      btn.disabled = false;
+      showMsg("영상 생성 실패: " + err.message, false);
+    }
+  });
 
   // 내 의견 카드를 마무리 카드 바로 앞에 끼워 넣는다 (마무리가 없으면 맨 끝). 뒤 카드들의 번호는 하나씩 밀린다.
   $("addOpinionBtn").addEventListener("click", async () => {
@@ -1633,6 +1695,7 @@
     navigator.serviceWorker.register("/sw.js");
   }
 </script>
+<script src="/youtube/generate.js"></script>
 <script src="/hub-nav.js"></script>
 </body>
 </html>
