@@ -98,10 +98,7 @@ export async function onRequestPost(context) {
     try { perspectives = await findPerspectiveArticles(cleanTopic, picked.map((a) => a.title), 3); } catch { /* 관점 자료 없이 진행 */ }
     const researched = {
       ok: perspectives.length > 0,
-      text: perspectives.map((a, i) => `(${i + 1}) [${a.source}] ${a.title}
-${a.text}`).join("
-
-"),
+      text: perspectives.map((a, i) => `(${i + 1}) [${a.source}] ${a.title}\n${a.text}`).join("\n\n"),
       sources: perspectives.map((a) => ({ title: `${a.source} — ${a.title}`, url: a.url })),
     };
     
