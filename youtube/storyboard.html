@@ -295,6 +295,7 @@
     <div class="runtime-summary" id="runtimeSummary" style="display:none;">
       <div id="runtimeText"></div>
       <button type="button" id="genBtn" class="gen-main-btn">영상 생성</button>
+      <div class="note" id="genNote" style="display:none;color:#ff8a80;"></div>
     </div>
 
     <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
@@ -1678,8 +1679,16 @@
   const genWatch = new Map(); // scriptId -> 타이머
   async function refreshGenState(scriptId) {
     const btn = $("genBtn");
-    const status = await genFetchStatus(scriptId);
+    const info = await genFetchInfo(scriptId);
+    const status = info ? info.status : null;
     if (String($("scriptSelect").value) !== String(scriptId)) return status;
+    const noteEl = $("genNote");
+    if (status === "error") {
+      noteEl.innerHTML = `${escapeHtml(genErrorText(info.lastError))}${info.lastError && info.lastError.url ? ` · <a href="${escapeAttr(info.lastError.url)}" target="_blank" rel="noopener" style="color:#ffd93d;">실행 기록 보기</a>` : ""}<br>버튼을 다시 누르면 재시도합니다 (일시적인 서버 오류는 재시도로 해결되는 경우가 많습니다).`;
+      noteEl.style.display = "block";
+    } else {
+      noteEl.style.display = "none";
+    }
     if (status === "running") {
       btn.disabled = true;
       btn.textContent = "영상 생성 중... (몇 분 걸려요)";

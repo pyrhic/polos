@@ -139,6 +139,7 @@
         <div class="title" style="font-weight:800;margin-bottom:6px;">${escapeHtml(videoName(r) || "(이름 없음)")}</div>
         <div class="s-meta" style="margin-bottom:6px;"><span class="status-tag status-${r.generation_status || "idle"}">${r.generation_status || "idle"}</span></div>
         ${r.generation_status === "running" ? `<div class="s-meta" style="color:#4fc3f7;">영상 생성 중... (몇 분 걸려요. 끝나면 알림이 뜹니다)</div>` : ""}
+        ${r.generation_status === "error" ? `<div class="s-meta" style="color:#ff8a80;">${escapeHtml(genErrorText((r.video_settings || {}).last_error))}${((r.video_settings || {}).last_error || {}).url ? ` · <a class="accent" href="${escapeHtml(r.video_settings.last_error.url)}" target="_blank" rel="noopener">실행 기록 보기</a>` : ""}<br>Scenes에서 영상 생성 버튼을 다시 누르면 재시도합니다.</div>` : ""}
         ${!outputs.length && r.generation_status !== "running" ? '<div class="s-meta">남은 영상이 없습니다.</div>' : ""}
         <div class="video-wrap" id="video-${r.id}">
           ${outputs.map((o) => `

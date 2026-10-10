@@ -68,6 +68,21 @@ async function genNextVersion(scriptId) {
   return (rows[0] ? rows[0].version : 0) + 1;
 }
 
+// 상태와 마지막 실패 정보(어느 단계에서, 언제, 실행 기록 주소)
+async function genFetchInfo(scriptId) {
+  const res = await fetch(`${GEN_SUPABASE_URL}/rest/v1/youtube_scripts?select=generation_status,video_settings&id=eq.${scriptId}`, { headers: genHeaders });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  if (!rows[0]) return null;
+  return { status: rows[0].generation_status || "idle", lastError: (rows[0].video_settings || {}).last_error || null };
+}
+
+function genErrorText(le) {
+  if (!le) return "지난 영상 생성이 실패했습니다.";
+  const when = le.at ? new Date(le.at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" }) : "";
+  return `지난 영상 생성이 실패했습니다 — 실패 단계: ${le.step}${when ? " (" + when + ")" : ""}`;
+}
+
 async function genFetchStatus(scriptId) {
   const res = await fetch(`${GEN_SUPABASE_URL}/rest/v1/youtube_scripts?select=generation_status&id=eq.${scriptId}`, { headers: genHeaders });
   if (!res.ok) return null;
