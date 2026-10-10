@@ -1080,7 +1080,9 @@
       imageNote += embedNote(data.embeds);
       const researchNote = data.research && data.research.ok
         ? ` 관점 자료는 구글 검색 출처 ${data.research.sources.length}건을 참고했습니다.`
-        : " 검색 조사에 실패해 관점 정리 없이 기사 중심으로 썼습니다.";
+        : (data.research && data.research.skipped && data.research.skipped.quota
+          ? " 구글 검색 조사는 한도 문제로 건너뛰어서, 관점 정리 없이 기사 중심으로 썼습니다."
+          : " 검색 조사에 실패해 관점 정리 없이 기사 중심으로 썼습니다.");
       const doneText = `"${data.name}" 콘티가 만들어졌습니다. '내 의견' 장면은 비어 있으니 직접 써 넣으세요.${researchNote}${imageNote}`;
       showDraftMsg(doneText, true);
       showMsg(doneText, true);

@@ -54,7 +54,7 @@ ${titles}
 - 정치적으로 민감하면 어느 한쪽 편을 들지 말고 각 입장을 있는 그대로 전달
 - 간결한 불릿으로`;
   const r = await callGemini(apiKey, { contents: [{ parts: [{ text: prompt }] }], tools: [{ google_search: {} }] });
-  if (!r.ok) return { ok: false, quotaExceeded: r.quotaExceeded, text: "", sources: [] };
+  if (!r.ok) return { ok: false, quotaExceeded: r.quotaExceeded, status: r.status, errText: String(r.errText || "").slice(0, 600), text: "", sources: [] };
   const cand = r.data.candidates?.[0];
   const text = (cand?.content?.parts || []).map((p) => p.text || "").join("").trim();
   const seen = new Set();
@@ -122,9 +122,8 @@ export async function onRequestPost(context) {
     picked.forEach((a, i) => { a.text = fetched[i].text; a.media = [...fetched[i].images, ...fetched[i].videos]; a.embeds = fetched[i].embeds; });
 
     const researched = await research(apiKey, cleanTopic, picked);
-    if (!researched.ok && researched.quotaExceeded) {
-      return json({ error: "제미나이 무료 사용량을 오늘 다 썼습니다 (하루 20회 제한). 내일 다시 시도하세요.", quotaExceeded: true }, 502);
-    }
+    // 검색 조사는 선택 단계다. 여기서 한도/오류가 나도 중단하지 않고, 조사 없이 기사만으로 대본을 쓴다
+    // (구글 검색 연결은 일반 호출과 따로 한도가 걸릴 수 있어서, 이걸 "오늘 다 썼다"로 오인하면 며칠째 아무것도 못 만든다)
 
     const written = await callGemini(apiKey, {
       contents: [{ parts: [{ text: buildPrompt(cleanTopic, picked, researched.text, String(note || "").trim().slice(0, 300), String(traffic || "").slice(0, 20)) }] }],
@@ -169,7 +168,7 @@ export async function onRequestPost(context) {
     delete parsed.trend_summary; delete parsed.issue; delete parsed.perspectives; delete parsed.closing;
 
     parsed.usedArticles = picked.map((a) => ({ title: a.title, url: a.url, source: a.source, hadText: !!a.text }));
-    parsed.research = { ok: researched.ok, sources: researched.sources };
+    parsed.research = { ok: researched.ok, sources: researched.sources, skipped: researched.ok ? null : { quota: !!researched.quotaExceeded, status: researched.status || null, detail: researched.errText || "" } };
     // 기사에서 찾은 사진 후보 (저작권 확인은 사용자가 콘티에서 직접 한다)
     parsed.images = picked.flatMap((a) => a.media.map((m) => ({
       type: m.type, url: m.url, caption: m.caption, source: a.source, articleUrl: a.url, articleTitle: a.title,
