@@ -1,7 +1,8 @@
 import { fetchArticle } from "../_lib/article.js";
+import { findPerspectiveArticles } from "../_lib/news.js";
 
 // Trend에서 고른 주제 + 관련 기사로 대본과 장면(콘티)을 만든다.
-// 1) 구글 검색으로 배경·관점 조사  2) 기사 + 조사 자료로 대본/장면 작성 (제미나이 2회 호출, 하루 20회 무료 쿼터 공유)
+// 1) 구글 뉴스 검색(무료)으로 관련 칼럼·분석 기사 수집  2) 기사 + 관점 자료로 대본/장면 작성 (제미나이 호출은 1번)
 const CLICHES = [
   "안녕하세요 여러분, 오늘은 ~에 대해 알아보겠습니다", "결론적으로", "다양한 이야기가 있습니다",
   "이처럼", "정리해보겠습니다", "여러분들도 알다시피",
@@ -37,36 +38,7 @@ async function callGemini(apiKey, body) {
   return { ok: false, status: res.status, errText, quotaExceeded };
 }
 
-// 1단계: 구글 검색으로 이슈의 배경과 철학/정치/종교/역사적 관점(전문가·연구·논문의 주류 해석, 대립 의견)을 조사한다.
-// (검색 도구는 JSON 구조 출력과 같이 못 쓰는 경우가 있어 조사와 작성을 두 번으로 나눈다)
-async function research(apiKey, topic, articles) {
-  const titles = articles.map((a) => `- [${a.source || "출처 미상"}] ${a.title}`).join("\n") || "(없음)";
-  const prompt = `"${topic}"는 지금 한국에서 구글 급상승 검색어다. 관련 기사 제목:
-${titles}
-
-구글 검색으로 다음을 조사해서 한국어로 정리해줘.
-1) 이 주제가 왜 지금 이슈가 되고 있는지, 핵심 배경
-2) 이 이슈에 해당하는 철학적·정치적·종교적·역사적 관점이 있다면, 전문가·연구기관·학술 논문·주요 언론 논평의 주류 해석과 의견. 대립하는 의견이 있으면 양쪽 모두 (누가/어느 기관·매체가 그렇게 말했는지 함께)
-
-규칙:
-- 검색으로 실제 확인한 내용만 쓰고, 확인하지 못했으면 "확인된 자료 없음"이라고 쓸 것. 추측·창작 금지
-- 해당하지 않는 관점은 쓰지 말 것 (예: 단순 연예 이슈에 철학적 관점을 억지로 만들지 말 것)
-- 정치적으로 민감하면 어느 한쪽 편을 들지 말고 각 입장을 있는 그대로 전달
-- 간결한 불릿으로`;
-  const r = await callGemini(apiKey, { contents: [{ parts: [{ text: prompt }] }], tools: [{ google_search: {} }] });
-  if (!r.ok) return { ok: false, quotaExceeded: r.quotaExceeded, status: r.status, errText: String(r.errText || "").slice(0, 600), text: "", sources: [] };
-  const cand = r.data.candidates?.[0];
-  const text = (cand?.content?.parts || []).map((p) => p.text || "").join("").trim();
-  const seen = new Set();
-  const sources = [];
-  for (const c of cand?.groundingMetadata?.groundingChunks || []) {
-    const uri = c.web?.uri;
-    if (uri && !seen.has(uri)) { seen.add(uri); sources.push({ title: c.web.title || "", url: uri }); }
-  }
-  return { ok: !!text, text, sources: sources.slice(0, 5) };
-}
-
-const researchUsable = (text) => !!text && !/확인된 자료 없음\s*$/.test(text.trim());
+const researchUsable = (text) => !!text && text.trim().length > 0;
 
 function buildPrompt(topic, articles, researchText, note, traffic) {
   const refs = articles.length
@@ -81,18 +53,18 @@ function buildPrompt(topic, articles, researchText, note, traffic) {
 [참고 기사 — 이 기사들에 실린 내용이 중심 자료다]
 ${refs}
 
-[검색으로 조사한 배경·관점 자료]
-${hasResearch ? researchText : "(조사 자료 없음 — 관점 정리 장면은 만들지 말 것)"}
+[관련 칼럼·분석 기사 — 구글 뉴스 검색 결과]
+${hasResearch ? researchText : "(관련 칼럼·분석 기사를 찾지 못함 — 관점 정리 장면은 만들지 말 것)"}
 ${note ? `\n[작성자 방향 메모 — 반드시 반영]\n${note}\n` : ""}
 [대본 구조 — 카드(장면)를 아래 구분으로 나눠서 쓴다. 카드 하나는 1~3문장, 공백 제외 약 60~130자이고, 카드마다 서로 다른 내용(한 가지 사실·측면)만 담는다]
 - trend_summary (1~2장): "지금 '${topic}'가 급상승 검색어입니다"처럼 시작해, 기사들이 전한 핵심을 요약한다. "○○ 보도에 따르면"처럼 기사가 보도한 내용임을 밝힌다
-- issue (3~6장, 반드시 3장 이상): 이 사건/이슈가 무엇이고 왜 지금 화제인지를 카드마다 한 측면씩 나눠 설명한다. 예) 무슨 일이 있었나 → 관련된 사람·기관과 경과 → 구체적 수치·발언·날짜 → 쟁점이나 논란 → 앞으로의 계획·일정·방향(기사에 있으면 반드시). 같은 내용을 반복하거나 말을 늘려 채우지 말고, 기사에 정보가 모자라면 조사 자료에서 확인된 사실로 보충한다
-- perspectives (${hasResearch ? "1~3장" : "0장 — 조사 자료가 없으니 빈 배열"}): 철학·정치·종교·역사 등 해당되는 관점에서 전문가·연구의 주류 해석을 전하고, 대립하는 의견이 있으면 양쪽 모두 각각 누구(기관·매체)의 의견인지 밝혀 균형 있게 전한다. 해당 없는 관점은 억지로 만들지 않는다
+- issue (3~6장, 반드시 3장 이상): 이 사건/이슈가 무엇이고 왜 지금 화제인지를 카드마다 한 측면씩 나눠 설명한다. 예) 무슨 일이 있었나 → 관련된 사람·기관과 경과 → 구체적 수치·발언·날짜 → 쟁점이나 논란 → 앞으로의 계획·일정·방향(기사에 있으면 반드시). 같은 내용을 반복하거나 말을 늘려 채우지 말고, 기사에 정보가 모자라면 관련 기사 자료에서 확인된 사실로 보충한다
+- perspectives (${hasResearch ? "0~3장" : "0장 — 자료가 없으니 빈 배열"}): 위 관련 칼럼·분석 기사에 **실제로 담긴 의견·해석**만 전한다. 각 의견은 어느 매체의 기사·칼럼인지 밝히고("○○ 분석에 따르면"), 대립하는 의견이 있으면 양쪽 모두 균형 있게 전한다. 기사에 의견이나 해석 없이 사실 전달뿐이면 억지로 만들지 말고 0장으로 둔다. 문장은 새로 쓰고 길게 인용하지 않는다
 - closing (정확히 1장): 위 내용을 한두 문장으로 정리하고 시청자가 생각해볼 질문 하나로 끝낸다. 마지막에 "구독과 좋아요" 한 줄
 (작성자가 직접 쓸 "내 의견" 카드는 시스템이 따로 넣으니 만들지 않는다)
 
 [대본 규칙]
-- 사실은 기사와 조사 자료에 있는 것만 쓴다. 기사에 있는 구체적 정보(이름·날짜·장소·수치·발언)는 빠뜨리지 말고 담는다. 내용은 기사에 충실하게, 문장은 기사 문장을 그대로 복사하지 않고 새로 쓴다
+- 사실은 참고 기사와 관련 기사 자료에 있는 것만 쓴다. 기사에 있는 구체적 정보(이름·날짜·장소·수치·발언)는 빠뜨리지 말고 담는다. 내용은 기사에 충실하게, 문장은 기사 문장을 그대로 복사하지 않고 새로 쓴다
 - 정치적으로 민감한 내용은 편향 없이: 당사자의 주장은 "~라고 주장했다/밝혔다"로 출처와 함께 전하고, 평가·형용사·추측을 붙이지 않으며, 서로 다른 주장은 균형 있게 다룬다
 - 확인되지 않은 내용은 "~라고 보도됐다"로 표현. 실존 인물·기업에 대한 명예훼손성 표현/조롱 금지
 - 다음 AI 상투어 사용 금지: ${CLICHES.join(", ")}
@@ -121,10 +93,18 @@ export async function onRequestPost(context) {
     const fetched = await Promise.all(picked.map((a) => fetchArticle(a.url)));
     picked.forEach((a, i) => { a.text = fetched[i].text; a.media = [...fetched[i].images, ...fetched[i].videos]; a.embeds = fetched[i].embeds; });
 
-    const researched = await research(apiKey, cleanTopic, picked);
-    // 검색 조사는 선택 단계다. 여기서 한도/오류가 나도 중단하지 않고, 조사 없이 기사만으로 대본을 쓴다
-    // (구글 검색 연결은 일반 호출과 따로 한도가 걸릴 수 있어서, 이걸 "오늘 다 썼다"로 오인하면 며칠째 아무것도 못 만든다)
+    // 관점 자료: 구글 뉴스 검색(무료)으로 관련 칼럼·분석 기사를 찾아 본문을 읽는다. 못 찾으면 관점 정리 없이 쓴다.
+    let perspectives = [];
+    try { perspectives = await findPerspectiveArticles(cleanTopic, picked.map((a) => a.title), 3); } catch { /* 관점 자료 없이 진행 */ }
+    const researched = {
+      ok: perspectives.length > 0,
+      text: perspectives.map((a, i) => `(${i + 1}) [${a.source}] ${a.title}
+${a.text}`).join("
 
+"),
+      sources: perspectives.map((a) => ({ title: `${a.source} — ${a.title}`, url: a.url })),
+    };
+    
     const written = await callGemini(apiKey, {
       contents: [{ parts: [{ text: buildPrompt(cleanTopic, picked, researched.text, String(note || "").trim().slice(0, 300), String(traffic || "").slice(0, 20)) }] }],
       generationConfig: {
@@ -168,7 +148,7 @@ export async function onRequestPost(context) {
     delete parsed.trend_summary; delete parsed.issue; delete parsed.perspectives; delete parsed.closing;
 
     parsed.usedArticles = picked.map((a) => ({ title: a.title, url: a.url, source: a.source, hadText: !!a.text }));
-    parsed.research = { ok: researched.ok, sources: researched.sources, skipped: researched.ok ? null : { quota: !!researched.quotaExceeded, status: researched.status || null, detail: researched.errText || "" } };
+    parsed.research = { ok: researched.ok, sources: researched.sources };
     // 기사에서 찾은 사진 후보 (저작권 확인은 사용자가 콘티에서 직접 한다)
     parsed.images = picked.flatMap((a) => a.media.map((m) => ({
       type: m.type, url: m.url, caption: m.caption, source: a.source, articleUrl: a.url, articleTitle: a.title,
