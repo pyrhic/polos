@@ -30,7 +30,9 @@
   .cu-list-item:hover { border-color:#7cff4a; }
   .cu-list-item .t { font-weight:800; margin-bottom:4px; }
   .cu-list-item .m { color:#a89bb5; font-size:0.8rem; }
-  .cu-del { width:auto; padding:4px 10px; margin:0; font-size:0.72rem; background:#3a1414; color:#ff8a80; flex-shrink:0; text-transform:none; letter-spacing:0; }
+  .cu-list-item { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+  .cu-list-item.pressing { border-color:#ff8a80; background:#2a1a24; }
+  .list-hint { color:#a89bb5; font-size:0.72rem; text-align:center; margin:8px 0 0; }
   .cu-sum { background:#17141c; border-radius:3px; padding:10px 14px; color:#7cff4a; font-weight:700; font-size:0.9rem; margin:10px 0; }
   .cu-main { background:#7cff4a; color:#0f0a14; padding:12px; font-size:0.95rem; }
   .cu-main:hover { background:#fff; }
@@ -55,7 +57,8 @@
 
     <div id="listView">
       <div id="curList"><div class="empty">불러오는 중...</div></div>
-      <button type="button" id="newBtn" class="cu-main" style="margin-top:6px;">+ 새 큐레이션 만들기</button>
+      <div class="list-hint">큐레이션을 길게 누르면 삭제할 수 있어요</div>
+      <button type="button" id="newBtn" class="cu-main" style="margin-top:10px;">+ 새 큐레이션 만들기</button>
       <div class="msg" id="listMsg"></div>
     </div>
 
@@ -147,16 +150,36 @@
     const rows = res.ok ? await res.json() : [];
     $("curList").innerHTML = rows.length ? rows.map((r) => `
       <div class="cu-list-item" data-id="${r.id}" role="button" tabindex="0">
-        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
-          <div style="min-width:0;"><div class="t">${esc((r.video_settings || {}).name || "(제목 없음)")}</div>
-          <div class="m">${esc((r.created_at || "").slice(0, 10))}${r.generation_status === "running" ? " · 영상 생성 중" : ""}</div></div>
-          <button type="button" class="cu-del" data-id="${r.id}">삭제</button>
-        </div>
+        <div class="t">${esc((r.video_settings || {}).name || "(제목 없음)")}</div>
+        <div class="m">${esc((r.created_at || "").slice(0, 10))}${r.generation_status === "running" ? " · 영상 생성 중" : ""}</div>
       </div>`).join("") : '<div class="empty" style="margin:20px 0;">아직 큐레이션이 없습니다</div>';
   }
+  // 카드를 길게 누르면(0.6초) 삭제 확인이 뜬다. 스크롤하려고 손가락을 움직이면 취소하고,
+  // 길게 눌러서 확인창이 뜬 뒤에 이어지는 클릭은 카드를 열지 않게 막는다.
+  function bindLongPress(listEl, itemSel, onLong) {
+    let timer = null, startX = 0, startY = 0, fired = false;
+    const clear = () => {
+      clearTimeout(timer); timer = null;
+      listEl.querySelectorAll(itemSel + ".pressing").forEach((e) => e.classList.remove("pressing"));
+    };
+    listEl.addEventListener("pointerdown", (e) => {
+      const item = e.target.closest(itemSel);
+      if (!item || e.button > 0) return;
+      fired = false; startX = e.clientX; startY = e.clientY;
+      item.classList.add("pressing");
+      timer = setTimeout(() => {
+        fired = true; clear();
+        if (navigator.vibrate) navigator.vibrate(30);
+        onLong(item.dataset.id);
+      }, 600);
+    });
+    listEl.addEventListener("pointermove", (e) => { if (timer && Math.hypot(e.clientX - startX, e.clientY - startY) > 10) clear(); });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((t) => listEl.addEventListener(t, () => { if (timer) clear(); }));
+    listEl.addEventListener("contextmenu", (e) => { if (e.target.closest(itemSel)) e.preventDefault(); });
+    listEl.addEventListener("click", (e) => { if (fired) { fired = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  }
+  bindLongPress($("curList"), ".cu-list-item", (id) => deleteCuration(id));
   $("curList").addEventListener("click", (e) => {
-    const del = e.target.closest(".cu-del");
-    if (del) { e.stopPropagation(); deleteCuration(del.dataset.id); return; }
     const item = e.target.closest(".cu-list-item");
     if (item) openCuration(Number(item.dataset.id));
   });
