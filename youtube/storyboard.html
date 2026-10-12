@@ -120,6 +120,8 @@
   .cap-modal .cap-preview { touch-action:none; cursor:grab; user-select:none; }
   .cap-modal .cap-lines { cursor:grab; }
   /* 콘티 목록 */
+  .conti-del { width:auto; padding:4px 10px; margin:0; font-size:0.72rem; background:#3a1414; color:#ff8a80; flex-shrink:0; text-transform:none; letter-spacing:0; }
+  .conti-del:hover { background:#ff8a80; color:#0f0a14; }
   .conti-item { display:block; width:100%; text-align:left; cursor:pointer; background:#221a2e; color:#fff; border:2px solid transparent; border-radius:3px; padding:14px 16px; margin-bottom:10px; font:inherit; }
   .conti-item:hover, .conti-item:focus-visible { border-color:#7cff4a; background:#221a2e; color:#fff; }
   .conti-item .title { font-weight:800; font-size:1rem; margin-bottom:4px; }
@@ -158,6 +160,7 @@
     <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">Scenes</h1>
     <div id="listView">
       <div id="contiList"><div class="empty">불러오는 중...</div></div>
+      <div class="msg" id="listMsg"></div>
 
       <details id="newDraft" class="card-box" style="margin:14px 0 0;">
         <summary>+ 새 콘티 만들기</summary>
@@ -890,10 +893,15 @@
       sel.innerHTML = '<option value="">선택하세요</option>' +
         scripts.map((r) => `<option value="${r.id}">${escapeHtml(nameOf(r))}</option>`).join("");
       $("contiList").innerHTML = scripts.length
-        ? scripts.map((r) => `<button type="button" class="conti-item" data-id="${r.id}">
-            <div class="title">${escapeHtml(nameOf(r))}</div>
-            <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>
-          </button>`).join("")
+        ? scripts.map((r) => `<div class="conti-item" role="button" tabindex="0" data-id="${r.id}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+              <div style="min-width:0;">
+                <div class="title">${escapeHtml(nameOf(r))}</div>
+                <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>
+              </div>
+              <button type="button" class="conti-del" data-id="${r.id}" title="이 콘티 삭제">삭제</button>
+            </div>
+          </div>`).join("")
         : '<div class="empty" style="margin:20px 0;">아직 콘티가 없습니다</div>';
     } catch (err) {
       sel.innerHTML = '<option value="">불러오기 실패</option>';
@@ -1659,9 +1667,76 @@
     sel.dispatchEvent(new Event("change", { bubbles: true }));
   }
   $("contiList").addEventListener("click", (e) => {
+    const del = e.target.closest(".conti-del");
+    if (del) { e.stopPropagation(); deleteConti(del.dataset.id); return; }
     const item = e.target.closest(".conti-item");
     if (item) openConti(item.dataset.id);
   });
+  $("contiList").addEventListener("keydown", (e) => {
+    const item = e.target.closest(".conti-item");
+    if (item && e.key === "Enter" && !e.target.closest(".conti-del")) openConti(item.dataset.id);
+  });
+
+  function showListMsg(text, ok) {
+    const m = $("listMsg");
+    m.className = "msg " + (ok ? "ok" : "err");
+    m.textContent = text;
+  }
+
+  // 콘티 하나를 통째로 지운다: 만든 영상(파일+기록), 올려둔 사진/음악, 장면, 콘티 순서.
+  // 유튜브에 이미 올린 영상은 유튜브에 그대로 남는다(여기서는 지울 수 없다).
+  async function deleteConti(id) {
+    const row = scripts.find((r) => String(r.id) === String(id));
+    if (!row) return;
+    if (row.generation_status === "running") { showListMsg("영상 생성 중인 콘티는 끝난 뒤에 삭제할 수 있습니다.", false); return; }
+    const name = (row.video_settings && row.video_settings.name) || (row.hook || "").slice(0, 30) || "(이름 없음)";
+    try {
+      const [segRes, outRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=id&script_id=eq.${id}`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?select=id,storage_path,youtube_status&script_id=eq.${id}`, { headers }),
+      ]);
+      const segCount = segRes.ok ? (await segRes.json()).length : 0;
+      const outputs = outRes.ok ? await outRes.json() : [];
+      const onYoutube = outputs.filter((o) => o.youtube_status === "done").length;
+      const lines = [`"${name}" 콘티를 삭제할까요?`, "", `· 장면 ${segCount}개와 올려둔 사진·영상·음악`, `· 만든 영상 ${outputs.length}개`];
+      if (onYoutube) lines.push("", `※ 유튜브에 이미 올린 영상 ${onYoutube}개는 유튜브에 그대로 남습니다 (유튜브 스튜디오에서 직접 삭제해야 합니다).`);
+      lines.push("", "되돌릴 수 없습니다.");
+      if (!confirm(lines.join("\n"))) return;
+
+      showListMsg("삭제하는 중...", true);
+      // 1) 만든 영상
+      for (const o of outputs) {
+        const r = await fetch(`${SUPABASE_URL}/storage/v1/object/youtube-outputs/${o.storage_path}`, { method: "DELETE", headers });
+        if (!r.ok && r.status !== 404) { const t = await r.text(); if (!/not_found|Object not found/i.test(t)) throw new Error("영상 파일 삭제 실패: " + t); }
+      }
+      if (outputs.length) {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?script_id=eq.${id}`, { method: "DELETE", headers });
+        if (!r.ok) throw new Error("영상 기록 삭제 실패: " + await r.text());
+      }
+      // 2) 올려둔 사진/영상/음악 (콘티 번호 폴더에 모여 있다)
+      const listRes = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${BUCKET}`, {
+        method: "POST", headers: jsonHeaders, body: JSON.stringify({ prefix: `${id}/`, limit: 1000 }),
+      });
+      if (listRes.ok) {
+        const files = (await listRes.json()).filter((f) => f.name).map((f) => `${id}/${f.name}`);
+        if (files.length) {
+          await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, { method: "DELETE", headers: jsonHeaders, body: JSON.stringify({ prefixes: files }) });
+        }
+      }
+      // 3) 장면, 그리고 콘티
+      let r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?script_id=eq.${id}`, { method: "DELETE", headers });
+      if (!r.ok) throw new Error("장면 삭제 실패: " + await r.text());
+      r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${id}`, { method: "DELETE", headers });
+      if (!r.ok) throw new Error("콘티 삭제 실패: " + await r.text());
+
+      if (genWatch.has(String(id))) { clearInterval(genWatch.get(String(id))); genWatch.delete(String(id)); }
+      await loadScripts();
+      showListMsg(`"${name}" 콘티를 삭제했습니다.`, true);
+    } catch (err) {
+      showListMsg("삭제 실패: " + err.message, false);
+      await loadScripts();
+    }
+  }
   $("backToList").addEventListener("click", () => openConti(""));
 
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && cardsDirty()) flushDirtyCards(); });
