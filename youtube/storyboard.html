@@ -415,6 +415,24 @@
     return estimateSeconds(el.querySelector(".seg-script").value);
   }
 
+  // 장면이 길어서 사진 하나가 오래 머물면 지루하다. 영상 생성 때는 모자란 컷을 키워드로 Pexels 영상으로 채우지만,
+  // 직접 고른 사진이 더 낫다 -> 카드에 미리 알려준다. (기준은 영상 만들기 단계와 같은 4.5초당 1컷, 7초 넘는 장면부터)
+  function updateMediaHints(perCard) {
+    perCard.forEach(({ el, seconds }) => {
+      const seg = segments.find((s) => String(s.id) === el.dataset.id);
+      const hint = el.querySelector(".seg-media-hint");
+      if (!hint || !seg) return;
+      const have = (seg.asset_paths || []).length;
+      const need = Math.max(2, Math.round(seconds / 4.5));
+      if (seconds > 7 && have < need) {
+        hint.style.display = "block";
+        hint.textContent = `약 ${Math.round(seconds)}초 장면인데 사진·영상이 ${have}개예요. ${need - have}개 이상 더 넣으면 화면이 자주 바뀌어 덜 지루해요. (그대로 두면 아래 키워드로 Pexels 영상이 자동으로 채워져요)`;
+      } else {
+        hint.style.display = "none";
+      }
+    });
+  }
+
   function updateRuntimeSummary() {
     const box = document.getElementById("runtimeSummary");
     const cards = Array.from(document.querySelectorAll(".seg-item"));
@@ -423,6 +441,7 @@
     const perCard = cards.map((el) => ({
       el, seconds: effectiveSeconds(el, segments.find((s) => String(s.id) === el.dataset.id)),
     }));
+    updateMediaHints(perCard);
     const total = perCard.reduce((sum, c) => sum + c.seconds, 0);
 
     perCard.forEach(({ el, seconds }) => {
@@ -1157,7 +1176,7 @@
       const researchNote = data.research && data.research.ok
         ? ` 관점 자료로 관련 칼럼·분석 기사 ${data.research.sources.length}건을 참고했습니다.`
         : " 관련 칼럼·분석 기사를 찾지 못해 관점 정리 없이 기사 중심으로 썼습니다.";
-      const doneText = `"${data.name}" 콘티가 만들어졌습니다. '내 의견' 장면은 비어 있으니 직접 써 넣으세요.${researchNote}${imageNote}`;
+      const doneText = `"${data.name}" 콘티가 만들어졌습니다.${researchNote}${imageNote}`;
       showDraftMsg(doneText, true);
       showMsg(doneText, true);
       $("newDraft").open = false;
@@ -1257,6 +1276,7 @@
           <button type="button" class="seg-icon-btn seg-delete-btn" title="이 장면 삭제">×</button>
         </div>
         <div class="seg-thumbs-area">${thumbsHtml(seg)}</div>
+        <div class="seg-media-hint" style="display:none;color:#ffd93d;font-size:0.78rem;margin:2px 0 8px;"></div>
         <div class="seg-actions" style="margin-bottom:4px;">
           <label class="seg-file-label">
             + 사진/영상 추가 (여러 개 선택 가능)
@@ -1471,6 +1491,7 @@
     if (!res.ok) throw new Error(await res.text());
     const seg = segments.find((s) => String(s.id) === id);
     if (seg) seg[field] = value;
+    if (field === "asset_paths") updateRuntimeSummary();   // 사진 개수가 바뀌면 "사진을 더 넣으세요" 안내도 갱신
   }
 
   async function saveSegmentCard(id, el) {
