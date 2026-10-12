@@ -225,6 +225,11 @@
         <div class="sr"><span class="k">화면 전환</span><span class="v"><button type="button" class="tok" data-wheel="trans" id="tokTrans"></button></span></div>
       </div>
       <button type="button" id="settingsSaveBtn" style="display:none;margin-top:12px;">전체 설정 저장</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
+        <button type="button" class="tok tok-btn" id="defaultSaveBtn" style="margin-left:0;">이 설정을 기본값으로 저장</button>
+        <button type="button" class="tok tok-btn" id="defaultApplyBtn">기본값 불러오기</button>
+      </div>
+      <div class="settings-note" id="defaultNote" style="margin-top:6px;font-size:0.72rem;"></div>
 
       <!-- 아래 입력들은 화면에 보이지 않는 실제 값 저장소. 위 요약 줄들이 이 값을 읽고 바꾼다 -->
       <div id="settingsBody">
@@ -819,6 +824,71 @@
     }
   }
 
+  // ───── 기본값: 전체 설정을 한 번 정해두면 새 콘티가 그 값으로 시작한다 ─────
+  // 서버(youtube_default_settings, 기기를 바꿔도 유지)에 저장하고, 이 기기에도 복사본을 둔다. 서버 표가 아직 없거나 연결이 안 되면
+  // 이 기기 복사본으로 동작한다. 콘티마다 다른 값(이름, 제목 1·2줄, 출처 문구, 직접 올린 배경음악)은 기본값에서 뺀다.
+  const DEFAULTS_LS_KEY = "polos_youtube_default_settings";
+  const DEFAULT_KEYS = ["caption_font_size", "bgm_volume", "mood", "mood_note", "transition", "tts_voice", "tts_rate", "tts_pitch", "caption_weight", "caption_position_pct", "layout"];
+  function pickDefaults(settings) {
+    const o = {};
+    DEFAULT_KEYS.forEach((k) => { if (settings[k] !== undefined) o[k] = settings[k]; });
+    if (settings.bgm_path && isExternalUrl(settings.bgm_path)) o.bgm_path = settings.bgm_path;
+    return o;
+  }
+  let userDefaults = null;
+  const userDefaultsReady = (async () => {
+    let remote = null;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_default_settings?select=settings&id=eq.1`, { headers });
+      if (res.ok) { const rows = await res.json(); remote = rows[0] ? rows[0].settings : null; }
+    } catch { /* 서버를 못 읽으면 이 기기 복사본으로 */ }
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem(DEFAULTS_LS_KEY)); } catch { /* 없음 */ }
+    userDefaults = remote && Object.keys(remote).length ? remote : local;
+    if (userDefaults) { try { localStorage.setItem(DEFAULTS_LS_KEY, JSON.stringify(userDefaults)); } catch { /* 무시 */ } }
+    $("defaultNote").textContent = userDefaults
+      ? "저장된 기본값이 있어요. 새 콘티는 이 값으로 시작해요."
+      : "저장된 기본값이 아직 없어요. 설정을 맞춘 뒤 '이 설정을 기본값으로 저장'을 눌러보세요.";
+  })();
+
+  async function saveUserDefaults(obj) {
+    userDefaults = obj;
+    try { localStorage.setItem(DEFAULTS_LS_KEY, JSON.stringify(obj)); } catch { /* 무시 */ }
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_default_settings`, {
+        method: "POST",
+        headers: { ...jsonHeaders, Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify({ id: 1, settings: obj, updated_at: new Date().toISOString() }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  $("defaultSaveBtn").addEventListener("click", async () => {
+    const btn = $("defaultSaveBtn");
+    btn.disabled = true;
+    const savedOnServer = await saveUserDefaults(pickDefaults(currentSettings));
+    btn.disabled = false;
+    $("defaultNote").textContent = savedOnServer
+      ? "기본값으로 저장했어요. 새 콘티는 이 값으로 시작해요. (콘티 이름·제목·출처 문구·직접 올린 배경음악은 콘티마다 달라서 제외)"
+      : "이 기기에만 저장했어요(서버 저장 실패 - youtube_tables_13_default_settings.sql을 아직 안 돌렸다면 Supabase에서 실행해주세요).";
+  });
+
+  $("defaultApplyBtn").addEventListener("click", () => {
+    if (!userDefaults) { $("defaultNote").textContent = "저장된 기본값이 없어요."; return; }
+    const scriptId = $("scriptSelect").value;
+    const row = scripts.find((r) => String(r.id) === String(scriptId));
+    if (!row) return;
+    const originalBgm = savedBgmPath; // 직접 올린 음악이 바뀌면 저장할 때 예전 파일을 지우기 위해 원래 경로를 기억
+    row.video_settings = { ...(row.video_settings || {}), ...userDefaults };
+    loadSettingsCard(scriptId);
+    savedBgmPath = originalBgm;
+    markSettingsDirty();
+    $("defaultNote").textContent = "기본값을 불러왔어요. '전체 설정 저장'을 눌러야 이 콘티에 적용돼요.";
+  });
+
   // 어떤 설정을 바꿔도(다른 핸들러가 값을 갱신한 뒤) 요약을 새로 그린다
   $("settingsBody").addEventListener("input", () => setTimeout(updateSettingsSummary, 0));
   $("settingsBody").addEventListener("change", () => setTimeout(updateSettingsSummary, 0));
@@ -1037,6 +1107,7 @@
     btn.textContent = "대본과 콘티를 만드는 중... (10~30초)";
     showDraftMsg("기사를 읽고, 배경·관점을 검색한 뒤 대본을 쓰는 중입니다.", true);
     try {
+      await userDefaultsReady;
       const res = await fetch("/api/gemini-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1061,7 +1132,7 @@
           ].join("\n"),
           status: "approved",
           slug: `${new Date().toISOString().slice(0, 10)}_${topic.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20)}`,
-          video_settings: { name: (data.name || topic).slice(0, 40) },
+          video_settings: { ...(userDefaults || {}), name: (data.name || topic).slice(0, 40) },
         }),
       });
       if (!scriptRes.ok) throw new Error(await scriptRes.text());
