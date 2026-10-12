@@ -21,15 +21,29 @@ const CARD_SCHEMA = {
 
 const researchUsable = (text) => !!text && text.trim().length > 0;
 
-function buildPrompt(topic, articles, researchText, note, traffic) {
+// 트렌드 화면의 나라 선택 목록과 같은 코드(KR이면 국내). 모르는 코드는 국내처럼 처리한다
+const COUNTRY_NAMES = { US: "미국", JP: "일본", GB: "영국", DE: "독일", FR: "프랑스", IN: "인도", BR: "브라질", AU: "호주", CA: "캐나다", TW: "대만" };
+
+function buildPrompt(topic, articles, researchText, note, traffic, country) {
   const refs = articles.length
     ? articles.map((a, i) => `(${i + 1}) [${a.source || "출처 미상"}] ${a.title}\n${a.text || "(본문을 가져오지 못해 제목만 참고)"}`).join("\n\n")
     : "(참고 기사 없음 — 주제만으로 작성하되, 구체적 수치/날짜/인용은 쓰지 말 것)";
   const hasResearch = researchUsable(researchText);
+  // 해외 트렌드(미국·일본 등)로 만들 때는 "한국 시청자에게 외국 소식을 전해주는" 방식으로 쓴다. 국내 트렌드는 기존 그대로.
+  // 대본이 1분(약 250자)으로 짧아서, 도입 카드는 한 문장 + 한국 시청자용 배경 한 문장만 넣는다.
+  const trendLine = country
+    ? `[트렌드 정보] ${country} 구글 급상승 검색어${traffic ? ` (검색량 ${traffic})` : ""} — 한국이 아닌 해외 트렌드다`
+    : `[트렌드 정보] 구글 급상승 검색어${traffic ? ` (검색량 ${traffic})` : ""}`;
+  const summaryRule = country
+    ? `- trend_summary (1~2장): 첫 카드는 반드시 "지금 ${country}에서는 ○○가 화제입니다"처럼 가볍고 자연스럽게 시작한다(○○는 한국 시청자가 알아듣게 한글로 풀어쓴 주제명이고, 외국어 고유명사는 처음 한 번만 괄호로 원어를 병기한다). 두 번째 카드(또는 첫 카드의 둘째 문장)에서 한국 시청자를 위해 이게 무엇이고 현지에서 왜 화제인지를 한 문장으로 설명하되 기사에 있는 내용만 쓴다. 기사에 언제 일어난 일인지(날짜·요일·현지 시간)가 나와 있으면 그 시점도 밝히고, 없으면 시점을 추측하지 않는다. 기사가 전한 핵심은 "○○ 보도에 따르면"처럼 기사가 보도한 내용임을 밝힌다`
+    : `- trend_summary (1~2장): "지금 '${topic}'가 급상승 검색어입니다"처럼 시작해, 기사들이 전한 핵심을 요약한다. "○○ 보도에 따르면"처럼 기사가 보도한 내용임을 밝힌다`;
+  const overseasRule = country
+    ? `\n- 이 영상은 ${country} 소식을 한국 시청자에게 소개하는 영상이다. 인물·단체·작품·지명 등 외국어 고유명사는 한글 표기로 쓰고 처음 한 번만 괄호로 원어를 병기한다. 외국어 기사는 번역해서 새 문장으로 쓰되, 기사에 없는 현지 배경·평가·한국과의 관련을 덧붙이지 않는다`
+    : "";
   return `너는 한국어 유튜브 정보 채널의 대본 작가다. 이 채널은 "지금 인기 검색어가 왜 이슈인지"를 차분하고 균형 있게 설명한다. 자극적인 후킹, 과장, 인사말("안녕하세요 여러분")은 쓰지 않는다.
 
 [주제] ${topic}
-[트렌드 정보] 구글 급상승 검색어${traffic ? ` (검색량 ${traffic})` : ""}
+${trendLine}
 
 [참고 기사 — 이 기사들에 실린 내용이 중심 자료다]
 ${refs}
@@ -38,7 +52,7 @@ ${refs}
 ${hasResearch ? researchText : "(관련 칼럼·분석 기사를 찾지 못함 — 관점 정리 장면은 만들지 말 것)"}
 ${note ? `\n[작성자 방향 메모 — 반드시 반영]\n${note}\n` : ""}
 [대본 구조 — 카드(장면)를 아래 구분으로 나눠서 쓴다. 카드 하나는 1~2문장, 공백 제외 약 30~60자이고, 카드마다 서로 다른 내용(한 가지 사실·측면)만 담는다]
-- trend_summary (1~2장): "지금 '${topic}'가 급상승 검색어입니다"처럼 시작해, 기사들이 전한 핵심을 요약한다. "○○ 보도에 따르면"처럼 기사가 보도한 내용임을 밝힌다
+${summaryRule}
 - issue (3~5장, 반드시 3장 이상): 이 사건/이슈가 무엇이고 왜 지금 화제인지를 카드마다 한 측면씩 나눠 설명한다. 예) 무슨 일이 있었나 → 관련된 사람·기관과 경과 → 구체적 수치·발언·날짜 → 쟁점이나 논란 → 앞으로의 계획·일정·방향(기사에 있으면 반드시). 같은 내용을 반복하거나 말을 늘려 채우지 말고, 기사에 정보가 모자라면 관련 기사 자료에서 확인된 사실로 보충한다
 - perspectives (${hasResearch ? "0~2장" : "0장 — 자료가 없으니 빈 배열"}): 위 관련 칼럼·분석 기사에 **실제로 담긴 의견·해석**만 전한다. 각 의견은 어느 매체의 기사·칼럼인지 밝히고("○○ 분석에 따르면"), 대립하는 의견이 있으면 양쪽 모두 균형 있게 전한다. 기사에 의견이나 해석 없이 사실 전달뿐이면 억지로 만들지 말고 0장으로 둔다. 문장은 새로 쓰고 길게 인용하지 않는다
 - closing (정확히 1장): 위 내용을 한두 문장으로 정리하고 시청자가 생각해볼 질문 하나로 끝낸다. 마지막에 "구독과 좋아요" 한 줄
@@ -48,7 +62,7 @@ ${note ? `\n[작성자 방향 메모 — 반드시 반영]\n${note}\n` : ""}
 - 정치적으로 민감한 내용은 편향 없이: 당사자의 주장은 "~라고 주장했다/밝혔다"로 출처와 함께 전하고, 평가·형용사·추측을 붙이지 않으며, 서로 다른 주장은 균형 있게 다룬다
 - 확인되지 않은 내용은 "~라고 보도됐다"로 표현. 실존 인물·기업에 대한 명예훼손성 표현/조롱 금지
 - 다음 AI 상투어 사용 금지: ${CLICHES.join(", ")}
-- 분량 가이드: 영상 길이는 1분 안팎이 목표다(내레이션 초당 약 4.3자). 전체 카드 합쳐 공백 제외 약 250자를 기준으로, 이슈를 설명하는 데 꼭 필요한 만큼만 쓴다. 카드는 설명과 장면 전환이 필요한 만큼 쓰되 전체 최대 10장을 넘기지 않는다
+- 분량 가이드: 영상 길이는 1분 안팎이 목표다(내레이션 초당 약 4.3자). 전체 카드 합쳐 공백 제외 약 250자를 기준으로, 이슈를 설명하는 데 꼭 필요한 만큼만 쓴다. 카드는 설명과 장면 전환이 필요한 만큼 쓰되 전체 최대 10장을 넘기지 않는다${overseasRule}
 
 [카드 규칙]
 - 카드의 script_text를 구분 순서대로(trend_summary → issue → perspectives → closing) 이어 붙이면 전체 대본이 되어야 함
@@ -63,7 +77,8 @@ export async function onRequestPost(context) {
   if (!apiKey) return json({ error: "GEMINI_API_KEY 환경변수가 설정되지 않았습니다" }, 500);
 
   try {
-    const { topic, articles, note, traffic } = await request.json();
+    const { topic, articles, note, traffic, geo } = await request.json();
+    const country = COUNTRY_NAMES[String(geo || "").toUpperCase()] || "";
     if (!topic || !String(topic).trim()) return json({ error: "주제가 필요합니다" }, 400);
     const cleanTopic = String(topic).trim().slice(0, 100);
 
@@ -83,7 +98,7 @@ export async function onRequestPost(context) {
     };
     
     const requestBody = {
-      contents: [{ parts: [{ text: buildPrompt(cleanTopic, picked, researched.text, String(note || "").trim().slice(0, 300), String(traffic || "").slice(0, 20)) }] }],
+      contents: [{ parts: [{ text: buildPrompt(cleanTopic, picked, researched.text, String(note || "").trim().slice(0, 300), String(traffic || "").slice(0, 20), country) }] }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -123,6 +138,7 @@ export async function onRequestPost(context) {
     if (!parsed) return json({ error: lastProblem + " (두 번 시도했어요). 잠시 뒤 다시 시도해주세요" }, 502);
     delete parsed.trend_summary; delete parsed.issue; delete parsed.perspectives; delete parsed.closing;
 
+    parsed.country = country || null;
     parsed.usedArticles = picked.map((a) => ({ title: a.title, url: a.url, source: a.source, hadText: !!a.text }));
     parsed.research = { ok: researched.ok, sources: researched.sources };
     // 기사에서 찾은 사진 후보 (저작권 확인은 사용자가 콘티에서 직접 한다)

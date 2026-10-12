@@ -997,6 +997,7 @@
   // ───── 새 콘티 만들기: 주제 + 기사 -> 제미나이가 대본과 장면을 한 번에 생성 -> 저장 후 바로 열기 ─────
   let draftCandidates = [];
   let draftTraffic = "";
+  let draftGeo = ""; // 트렌드에서 넘어온 나라 코드(KR=국내) - 해외면 대본 도입에서 나라를 밝힘
 
   function showDraftMsg(text, ok) {
     const m = $("draftMsg");
@@ -1024,6 +1025,7 @@
     if (!saved || !saved.topic) return;
     $("draftTopic").value = saved.topic;
     draftTraffic = saved.traffic || "";
+    draftGeo = saved.geo || "";
     draftCandidates = (saved.articles || []).filter((a) => a && a.title);
     renderDraftArticles();
     $("newDraft").open = true;
@@ -1129,7 +1131,7 @@
       const res = await fetch("/api/gemini-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, articles, note: $("draftNote").value.trim(), traffic: draftTraffic }),
+        body: JSON.stringify({ topic, articles, note: $("draftNote").value.trim(), traffic: draftTraffic, geo: draftGeo }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "생성 실패");
