@@ -21,6 +21,9 @@ const CARD_SCHEMA = {
 
 const researchUsable = (text) => !!text && text.trim().length > 0;
 
+const MAX_CHARS = 260;   // 영상 1분 ≈ 초당 4.3자 × 60초 (콘티 화면의 길이 추정과 같은 기준)
+const charCount = (segs) => segs.reduce((n, c) => n + String(c.script_text || "").replace(/\s+/g, "").length, 0);
+
 function buildPrompt(topic, articles, researchText, note, traffic) {
   const refs = articles.length
     ? articles.map((a, i) => `(${i + 1}) [${a.source || "출처 미상"}] ${a.title}\n${a.text || "(본문을 가져오지 못해 제목만 참고)"}`).join("\n\n")
@@ -37,10 +40,10 @@ ${refs}
 [관련 칼럼·분석 기사 — 구글 뉴스 검색 결과]
 ${hasResearch ? researchText : "(관련 칼럼·분석 기사를 찾지 못함 — 관점 정리 장면은 만들지 말 것)"}
 ${note ? `\n[작성자 방향 메모 — 반드시 반영]\n${note}\n` : ""}
-[대본 구조 — 카드(장면)를 아래 구분으로 나눠서 쓴다. 카드 하나는 1~3문장, 공백 제외 약 60~130자이고, 카드마다 서로 다른 내용(한 가지 사실·측면)만 담는다]
-- trend_summary (1~2장): "지금 '${topic}'가 급상승 검색어입니다"처럼 시작해, 기사들이 전한 핵심을 요약한다. "○○ 보도에 따르면"처럼 기사가 보도한 내용임을 밝힌다
-- issue (3~6장, 반드시 3장 이상): 이 사건/이슈가 무엇이고 왜 지금 화제인지를 카드마다 한 측면씩 나눠 설명한다. 예) 무슨 일이 있었나 → 관련된 사람·기관과 경과 → 구체적 수치·발언·날짜 → 쟁점이나 논란 → 앞으로의 계획·일정·방향(기사에 있으면 반드시). 같은 내용을 반복하거나 말을 늘려 채우지 말고, 기사에 정보가 모자라면 관련 기사 자료에서 확인된 사실로 보충한다
-- perspectives (${hasResearch ? "0~3장" : "0장 — 자료가 없으니 빈 배열"}): 위 관련 칼럼·분석 기사에 **실제로 담긴 의견·해석**만 전한다. 각 의견은 어느 매체의 기사·칼럼인지 밝히고("○○ 분석에 따르면"), 대립하는 의견이 있으면 양쪽 모두 균형 있게 전한다. 기사에 의견이나 해석 없이 사실 전달뿐이면 억지로 만들지 말고 0장으로 둔다. 문장은 새로 쓰고 길게 인용하지 않는다
+[대본 구조 — 카드(장면)를 아래 구분으로 나눠서 쓴다. 카드 하나는 1~2문장, 공백 제외 약 30~55자이고, 카드마다 서로 다른 내용(한 가지 사실·측면)만 담는다]
+- trend_summary (정확히 1장): "지금 '${topic}'가 급상승 검색어입니다"처럼 시작해, 기사들이 전한 핵심을 요약한다. "○○ 보도에 따르면"처럼 기사가 보도한 내용임을 밝힌다
+- issue (3~4장, 반드시 3장 이상): 이 사건/이슈가 무엇이고 왜 지금 화제인지를 카드마다 한 측면씩 나눠 설명한다. 예) 무슨 일이 있었나 → 관련된 사람·기관과 경과 → 구체적 수치·발언·날짜 → 쟁점이나 논란 → 앞으로의 계획·일정·방향(기사에 있으면 반드시). 같은 내용을 반복하거나 말을 늘려 채우지 말고, 기사에 정보가 모자라면 관련 기사 자료에서 확인된 사실로 보충한다
+- perspectives (${hasResearch ? "0~1장" : "0장 — 자료가 없으니 빈 배열"}): 위 관련 칼럼·분석 기사에 **실제로 담긴 의견·해석**만 전한다. 각 의견은 어느 매체의 기사·칼럼인지 밝히고("○○ 분석에 따르면"), 대립하는 의견이 있으면 양쪽 모두 균형 있게 전한다. 기사에 의견이나 해석 없이 사실 전달뿐이면 억지로 만들지 말고 0장으로 둔다. 문장은 새로 쓰고 길게 인용하지 않는다
 - closing (정확히 1장): 위 내용을 한두 문장으로 정리하고 시청자가 생각해볼 질문 하나로 끝낸다. 마지막에 "구독과 좋아요" 한 줄
 (작성자가 직접 쓸 "내 의견" 카드는 시스템이 따로 넣으니 만들지 않는다)
 
@@ -49,7 +52,7 @@ ${note ? `\n[작성자 방향 메모 — 반드시 반영]\n${note}\n` : ""}
 - 정치적으로 민감한 내용은 편향 없이: 당사자의 주장은 "~라고 주장했다/밝혔다"로 출처와 함께 전하고, 평가·형용사·추측을 붙이지 않으며, 서로 다른 주장은 균형 있게 다룬다
 - 확인되지 않은 내용은 "~라고 보도됐다"로 표현. 실존 인물·기업에 대한 명예훼손성 표현/조롱 금지
 - 다음 AI 상투어 사용 금지: ${CLICHES.join(", ")}
-- 분량: 전체 카드 합쳐 공백 제외 약 600~900자
+- 분량(가장 중요): 영상은 아무리 길어도 1분이다(내레이션 초당 약 4.3자). 전체 카드 합쳐 공백 제외 **200~240자**, 절대 260자를 넘기지 않는다. 길이가 모자라서 못 담는 정보는 과감히 버리고 가장 핵심만 남긴다
 
 [카드 규칙]
 - 카드의 script_text를 구분 순서대로(trend_summary → issue → perspectives → closing) 이어 붙이면 전체 대본이 되어야 함
@@ -91,9 +94,9 @@ export async function onRequestPost(context) {
           type: "OBJECT",
           properties: {
             name: { type: "STRING" },
-            trend_summary: { type: "ARRAY", minItems: 1, maxItems: 2, items: CARD_SCHEMA },
-            issue: { type: "ARRAY", minItems: 3, maxItems: 6, items: CARD_SCHEMA },
-            perspectives: { type: "ARRAY", maxItems: 3, items: CARD_SCHEMA },
+            trend_summary: { type: "ARRAY", minItems: 1, maxItems: 1, items: CARD_SCHEMA },
+            issue: { type: "ARRAY", minItems: 3, maxItems: 4, items: CARD_SCHEMA },
+            perspectives: { type: "ARRAY", maxItems: 1, items: CARD_SCHEMA },
             closing: { type: "ARRAY", minItems: 1, maxItems: 1, items: CARD_SCHEMA },
           },
           required: ["name", "trend_summary", "issue", "perspectives", "closing"],
@@ -104,7 +107,7 @@ export async function onRequestPost(context) {
     const card = (part) => (c) => ({ section: part, script_text: String(c.script_text || "").trim(), keyword: c.keyword || "", direction: c.direction || "" });
 
     // 응답이 중간에 잘려 JSON이 깨지거나 대본이 너무 짧게 나오는 건 가끔 있는 일시적 현상이라, 이 경우만 한 번 더 시도함
-    let parsed = null, lastProblem = "";
+    let parsed = null, lastProblem = "", overLen = 0, fallback = null;
     for (let pass = 0; pass < 2 && !parsed; pass++) {
       const written = await callGemini(apiKey, requestBody);
       if (!written.ok) return json({ error: written.message, quotaExceeded: written.quotaExceeded, detail: written.errText }, 502);
@@ -120,10 +123,25 @@ export async function onRequestPost(context) {
         { section: "내 의견", script_text: "", keyword: "person thinking window", direction: "천천히 줌인" },
         ...(candidate.closing || []).map(card("마무리")),
       ];
+      // 1분(약 260자)을 넘기면 한 번 더 시도하고, 그래도 길면 아래에서 뒤쪽 카드를 덜어낸다
+      if (pass === 0 && charCount(candidate.segments) > MAX_CHARS + 20) { overLen = charCount(candidate.segments); fallback = candidate; requestBody.contents[0].parts[0].text += `
+
+[재작성 요청] 지난 대본은 ${overLen}자로 너무 길었다. 반드시 전체 ${MAX_CHARS - 20}자 안팎(최대 ${MAX_CHARS}자)으로, 카드 수도 줄여서 다시 써라.`; continue; }
       if (candidate.segments.filter((c) => c.script_text).length < 4) { lastProblem = "대본이 충분히 만들어지지 않았습니다"; continue; }
       parsed = candidate;
     }
+    if (!parsed && fallback) parsed = fallback;
     if (!parsed) return json({ error: lastProblem + " (두 번 시도했어요). 잠시 뒤 다시 시도해주세요" }, 502);
+    // 그래도 1분을 넘으면 관점 정리 → 뒤쪽 이슈 카드 순으로 덜어낸다 (이슈 3장·트렌드·마무리는 유지)
+    while (charCount(parsed.segments) > MAX_CHARS) {
+      let i = parsed.segments.map((c) => c.section).lastIndexOf("관점 정리");
+      if (i < 0) {
+        const issues = parsed.segments.map((c, k) => (c.section === "이슈 설명" ? k : -1)).filter((k) => k >= 0);
+        if (issues.length <= 3) break;
+        i = issues[issues.length - 1];
+      }
+      parsed.segments.splice(i, 1);
+    }
     delete parsed.trend_summary; delete parsed.issue; delete parsed.perspectives; delete parsed.closing;
 
     parsed.usedArticles = picked.map((a) => ({ title: a.title, url: a.url, source: a.source, hadText: !!a.text }));
