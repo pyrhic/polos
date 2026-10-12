@@ -5,6 +5,8 @@ const YT_RESPONSIBILITY = "정확한 사실 확인은 원본 자료를 참고해
 
 function ytDefaultDescription(row) {
   const sources = (row.fact_sources || "").split("\n").map((s) => s.trim()).filter(Boolean);
+  // 큐레이션(사진+음악) 영상은 뉴스형 안내 문구 없이 사진·음악 출처만 적는다
+  if (row.category === "큐레이션") return sources.length ? "출처:\n" + sources.join("\n") : "";
   return [YT_DISCLAIMER, YT_RESPONSIBILITY, sources.length ? "출처:\n" + sources.join("\n") : ""]
     .filter(Boolean).join("\n\n");
 }
