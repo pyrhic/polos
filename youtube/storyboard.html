@@ -224,12 +224,11 @@
         <div class="sr"><span class="k"></span><span class="v"><input class="sr-input" id="srMoodNote" placeholder="분위기 메모 (예: 긴장감 있게)"></span></div>
         <div class="sr"><span class="k">화면 전환</span><span class="v"><button type="button" class="tok" data-wheel="trans" id="tokTrans"></button></span></div>
       </div>
-      <button type="button" id="settingsSaveBtn" style="display:none;margin-top:12px;">전체 설정 저장</button>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
+        <button type="button" class="tok tok-btn" id="settingsSaveBtn" style="display:none;margin-left:0;">전체 설정 저장</button>
         <button type="button" class="tok tok-btn" id="defaultSaveBtn" style="margin-left:0;">이 설정을 기본값으로 저장</button>
-        <button type="button" class="tok tok-btn" id="defaultApplyBtn">기본값 불러오기</button>
+        <button type="button" class="tok tok-btn" id="defaultApplyBtn" style="margin-left:0;">기본값 불러오기</button>
       </div>
-      <div class="settings-note" id="defaultNote" style="margin-top:6px;font-size:0.72rem;"></div>
 
       <!-- 아래 입력들은 화면에 보이지 않는 실제 값 저장소. 위 요약 줄들이 이 값을 읽고 바꾼다 -->
       <div id="settingsBody">
@@ -484,7 +483,7 @@
   function markSettingsDirty() {
     const b = $("settingsSaveBtn");
     b.classList.add("dirty");
-    b.textContent = "전체 설정 저장 (수정됨)";
+    b.textContent = "전체 설정 저장";
     updateSettingsSummary();
   }
 
@@ -593,7 +592,7 @@
     $("tokTrans").textContent = label("trans");
     $("capModalVal").textContent = `크기 ${$("capSize").value} · ${WEIGHTS[Number($("capWeight").value)].label} · 위치 ${$("capPos").value}%`;
     const dirty = $("settingsSaveBtn").classList.contains("dirty");
-    $("settingsSaveBtn").style.display = dirty || $("settingsSaveBtn").disabled ? "block" : "none";
+    $("settingsSaveBtn").style.display = dirty || $("settingsSaveBtn").disabled ? "inline" : "none";
     const badge = $("settingsDirtyBadge");
     badge.textContent = dirty ? "저장 안 됨" : (settingsJustSaved ? "저장됨 ✓" : "");
     badge.style.display = badge.textContent ? "inline-block" : "none";
@@ -817,7 +816,7 @@
     } catch (err) {
       showMsg("전체 설정 저장 실패: " + err.message, false);
       btn.classList.add("dirty");
-      btn.textContent = "전체 설정 저장 (수정됨)";
+      btn.textContent = "전체 설정 저장";
       updateSettingsSummary();
     } finally {
       btn.disabled = false;
@@ -846,9 +845,6 @@
     try { local = JSON.parse(localStorage.getItem(DEFAULTS_LS_KEY)); } catch { /* 없음 */ }
     userDefaults = remote && Object.keys(remote).length ? remote : local;
     if (userDefaults) { try { localStorage.setItem(DEFAULTS_LS_KEY, JSON.stringify(userDefaults)); } catch { /* 무시 */ } }
-    $("defaultNote").textContent = userDefaults
-      ? "저장된 기본값이 있어요. 새 콘티는 이 값으로 시작해요."
-      : "저장된 기본값이 아직 없어요. 설정을 맞춘 뒤 '이 설정을 기본값으로 저장'을 눌러보세요.";
   })();
 
   async function saveUserDefaults(obj) {
@@ -871,13 +867,17 @@
     btn.disabled = true;
     const savedOnServer = await saveUserDefaults(pickDefaults(currentSettings));
     btn.disabled = false;
-    $("defaultNote").textContent = savedOnServer
-      ? "기본값으로 저장했어요. 새 콘티는 이 값으로 시작해요. (콘티 이름·제목·출처 문구·직접 올린 배경음악은 콘티마다 달라서 제외)"
-      : "이 기기에만 저장했어요(서버 저장 실패 - youtube_tables_13_default_settings.sql을 아직 안 돌렸다면 Supabase에서 실행해주세요).";
+    if (savedOnServer) {
+      // 성공은 설명 문구 대신 버튼 글자가 잠깐 바뀌는 것으로만 알림
+      btn.textContent = "저장됨";
+      setTimeout(() => { btn.textContent = "이 설정을 기본값으로 저장"; }, 1200);
+    } else {
+      showMsg("서버에 저장하지 못해 이 기기에만 저장했어요.", false);
+    }
   });
 
   $("defaultApplyBtn").addEventListener("click", () => {
-    if (!userDefaults) { $("defaultNote").textContent = "저장된 기본값이 없어요."; return; }
+    if (!userDefaults) { showMsg("저장된 기본값이 없어요.", false); return; }
     const scriptId = $("scriptSelect").value;
     const row = scripts.find((r) => String(r.id) === String(scriptId));
     if (!row) return;
@@ -886,7 +886,6 @@
     loadSettingsCard(scriptId);
     savedBgmPath = originalBgm;
     markSettingsDirty();
-    $("defaultNote").textContent = "기본값을 불러왔어요. '전체 설정 저장'을 눌러야 이 콘티에 적용돼요.";
   });
 
   // 어떤 설정을 바꿔도(다른 핸들러가 값을 갱신한 뒤) 요약을 새로 그린다
