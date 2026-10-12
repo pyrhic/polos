@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>큐레이션 — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .cu-item { background:#221a2e; border-radius:3px; padding:12px; margin-bottom:10px; }
+  .cu-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .cu-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .cu-body { display:flex; gap:10px; }
+  .cu-photo { width:96px; height:128px; border-radius:3px; background:#0f0a14 center/cover no-repeat; flex-shrink:0; cursor:pointer; position:relative; border:2px solid transparent; }
+  .cu-photo:hover { border-color:#7cff4a; }
+  .cu-photo span { position:absolute; left:0; right:0; bottom:0; background:rgba(0,0,0,0.65); color:#fff; font-size:0.62rem; text-align:center; padding:2px 0; }
+  .cu-fields { flex:1; min-width:0; }
+  .cu-fields input { margin-bottom:6px; font-size:0.88rem; padding:7px 9px; }
+  .cu-fields .k { font-size:0.7rem; color:#a89bb5; margin:0 0 2px; }
+  .cu-mini { width:auto; padding:3px 9px; margin:0; font-size:0.72rem; background:#0f0a14; color:#a89bb5; text-transform:none; letter-spacing:0; }
+  .cu-mini.del { color:#ff8a80; margin-left:auto; }
+  .cu-card { background:#221a2e; border-radius:3px; padding:14px; margin-bottom:12px; }
+  .cu-card h2 { font-size:0.95rem; margin:0 0 8px; }
+  .cu-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .cu-row input[type="number"] { width:80px; }
+  .cu-list-item { display:block; background:#221a2e; border:2px solid transparent; border-radius:3px; padding:14px 16px; margin-bottom:10px; cursor:pointer; }
+  .cu-list-item:hover { border-color:#7cff4a; }
+  .cu-list-item .t { font-weight:800; margin-bottom:4px; }
+  .cu-list-item .m { color:#a89bb5; font-size:0.8rem; }
+  .cu-del { width:auto; padding:4px 10px; margin:0; font-size:0.72rem; background:#3a1414; color:#ff8a80; flex-shrink:0; text-transform:none; letter-spacing:0; }
+  .cu-sum { background:#17141c; border-radius:3px; padding:10px 14px; color:#7cff4a; font-weight:700; font-size:0.9rem; margin:10px 0; }
+  .cu-main { background:#7cff4a; color:#0f0a14; padding:12px; font-size:0.95rem; }
+  .cu-main:hover { background:#fff; }
+  .cu-main:disabled { background:#16324a; color:#4fc3f7; }
+  .cu-save { font-size:0.75rem; color:#a89bb5; text-align:right; min-height:1em; }
+  .cu-modal { display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.8); overflow-y:auto; padding:12px; }
+  .cu-modal.open { display:block; }
+  .cu-modal-box { background:#221a2e; border-radius:6px; padding:14px; max-width:480px; margin:0 auto; }
+  .cu-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:10px; }
+  .cu-grid div { aspect-ratio:3/4; background:#0f0a14 center/cover no-repeat; border-radius:3px; cursor:pointer; border:2px solid transparent; position:relative; }
+  .cu-grid div:hover { border-color:#7cff4a; }
+  .cu-grid div.sel { border-color:#7cff4a; }
+  .cu-grid small { position:absolute; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); font-size:0.55rem; padding:1px 3px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .cu-note { color:#a89bb5; font-size:0.78rem; margin:6px 0; }
+  .cu-err { color:#ff8a80; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">큐레이션</h1>
+
+    <div id="listView">
+      <div id="curList"><div class="empty">불러오는 중...</div></div>
+      <button type="button" id="newBtn" class="cu-main" style="margin-top:6px;">+ 새 큐레이션 만들기</button>
+      <div class="msg" id="listMsg"></div>
+    </div>
+
+    <div id="editView" style="display:none;">
+      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;background:#221a2e;margin-bottom:12px;">← 큐레이션 목록</button>
+
+      <div class="cu-card">
+        <label for="curTitle" style="margin-top:0;">제목 (영상 첫 화면에 들어갑니다)</label>
+        <input type="text" id="curTitle" maxlength="60" placeholder="예: 지구에서 가장 비현실적인 해변 10곳">
+        <div class="cu-row" style="margin-top:8px;">
+          <label style="margin:0;">사진 수</label>
+          <input type="number" id="curCount" min="3" max="30" value="10">
+          <input type="text" id="curNote" maxlength="300" placeholder="AI에게 요청 (선택) 예: 아시아 위주로" style="flex:1;min-width:140px;">
+        </div>
+        <button type="button" id="planBtn" style="margin-top:10px;background:#2f2440;">AI로 구성안 만들기</button>
+        <div class="cu-note" id="planMsg"></div>
+      </div>
+
+      <div id="items"></div>
+      <button type="button" id="addItemBtn" style="background:#221a2e;margin-bottom:12px;">+ 항목 추가</button>
+
+      <div class="cu-card">
+        <h2>영상 설정</h2>
+        <div class="cu-row">
+          <label style="margin:0;">사진 한 장당</label>
+          <input type="number" id="curSecs" min="1.5" max="10" step="0.5" value="3.5">
+          <label style="margin:0;">초 · 전환</label>
+          <select id="curTrans" style="width:auto;">
+            <option value="fade">부드럽게 (페이드)</option>
+            <option value="cut">컷 (바로 전환)</option>
+          </select>
+        </div>
+        <label style="margin-top:12px;">배경음악 (사용이 허락된 음원만 올려주세요)</label>
+        <div id="bgmArea"></div>
+        <label class="cu-file" style="display:block;background:#2f2440;color:#fff;text-align:center;padding:9px;border-radius:3px;font-size:0.85rem;cursor:pointer;margin-top:6px;">
+          + 음악 파일 올리기<input type="file" id="bgmFile" accept="audio/*" style="display:none;">
+        </label>
+        <div class="cu-row" style="margin-top:8px;">
+          <label style="margin:0;">음악 볼륨</label>
+          <input type="range" id="curVol" min="10" max="100" step="5" value="80" style="flex:1;">
+          <b id="curVolVal">80%</b>
+        </div>
+        <label>음악 출처·크레딧 (CC 곡은 설명란에 꼭 필요 — 유튜브 설명란에 자동으로 들어갑니다)</label>
+        <input type="text" id="curCredit" maxlength="200" placeholder="예: Music: 곡명 — 아티스트 (YouTube Audio Library)">
+      </div>
+
+      <div class="cu-sum" id="sum"></div>
+      <button type="button" id="genBtn" class="cu-main">영상 생성</button>
+      <div class="cu-note cu-err" id="genNote" style="display:none;"></div>
+      <div class="cu-save" id="saveState"></div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+
+  <div class="cu-modal" id="pickModal">
+    <div class="cu-modal-box">
+      <div class="cu-row" style="margin-bottom:6px;"><b id="pickTitle" style="flex:1;"></b><button type="button" class="cu-mini" id="pickClose">닫기</button></div>
+      <div class="cu-row">
+        <input type="text" id="pickQuery" placeholder="영어 검색어 (예: Maldives beach aerial)" style="flex:1;min-width:150px;">
+        <button type="button" id="pickSearch" style="width:auto;padding:8px 14px;margin:0;">검색</button>
+      </div>
+      <div class="cu-grid" id="pickGrid"></div>
+      <div class="cu-row" style="margin-top:10px;">
+        <button type="button" class="cu-mini" id="pickMore">더 보기</button>
+        <span class="cu-note" id="pickInfo" style="margin:0;"></span>
+      </div>
+      <div class="cu-note">사진 출처(Pexels 작가)는 영상 설명란에 자동으로 들어갑니다.</div>
+    </div>
+  </div>
+
+<script src="/youtube/generate.js"></script>
+<script>
+  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const BUCKET = "youtube-assets";
+  const CATEGORY = "큐레이션";
+  const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  const jsonHeaders = { ...headers, "Content-Type": "application/json" };
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  let cur = null;          // 편집 중인 큐레이션
+  let curRow = null;       // DB의 콘티 행
+  const genWatch = new Map();
+
+  // ───────── 목록 ─────────
+  async function loadList() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id,created_at,video_settings,generation_status&category=eq.${encodeURIComponent(CATEGORY)}&order=created_at.desc`, { headers });
+    const rows = res.ok ? await res.json() : [];
+    $("curList").innerHTML = rows.length ? rows.map((r) => `
+      <div class="cu-list-item" data-id="${r.id}" role="button" tabindex="0">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+          <div style="min-width:0;"><div class="t">${esc((r.video_settings || {}).name || "(제목 없음)")}</div>
+          <div class="m">${esc((r.created_at || "").slice(0, 10))}${r.generation_status === "running" ? " · 영상 생성 중" : ""}</div></div>
+          <button type="button" class="cu-del" data-id="${r.id}">삭제</button>
+        </div>
+      </div>`).join("") : '<div class="empty" style="margin:20px 0;">아직 큐레이션이 없습니다</div>';
+  }
+  $("curList").addEventListener("click", (e) => {
+    const del = e.target.closest(".cu-del");
+    if (del) { e.stopPropagation(); deleteCuration(del.dataset.id); return; }
+    const item = e.target.closest(".cu-list-item");
+    if (item) openCuration(Number(item.dataset.id));
+  });
+
+  function showListMsg(t, ok) { const m = $("listMsg"); m.className = "msg " + (ok ? "ok" : "err"); m.textContent = t; }
+
+  // 콘티 하나를 통째로 지운다: 만든 영상(파일+기록), 올려둔 음악, 항목, 콘티 (유튜브에 올린 영상은 유튜브에 남는다)
+  async function deleteCuration(id) {
+    try {
+      const [sr, or] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=generation_status,video_settings&id=eq.${id}`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?select=id,storage_path,youtube_status&script_id=eq.${id}`, { headers }),
+      ]);
+      const row = (await sr.json())[0];
+      if (!row) return;
+      if (row.generation_status === "running") { showListMsg("영상 생성 중인 큐레이션은 끝난 뒤에 삭제할 수 있습니다.", false); return; }
+      const outs = or.ok ? await or.json() : [];
+      const onYt = outs.filter((o) => o.youtube_status === "done").length;
+      const name = (row.video_settings || {}).name || "(제목 없음)";
+      const lines = [`"${name}" 큐레이션을 삭제할까요?`, "", `· 항목과 올려둔 음악`, `· 만든 영상 ${outs.length}개`];
+      if (onYt) lines.push("", `※ 유튜브에 이미 올린 영상 ${onYt}개는 유튜브에 그대로 남습니다.`);
+      lines.push("", "되돌릴 수 없습니다.");
+      if (!confirm(lines.join("\n"))) return;
+      showListMsg("삭제하는 중...", true);
+      for (const o of outs) {
+        const r = await fetch(`${SUPABASE_URL}/storage/v1/object/youtube-outputs/${o.storage_path}`, { method: "DELETE", headers });
+        if (!r.ok && r.status !== 404) { const t = await r.text(); if (!/not_found|Object not found/i.test(t)) throw new Error("영상 파일 삭제 실패: " + t); }
+      }
+      if (outs.length) await fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?script_id=eq.${id}`, { method: "DELETE", headers });
+      const lr = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${BUCKET}`, { method: "POST", headers: jsonHeaders, body: JSON.stringify({ prefix: `${id}/`, limit: 1000 }) });
+      if (lr.ok) {
+        const files = (await lr.json()).filter((f) => f.name).map((f) => `${id}/${f.name}`);
+        if (files.length) await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, { method: "DELETE", headers: jsonHeaders, body: JSON.stringify({ prefixes: files }) });
+      }
+      let r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?script_id=eq.${id}`, { method: "DELETE", headers });
+      if (!r.ok) throw new Error("항목 삭제 실패: " + await r.text());
+      r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${id}`, { method: "DELETE", headers });
+      if (!r.ok) throw new Error("삭제 실패: " + await r.text());
+      if (genWatch.has(String(id))) { clearInterval(genWatch.get(String(id))); genWatch.delete(String(id)); }
+      await loadList();
+      showListMsg(`"${name}" 큐레이션을 삭제했습니다.`, true);
+    } catch (err) {
+      showListMsg("삭제 실패: " + err.message, false);
+      await loadList();
+    }
+  }
+
+  // ───────── 열기 / 새로 만들기 ─────────
+  function newCuration() {
+    cur = { id: null, title: "", count: 10, note: "", secs: 3.5, transition: "fade", bgm_path: null, bgm_volume: 0.8, credit: "", items: [] };
+    curRow = null;
+    showEdit();
+  }
+
+  async function openCuration(id) {
+    const [rr, sr] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&id=eq.${id}`, { headers }),
+      fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=*&script_id=eq.${id}&order=order_no.asc`, { headers }),
+    ]);
+    const row = (await rr.json())[0];
+    if (!row) return;
+    const segs = await sr.json();
+    const vs = row.video_settings || {};
+    curRow = row;
+    cur = {
+      id, title: vs.title_text || vs.name || "", count: segs.length || 10, note: "",
+      secs: vs.secs_per_photo || 3.5, transition: vs.transition || "fade", bgm_path: vs.bgm_path || null,
+      bgm_volume: vs.bgm_volume ?? 0.8, credit: vs.music_credit || "",
+      items: segs.map((s) => {
+        const url = (s.asset_paths || [])[0];
+        const n = (s.asset_notes || {})[url] || {};
+        return {
+          name: s.section || "", comment: s.script_text || "", keyword: s.keyword || "",
+          photo: url ? { url, thumb: n.thumb || url, page_url: n.articleUrl || "", photographer: n.photographer || "", photographer_url: n.photographer_url || "" } : null,
+        };
+      }),
+    };
+    showEdit();
+  }
+
+  function showEdit() {
+    $("listView").style.display = "none";
+    $("editView").style.display = "block";
+    $("curTitle").value = cur.title; $("curCount").value = cur.count; $("curNote").value = cur.note;
+    $("curSecs").value = cur.secs; $("curTrans").value = cur.transition;
+    $("curVol").value = Math.round(cur.bgm_volume * 100); $("curVolVal").textContent = Math.round(cur.bgm_volume * 100) + "%";
+    $("curCredit").value = cur.credit;
+    $("planMsg").textContent = ""; $("msg").className = "msg"; $("saveState").textContent = "";
+    renderItems(); renderBgm(); updateSum();
+    window.scrollTo(0, 0);
+    if (cur.id) refreshGenState();
+  }
+
+  async function backToList() {
+    await flushSave();
+    cur = null; curRow = null;
+    $("editView").style.display = "none"; $("listView").style.display = "block";
+    await loadList();
+  }
+  $("backBtn").addEventListener("click", backToList);
+  $("newBtn").addEventListener("click", newCuration);
+
+  // ───────── 항목 목록 ─────────
+  function renderItems() {
+    $("items").innerHTML = cur.items.map((it, i) => `
+      <div class="cu-item" data-i="${i}">
+        <div class="cu-head">
+          <div class="cu-no">${i + 1}</div>
+          <button type="button" class="cu-mini up" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button type="button" class="cu-mini dn" ${i === cur.items.length - 1 ? "disabled" : ""}>↓</button>
+          <button type="button" class="cu-mini del">삭제</button>
+        </div>
+        <div class="cu-body">
+          <div class="cu-photo" ${it.photo ? `style="background-image:url('${esc(it.photo.thumb)}')"` : ""}><span>${it.photo ? "사진 바꾸기" : "사진 고르기"}</span></div>
+          <div class="cu-fields">
+            <div class="k">이름</div><input type="text" class="f-name" value="${esc(it.name)}" maxlength="40" placeholder="예: 몰디브">
+            <div class="k">선정 이유 메모 (영상에는 안 나옴)</div><input type="text" class="f-comment" value="${esc(it.comment)}" maxlength="80">
+            <div class="k">사진 검색어 (영어)</div><input type="text" class="f-kw" value="${esc(it.keyword)}" maxlength="80">
+          </div>
+        </div>
+      </div>`).join("") || '<div class="empty" style="margin:16px 0;">위에서 제목을 입력하고 "AI로 구성안 만들기"를 누르거나, 항목을 직접 추가하세요.</div>';
+    document.querySelectorAll("#items .cu-item").forEach((el) => {
+      const i = Number(el.dataset.i), it = cur.items[i];
+      el.querySelector(".f-name").addEventListener("input", (e) => { it.name = e.target.value; queueSave(); });
+      el.querySelector(".f-comment").addEventListener("input", (e) => { it.comment = e.target.value; queueSave(); });
+      el.querySelector(".f-kw").addEventListener("input", (e) => { it.keyword = e.target.value; queueSave(); });
+      el.querySelector(".cu-photo").addEventListener("click", () => openPicker(i));
+      el.querySelector(".up").addEventListener("click", () => { [cur.items[i - 1], cur.items[i]] = [cur.items[i], cur.items[i - 1]]; renderItems(); queueSave(); });
+      el.querySelector(".dn").addEventListener("click", () => { [cur.items[i + 1], cur.items[i]] = [cur.items[i], cur.items[i + 1]]; renderItems(); queueSave(); });
+      el.querySelector(".del").addEventListener("click", () => { cur.items.splice(i, 1); renderItems(); updateSum(); queueSave(); });
+    });
+    updateSum();
+  }
+  $("addItemBtn").addEventListener("click", () => { cur.items.push({ name: "", comment: "", keyword: "", photo: null }); renderItems(); queueSave(); });
+
+  function updateSum() {
+    const n = cur.items.filter((it) => it.photo).length;
+    const total = n * cur.secs; // 페이드 전환은 사진 시간 안에서 겹쳐서, 전체 길이 = 사진 수 x 사진당 시간
+    $("sum").textContent = n ? `사진 ${n}장 · 예상 길이 약 ${total.toFixed(1)}초 (${(total / 60).toFixed(1)}분)` : "사진을 고르면 예상 길이가 표시됩니다.";
+    const missing = cur.items.length - n;
+    if (missing > 0) $("sum").textContent += ` · 사진이 없는 항목 ${missing}개는 영상에서 빠집니다`;
+  }
+
+  // ───────── 설정 입력 ─────────
+  $("curTitle").addEventListener("input", (e) => { cur.title = e.target.value; queueSave(); });
+  $("curCount").addEventListener("input", (e) => { cur.count = Number(e.target.value) || 10; });
+  $("curNote").addEventListener("input", (e) => { cur.note = e.target.value; });
+  $("curSecs").addEventListener("input", (e) => { cur.secs = Math.max(1.5, Math.min(10, Number(e.target.value) || 3.5)); updateSum(); queueSave(); });
+  $("curTrans").addEventListener("change", (e) => { cur.transition = e.target.value; updateSum(); queueSave(); });
+  $("curVol").addEventListener("input", (e) => { cur.bgm_volume = Number(e.target.value) / 100; $("curVolVal").textContent = e.target.value + "%"; queueSave(); });
+  $("curCredit").addEventListener("input", (e) => { cur.credit = e.target.value; queueSave(); });
+
+  // ───────── 음악 ─────────
+  function bgmUrl(path) { return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`; }
+  function renderBgm() {
+    $("bgmArea").innerHTML = cur.bgm_path
+      ? `<div class="cu-row"><audio controls preload="none" src="${esc(bgmUrl(cur.bgm_path))}" style="flex:1;height:34px;min-width:0;"></audio><button type="button" class="cu-mini del" id="bgmDel" style="margin:0;">삭제</button></div>`
+      : '<div class="cu-note" style="margin:0;">배경음악 없음 (무음으로 만들어집니다)</div>';
+    if ($("bgmDel")) $("bgmDel").addEventListener("click", async () => {
+      const old = cur.bgm_path; cur.bgm_path = null; renderBgm(); queueSave();
+      await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${old}`, { method: "DELETE", headers });
+    });
+  }
+  $("bgmFile").addEventListener("change", async (e) => {
+    const file = e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    try {
+      await saveNow(); // 올릴 폴더(콘티 번호)가 필요
+      const path = `${cur.id}/bgm_${Date.now()}_${file.name.replace(/[^\w.\-]/g, "_")}`;
+      const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "POST", headers: { ...headers, "Content-Type": file.type || "audio/mpeg" }, body: file });
+      if (!r.ok) throw new Error(await r.text());
+      const old = cur.bgm_path; cur.bgm_path = path; renderBgm(); queueSave();
+      if (old) await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${old}`, { method: "DELETE", headers });
+    } catch (err) { showMsg("음악 올리기 실패: " + err.message, false); }
+  });
+
+  // ───────── 저장 (자동) ─────────
+  let saveTimer = null, saving = Promise.resolve(), dirty = false;
+  function queueSave() {
+    dirty = true; $("saveState").textContent = "수정됨";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { saveNow().catch(() => {}); }, 1200);
+  }
+  function flushSave() { clearTimeout(saveTimer); return dirty ? saveNow() : saving; }
+
+  function creditLines() {
+    const seen = new Set(), lines = [];
+    cur.items.forEach((it) => {
+      const p = it.photo;
+      if (!p || !p.photographer || seen.has(p.photographer)) return;
+      seen.add(p.photographer);
+      lines.push(`사진: ${p.photographer} (Pexels)${p.photographer_url ? " — " + p.photographer_url : ""}`);
+    });
+    if (cur.credit.trim()) lines.push(cur.credit.trim());
+    return lines.join("\n");
+  }
+
+  function saveNow() {
+    saving = saving.then(async () => {
+      if (!cur) return;
+      dirty = false;
+      $("saveState").textContent = "저장 중…";
+      const settings = {
+        ...(curRow ? curRow.video_settings : {}),
+        name: cur.title.trim() || "(제목 없음)", mode: "curation", title_text: cur.title.trim(),
+        secs_per_photo: cur.secs, transition: cur.transition, bgm_path: cur.bgm_path, bgm_volume: cur.bgm_volume, music_credit: cur.credit,
+      };
+      const scriptBody = { hook: cur.title.trim() || "(제목 없음)", fact_sources: creditLines(), video_settings: settings };
+      if (!cur.id) {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts`, {
+          method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
+          body: JSON.stringify({ category: CATEGORY, story: "", closing: "", status: "approved", slug: `curation-${Date.now()}`, ...scriptBody }),
+        });
+        if (!r.ok) { dirty = true; $("saveState").textContent = "저장 실패"; throw new Error(await r.text()); }
+        curRow = (await r.json())[0]; cur.id = curRow.id;
+      } else {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${cur.id}`, { method: "PATCH", headers: { ...jsonHeaders, Prefer: "return=representation" }, body: JSON.stringify(scriptBody) });
+        if (!r.ok) { dirty = true; $("saveState").textContent = "저장 실패"; throw new Error(await r.text()); }
+        curRow = (await r.json())[0] || curRow;
+      }
+      // 항목: 통째로 다시 쓴다 (항목 번호를 참조하는 곳이 없어서 안전)
+      await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?script_id=eq.${cur.id}`, { method: "DELETE", headers });
+      const rows = cur.items.map((it, i) => ({
+        script_id: cur.id, order_no: i + 1, section: it.name, script_text: it.comment, keyword: it.keyword, direction: "",
+        target_seconds: cur.secs, asset_paths: it.photo ? [it.photo.url] : [],
+        asset_notes: it.photo ? { [it.photo.url]: { source: "Pexels", photographer: it.photo.photographer, photographer_url: it.photo.photographer_url, articleUrl: it.photo.page_url, thumb: it.photo.thumb } } : {},
+      }));
+      if (rows.length) {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, { method: "POST", headers: jsonHeaders, body: JSON.stringify(rows) });
+        if (!r.ok) { dirty = true; $("saveState").textContent = "저장 실패"; throw new Error(await r.text()); }
+      }
+      if (!dirty) { $("saveState").textContent = "저장됨 ✓"; setTimeout(() => { if (!dirty && $("saveState").textContent === "저장됨 ✓") $("saveState").textContent = ""; }, 1500); }
+    }).catch((err) => { showMsg("저장 실패: " + err.message, false); });
+    return saving;
+  }
+
+  function showMsg(t, ok) { const m = $("msg"); m.className = "msg " + (ok ? "ok" : "err"); m.textContent = t; }
+  window.addEventListener("beforeunload", (e) => { if (dirty) { saveNow(); e.preventDefault(); e.returnValue = ""; } });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && dirty) saveNow(); });
+
+  // ───────── AI 구성안 ─────────
+  $("planBtn").addEventListener("click", async () => {
+    const title = $("curTitle").value.trim();
+    if (!title) { $("planMsg").textContent = "제목(주제)을 먼저 입력하세요."; return; }
+    if (cur.items.some((it) => it.photo) && !confirm("지금 고른 항목과 사진이 모두 새 구성안으로 바뀝니다. 계속할까요?")) return;
+    const btn = $("planBtn"); btn.disabled = true; btn.textContent = "구성안 만드는 중... (10~20초)";
+    $("planMsg").textContent = "";
+    try {
+      const res = await fetch("/api/gemini-curation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, count: cur.count, note: cur.note }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "구성안 생성 실패");
+      cur.title = data.title || title; $("curTitle").value = cur.title;
+      cur.items = data.items.map((it) => ({ name: it.name, comment: it.comment, keyword: it.keyword, photo: null }));
+      renderItems(); queueSave();
+      // 항목마다 사진 첫 후보를 자동으로 (이미 쓴 사진은 피해서)
+      const used = new Set();
+      let done = 0;
+      for (let i = 0; i < cur.items.length; i++) {
+        $("planMsg").textContent = `사진 찾는 중... (${i + 1}/${cur.items.length})`;
+        const photos = await searchPhotos(cur.items[i].keyword, 1).catch(() => []);
+        const pick = photos.find((p) => !used.has(p.id)) || photos[0];
+        if (pick) { used.add(pick.id); cur.items[i].photo = toPhoto(pick); done++; }
+        if (i % 3 === 2) renderItems();
+      }
+      renderItems(); queueSave();
+      $("planMsg").textContent = `구성안을 만들었습니다 (사진 ${done}/${cur.items.length}장 자동 선택). 사진을 눌러 바꾸고, 이름·순서를 고쳐 보세요.`;
+    } catch (err) { $("planMsg").textContent = "실패: " + err.message; }
+    finally { btn.disabled = false; btn.textContent = "AI로 구성안 만들기"; }
+  });
+
+  // ───────── 사진 고르기 ─────────
+  let pickIdx = -1, pickPage = 1, pickQ = "";
+  const toPhoto = (p) => ({ url: p.url, thumb: p.thumb, page_url: p.page_url, photographer: p.photographer, photographer_url: p.photographer_url, id: p.id });
+  async function searchPhotos(q, page) {
+    const res = await fetch(`/api/pexels-photos?q=${encodeURIComponent(q)}&page=${page}&orientation=portrait`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "검색 실패");
+    return data.results;
+  }
+  async function runPick(page, append) {
+    $("pickInfo").textContent = "검색 중...";
+    try {
+      const list = await searchPhotos(pickQ, page);
+      pickPage = page;
+      const chosen = (cur.items[pickIdx] || {}).photo;
+      const html = list.map((p) => `<div data-p='${esc(JSON.stringify(toPhoto(p)))}' class="${chosen && chosen.url === p.url ? "sel" : ""}" style="background-image:url('${esc(p.thumb)}')"><small>${esc(p.photographer)}</small></div>`).join("");
+      $("pickGrid").innerHTML = append ? $("pickGrid").innerHTML + html : html;
+      $("pickInfo").textContent = list.length ? "" : "결과가 없습니다. 영어 검색어를 바꿔 보세요.";
+    } catch (err) { $("pickInfo").textContent = "실패: " + err.message; }
+  }
+  function openPicker(i) {
+    pickIdx = i; pickQ = cur.items[i].keyword || "";
+    $("pickTitle").textContent = `${i + 1}번 사진 고르기${cur.items[i].name ? " — " + cur.items[i].name : ""}`;
+    $("pickQuery").value = pickQ; $("pickGrid").innerHTML = "";
+    $("pickModal").classList.add("open");
+    if (pickQ) runPick(1, false);
+  }
+  $("pickSearch").addEventListener("click", () => { pickQ = $("pickQuery").value.trim(); if (pickQ) runPick(1, false); });
+  $("pickQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("pickSearch").click(); } });
+  $("pickMore").addEventListener("click", () => { if (pickQ) runPick(pickPage + 1, true); });
+  $("pickClose").addEventListener("click", () => $("pickModal").classList.remove("open"));
+  $("pickGrid").addEventListener("click", (e) => {
+    const d = e.target.closest("[data-p]");
+    if (!d) return;
+    cur.items[pickIdx].photo = JSON.parse(d.dataset.p);
+    if (pickQ && !cur.items[pickIdx].keyword) cur.items[pickIdx].keyword = pickQ;
+    $("pickModal").classList.remove("open");
+    renderItems(); queueSave();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("pickModal").classList.remove("open"); });
+
+  // ───────── 영상 생성 ─────────
+  async function refreshGenState() {
+    const info = await genFetchInfo(cur.id);
+    if (!info || !cur) return;
+    const btn = $("genBtn"), note = $("genNote");
+    if (info.status === "running") { btn.disabled = true; btn.textContent = "영상 생성 중... (몇 분 걸려요)"; watchGeneration(cur.id); }
+    else { btn.disabled = false; btn.textContent = `영상 생성 (v${await genNextVersion(cur.id)})`; }
+    if (info.status === "error") {
+      note.innerHTML = `${esc(genErrorText(info.lastError))}${info.lastError && info.lastError.url ? ` · <a href="${esc(info.lastError.url)}" target="_blank" rel="noopener" style="color:#ffd93d;">실행 기록 보기</a>` : ""}<br>버튼을 다시 누르면 재시도합니다.`;
+      note.style.display = "block";
+    } else note.style.display = "none";
+  }
+  function watchGeneration(id) {
+    if (genWatch.has(String(id))) return;
+    const timer = setInterval(async () => {
+      const info = await genFetchInfo(id);
+      if (!info || info.status === "running") return;
+      clearInterval(timer); genWatch.delete(String(id));
+      genNotify((curRow && curRow.video_settings && curRow.video_settings.name) || "큐레이션", info.status === "done");
+      if (cur && cur.id === id) refreshGenState();
+    }, 8000);
+    genWatch.set(String(id), timer);
+  }
+  $("genBtn").addEventListener("click", async () => {
+    const btn = $("genBtn");
+    if (!cur.title.trim()) { showMsg("제목을 입력하세요 (영상 첫 화면에 들어갑니다).", false); return; }
+    if (cur.items.filter((it) => it.photo).length < 1) { showMsg("사진을 한 장 이상 골라주세요.", false); return; }
+    btn.disabled = true;
+    try {
+      await flushSave();
+      const [rr, sr] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&id=eq.${cur.id}`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=*&script_id=eq.${cur.id}&order=order_no.asc`, { headers }),
+      ]);
+      const row = (await rr.json())[0];
+      const segs = (await sr.json()).filter((s) => (s.asset_paths || []).length);
+      const version = await genNextVersion(cur.id);
+      if (!confirm(`v${version} 영상 생성을 시작할까요? 몇 분 걸리고, 완성되면 알려드립니다. 영상은 Studio에서 확인하세요.`)) { btn.disabled = false; return; }
+      genRequestPermission();
+      await genStart(row, segs, version);
+      btn.textContent = "영상 생성 중... (몇 분 걸려요)";
+      watchGeneration(cur.id);
+      showMsg("영상 생성을 시작했습니다. 완성되면 알림이 뜹니다.", true);
+    } catch (err) { btn.disabled = false; showMsg("영상 생성 실패: " + err.message, false); }
+  });
+
+  loadList();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+</script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>

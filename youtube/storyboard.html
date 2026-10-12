@@ -887,7 +887,7 @@
   async function loadScripts() {
     const sel = document.getElementById("scriptSelect");
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&order=created_at.desc`, { headers });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&category=neq.${encodeURIComponent("큐레이션")}&order=created_at.desc`, { headers });
       scripts = await res.json();
       const nameOf = (r) => (r.video_settings && r.video_settings.name) || (r.hook || "").slice(0, 30) || "(이름 없음)";
       sel.innerHTML = '<option value="">선택하세요</option>' +

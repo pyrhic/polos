@@ -109,6 +109,10 @@ async function genStart(row, segRows, version) {
     tts_voice: vs.tts_voice,
     tts_rate: vs.tts_rate,
     tts_pitch: vs.tts_pitch,
+    // 큐레이션 영상(사진+제목+음악, 음성·자막 없음)용
+    mode: vs.mode,
+    title_text: vs.title_text,
+    secs_per_photo: vs.secs_per_photo,
   };
   const res = await fetch("/api/trigger-generation", {
     method: "POST",
