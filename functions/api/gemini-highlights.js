@@ -68,9 +68,7 @@ export async function onRequestPost(context) {
       },
     });
     if (!r.ok) {
-      const message = r.quotaExceeded
-        ? "제미나이 무료 사용량을 오늘 다 썼습니다 (하루 20회 제한). 내일 다시 시도하세요."
-        : "제미나이 호출 실패 (일시적 혼잡일 수 있음, 잠시 후 다시 시도해주세요)";
+      const message = r.message;
       return json({ error: message, quotaExceeded: r.quotaExceeded, detail: r.errText }, 502);
     }
     const text = r.data.candidates?.[0]?.content?.parts?.[0]?.text;

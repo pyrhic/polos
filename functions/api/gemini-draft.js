@@ -1,5 +1,6 @@
 import { fetchArticle } from "../_lib/article.js";
 import { findPerspectiveArticles } from "../_lib/news.js";
+import { callGemini } from "../_lib/gemini.js";
 
 // Trend에서 고른 주제 + 관련 기사로 대본과 장면(콘티)을 만든다.
 // 1) 구글 뉴스 검색(무료)으로 관련 칼럼·분석 기사 수집  2) 기사 + 관점 자료로 대본/장면 작성 (제미나이 호출은 1번)
@@ -17,26 +18,6 @@ const CARD_SCHEMA = {
   properties: { script_text: { type: "STRING" }, keyword: { type: "STRING" }, direction: { type: "STRING" } },
   required: ["script_text", "keyword", "direction"],
 };
-
-const MODEL_URL = (key) => `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`;
-
-// 제미나이 호출: 과부하(503/5xx)는 재시도하고, 하루 무료 한도 초과(429)는 재시도 없이 구분해서 알려준다
-async function callGemini(apiKey, body) {
-  const MAX_ATTEMPTS = 4;
-  const BACKOFF_MS = [1000, 2500, 5000];
-  let res, errText = "", quotaExceeded = false;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    res = await fetch(MODEL_URL(apiKey), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (res.ok) break;
-    errText = await res.text();
-    if (res.status === 429 && errText.includes("RESOURCE_EXHAUSTED")) { quotaExceeded = true; break; }
-    const retriable = res.status === 503 || res.status >= 500;
-    if (!retriable || attempt === MAX_ATTEMPTS - 1) break;
-    await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt] ?? 5000));
-  }
-  if (res.ok) return { ok: true, data: await res.json() };
-  return { ok: false, status: res.status, errText, quotaExceeded };
-}
 
 const researchUsable = (text) => !!text && text.trim().length > 0;
 
@@ -102,7 +83,7 @@ export async function onRequestPost(context) {
       sources: perspectives.map((a) => ({ title: `${a.source} — ${a.title}`, url: a.url })),
     };
     
-    const written = await callGemini(apiKey, {
+    const requestBody = {
       contents: [{ parts: [{ text: buildPrompt(cleanTopic, picked, researched.text, String(note || "").trim().slice(0, 300), String(traffic || "").slice(0, 20)) }] }],
       generationConfig: {
         responseMimeType: "application/json",
@@ -118,30 +99,31 @@ export async function onRequestPost(context) {
           required: ["name", "trend_summary", "issue", "perspectives", "closing"],
         },
       },
-    });
-
-    if (!written.ok) {
-      const message = written.quotaExceeded
-        ? "제미나이 무료 사용량을 오늘 다 썼습니다 (하루 20회 제한). 내일 다시 시도하세요."
-        : "제미나이 호출 실패 (일시적 혼잡일 수 있음, 잠시 후 다시 시도해주세요)";
-      return json({ error: message, quotaExceeded: written.quotaExceeded, detail: written.errText }, 502);
-    }
-
-    const text = written.data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return json({ error: "제미나이 응답을 이해할 수 없습니다", detail: JSON.stringify(written.data) }, 502);
-
-    const parsed = JSON.parse(text);
+    };
     const usePerspectives = researchUsable(researched.text);
     const card = (part) => (c) => ({ section: part, script_text: String(c.script_text || "").trim(), keyword: c.keyword || "", direction: c.direction || "" });
-    parsed.segments = [
-      ...(parsed.trend_summary || []).map(card("트렌드 요약")),
-      ...(parsed.issue || []).map(card("이슈 설명")),
-      ...(usePerspectives ? (parsed.perspectives || []).map(card("관점 정리")) : []),
-      // 작성자가 직접 쓸 자리: 항상 빈 대사로 넣는다
-      { section: "내 의견", script_text: "", keyword: "person thinking window", direction: "천천히 줌인" },
-      ...(parsed.closing || []).map(card("마무리")),
-    ];
-    if (parsed.segments.filter((c) => c.script_text).length < 4) return json({ error: "대본이 충분히 만들어지지 않았습니다. 다시 시도해주세요" }, 502);
+
+    // 응답이 중간에 잘려 JSON이 깨지거나 대본이 너무 짧게 나오는 건 가끔 있는 일시적 현상이라, 이 경우만 한 번 더 시도함
+    let parsed = null, lastProblem = "";
+    for (let pass = 0; pass < 2 && !parsed; pass++) {
+      const written = await callGemini(apiKey, requestBody);
+      if (!written.ok) return json({ error: written.message, quotaExceeded: written.quotaExceeded, detail: written.errText }, 502);
+      const text = written.data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("");
+      if (!text) { lastProblem = "제미나이 응답이 비어 있습니다"; continue; }
+      let candidate;
+      try { candidate = JSON.parse(text); } catch { lastProblem = "제미나이 응답이 중간에 끊겨 해석하지 못했습니다"; continue; }
+      candidate.segments = [
+        ...(candidate.trend_summary || []).map(card("트렌드 요약")),
+        ...(candidate.issue || []).map(card("이슈 설명")),
+        ...(usePerspectives ? (candidate.perspectives || []).map(card("관점 정리")) : []),
+        // 작성자가 직접 쓸 자리: 항상 빈 대사로 넣는다
+        { section: "내 의견", script_text: "", keyword: "person thinking window", direction: "천천히 줌인" },
+        ...(candidate.closing || []).map(card("마무리")),
+      ];
+      if (candidate.segments.filter((c) => c.script_text).length < 4) { lastProblem = "대본이 충분히 만들어지지 않았습니다"; continue; }
+      parsed = candidate;
+    }
+    if (!parsed) return json({ error: lastProblem + " (두 번 시도했어요). 잠시 뒤 다시 시도해주세요" }, 502);
     delete parsed.trend_summary; delete parsed.issue; delete parsed.perspectives; delete parsed.closing;
 
     parsed.usedArticles = picked.map((a) => ({ title: a.title, url: a.url, source: a.source, hadText: !!a.text }));
