@@ -137,7 +137,7 @@ export async function onRequestPost(context) {
         ...(usePerspectives ? (candidate.perspectives || []).map(card("관점 정리")) : []),
         ...(candidate.closing || []).map(card("마무리")),
         // 구독/좋아요 안내 카드: 항상 마지막에 넣는다. 사진은 영상 만들 때 마녀 사진이 자동으로 들어간다(직접 넣으면 그 사진을 씀)
-        { section: "구독/좋아요", script_text: SUBSCRIBE_TEXT, keyword: "witch", direction: "천천히 줌인" },
+        { section: "구독/좋아요", script_text: SUBSCRIBE_TEXT, keyword: "sexy witch", direction: "천천히 줌인" },
       ];
       if (candidate.segments.filter((c) => c.script_text).length < 4) { lastProblem = "대본이 충분히 만들어지지 않았습니다"; continue; }
       parsed = candidate;
