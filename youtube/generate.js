@@ -115,6 +115,7 @@ async function genStart(row, segRows, version) {
     mode: vs.mode,
     title_text: vs.title_text,
     secs_per_photo: vs.secs_per_photo,
+    caption_mode: vs.caption_mode,   // off / name / name_desc
   };
   const res = await fetch("/api/trigger-generation", {
     method: "POST",

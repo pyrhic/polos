@@ -91,6 +91,15 @@
             <option value="cut">컷 (바로 전환)</option>
           </select>
         </div>
+        <div class="cu-row" style="margin-top:10px;">
+          <label style="margin:0;">사진 밑 자막</label>
+          <select id="curCap" style="width:auto;">
+            <option value="name_desc">이름 + 한 줄 설명</option>
+            <option value="name">이름만</option>
+            <option value="off">없음</option>
+          </select>
+        </div>
+        <div class="settings-note" style="margin:4px 0 0;color:#a89bb5;font-size:0.75rem;">항목의 이름(장소, 나라)과 설명이 사진 아래에 작고 은은하게 나와요. 설명까지 읽으려면 사진 한 장당 4초 이상이 좋아요.</div>
         <label style="margin-top:12px;">배경음악 (사용이 허락된 음원만 올려주세요)</label>
         <div id="bgmArea"></div>
         <label class="cu-file" style="display:block;background:#2f2440;color:#fff;text-align:center;padding:9px;border-radius:3px;font-size:0.85rem;cursor:pointer;margin-top:6px;">
@@ -229,7 +238,7 @@
 
   // ───────── 열기 / 새로 만들기 ─────────
   function newCuration() {
-    cur = { id: null, title: "", count: 10, note: "", secs: 3.5, transition: "fade", bgm_path: null, bgm_volume: 0.8, credit: "", items: [] };
+    cur = { id: null, title: "", count: 10, note: "", secs: 3.5, transition: "fade", caption_mode: "name_desc", bgm_path: null, bgm_volume: 0.8, credit: "", items: [] };
     curRow = null;
     showEdit();
   }
@@ -246,7 +255,7 @@
     curRow = row;
     cur = {
       id, title: vs.title_text || vs.name || "", count: segs.length || 10, note: "",
-      secs: vs.secs_per_photo || 3.5, transition: vs.transition || "fade", bgm_path: vs.bgm_path || null,
+      secs: vs.secs_per_photo || 3.5, transition: vs.transition || "fade", caption_mode: vs.caption_mode || "name_desc", bgm_path: vs.bgm_path || null,
       bgm_volume: vs.bgm_volume ?? 0.8, credit: vs.music_credit || "",
       items: segs.map((s) => {
         const url = (s.asset_paths || [])[0];
@@ -264,7 +273,7 @@
     $("listView").style.display = "none";
     $("editView").style.display = "block";
     $("curTitle").value = cur.title; $("curCount").value = cur.count; $("curNote").value = cur.note;
-    $("curSecs").value = cur.secs; $("curTrans").value = cur.transition;
+    $("curSecs").value = cur.secs; $("curTrans").value = cur.transition; $("curCap").value = cur.caption_mode || "name_desc";
     $("curVol").value = Math.round(cur.bgm_volume * 100); $("curVolVal").textContent = Math.round(cur.bgm_volume * 100) + "%";
     $("curCredit").value = cur.credit;
     $("planMsg").textContent = ""; $("msg").className = "msg"; $("saveState").textContent = "";
@@ -329,6 +338,7 @@
   $("curNote").addEventListener("input", (e) => { cur.note = e.target.value; });
   $("curSecs").addEventListener("input", (e) => { cur.secs = Math.max(1.5, Math.min(10, Number(e.target.value) || 3.5)); updateSum(); queueSave(); });
   $("curTrans").addEventListener("change", (e) => { cur.transition = e.target.value; updateSum(); queueSave(); });
+  $("curCap").addEventListener("change", (e) => { cur.caption_mode = e.target.value; queueSave(); });
   $("curVol").addEventListener("input", (e) => { cur.bgm_volume = Number(e.target.value) / 100; $("curVolVal").textContent = e.target.value + "%"; queueSave(); });
   $("curCredit").addEventListener("input", (e) => { cur.credit = e.target.value; queueSave(); });
 
@@ -385,7 +395,7 @@
       const settings = {
         ...(curRow ? curRow.video_settings : {}),
         name: cur.title.trim() || "(제목 없음)", mode: "curation", title_text: cur.title.trim(),
-        secs_per_photo: cur.secs, transition: cur.transition, bgm_path: cur.bgm_path, bgm_volume: cur.bgm_volume, music_credit: cur.credit,
+        secs_per_photo: cur.secs, transition: cur.transition, caption_mode: cur.caption_mode || "name_desc", bgm_path: cur.bgm_path, bgm_volume: cur.bgm_volume, music_credit: cur.credit,
       };
       const scriptBody = { hook: cur.title.trim() || "(제목 없음)", fact_sources: creditLines(), video_settings: settings };
       if (!cur.id) {
