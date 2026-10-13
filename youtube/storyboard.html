@@ -1847,14 +1847,18 @@
   // ───── 사진 위치 팝업 ─────
   // 소재를 화면 비율로 자를 때 남길 부분. asset_trims.__focus[경로] = {x, y} (0~1, 0.5가 가운데). 영상 만들 때 그대로 쓴다.
   let posState = null;
-  function posAspect() { return $("layoutSel").value === "framed" ? 1080 / 1280 : 1080 / 1920; }
+  // "제목+영상+출처" 구성에서 세로/가로 1.3 이상인 소재는 영상 영역이 화면 맨 아래까지(1080x1500), 그 밖은 1080x1280 (영상 만들기와 같은 규칙)
+  function posAspect(iw, ih) {
+    if ($("layoutSel").value !== "framed") return 1080 / 1920;
+    return iw && ih && ih / iw >= 1.3 ? 1080 / 1500 : 1080 / 1280;
+  }
   function layoutPos() {
     const st = posState;
     if (!st || !st.iw) return;
     const stage = $("posStage");
     const W = stage.clientWidth, H = W * st.ih / st.iw;
     stage.style.height = H + "px";
-    const a = posAspect();
+    const a = posAspect(st.iw, st.ih);
     let ww, wh;
     if (st.iw / st.ih > a) { wh = H; ww = H * a; } else { ww = W; wh = W / a; }
     st.slackX = Math.max(0, W - ww); st.slackY = Math.max(0, H - wh);
@@ -2084,7 +2088,7 @@
     // 화면 구성 / 제목 / 자막 모양: 지금 설정 그대로
     const framed = $("layoutSel").value === "framed";
     const media = $("prevMedia");
-    media.style.cssText = framed ? "top:105px;height:320px;bottom:auto;" : "";
+    media.style.cssText = framed ? "top:105px;height:375px;bottom:auto;" : "";
     [["prevT1", "title1"], ["prevT2", "title2"], ["prevSrc", "sourceText"]].forEach(([id, src]) => {
       const v = $(src).value.trim();
       $(id).style.display = framed && v ? "block" : "none";
@@ -2117,6 +2121,16 @@
         node.src = a.url; node.alt = "";
       }
       node.className = "pv-cut";
+      if (framed) {
+        // 세로로 긴 소재는 맨 아래까지(375px), 그 밖은 320px. 크기를 알게 되면 정한다
+        const fit = () => {
+          const w = node.naturalWidth || node.videoWidth, h = node.naturalHeight || node.videoHeight;
+          node.style.height = (w && h && h / w >= 1.3 ? 375 : 320) + "px";
+          node.style.bottom = "auto";
+        };
+        node.style.bottom = "auto"; node.style.height = "320px";
+        node.addEventListener(a.video ? "loadedmetadata" : "load", fit);
+      }
       const fc = ((seg.asset_trims || {}).__focus || {})[a.path];
       if (fc) node.style.objectPosition = `${fc.x * 100}% ${fc.y * 100}%`;
       media.appendChild(node);
