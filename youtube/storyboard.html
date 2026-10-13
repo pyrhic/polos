@@ -55,9 +55,24 @@
   #trimModal .cap-modal-box { max-height:calc(100vh - 24px); overflow-y:auto; position:relative; padding-bottom:0; }
   .trim-actions { position:sticky; bottom:0; background:#221a2e; padding:10px 0 14px; margin-top:6px; display:flex; gap:8px; }
   .trim-actions button { margin:0; }
+  .prev-btn { display:block; width:100%; margin:6px 0 0; padding:8px 10px; font-size:0.75rem; background:#16324a; color:#4fc3f7; text-transform:none; letter-spacing:0; }
+  #prevStage { touch-action:auto; cursor:default; }
+  #prevStage .pv-layer { position:absolute; inset:0; overflow:hidden; background:#000; }
+  #prevStage .pv-cut { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+  #prevStage .pv-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:14px; text-align:center; color:#a89bb5; font-size:0.75rem; line-height:1.5; background:#17101f; }
+  .pv-bar { height:4px; background:#0f0a14; border-radius:2px; overflow:hidden; margin:6px 0; }
+  .pv-bar > div { height:100%; width:0; background:#7cff4a; }
+  .pv-opt { display:flex; align-items:center; gap:6px; color:#a89bb5; font-size:0.78rem; margin:4px 0 0; }
+  .pv-opt input { width:auto; margin:0; }
   .trim-x { position:absolute; top:6px; right:8px; width:auto; margin:0; padding:2px 9px; font-size:1.1rem; line-height:1.2; background:transparent; color:#a89bb5; }
   .seg-trim-btn { display:block; width:90px; margin-top:3px; padding:3px 0; font-size:0.65rem; background:#0f0a14; color:#a89bb5; text-transform:none; letter-spacing:0; }
   .seg-trim-btn.set { color:#7cff4a; }
+  .seg-pos-btn { display:block; width:90px; margin-top:3px; padding:3px 0; font-size:0.65rem; background:#0f0a14; color:#a89bb5; text-transform:none; letter-spacing:0; }
+  .seg-pos-btn.set { color:#7cff4a; }
+  #posModal .cap-modal-box { max-height:calc(100vh - 24px); overflow-y:auto; position:relative; padding-bottom:0; }
+  #posStage { position:relative; width:100%; background:#000; border-radius:3px; overflow:hidden; touch-action:none; cursor:grab; user-select:none; margin:6px 0; }
+  #posStage .pos-media { display:block; width:100%; height:100%; object-fit:fill; pointer-events:none; }
+  #posStage .pos-win { position:absolute; border:2px solid #7cff4a; box-shadow:0 0 0 999px rgba(0,0,0,.62); pointer-events:none; box-sizing:border-box; }
   .runtime-summary { background:#17141c; border-radius:3px; padding:10px 14px; margin-top:14px; font-size:0.85rem; color:#7cff4a; font-weight:700; }
   .gen-main-btn { margin-top:10px; background:#7cff4a; color:#0f0a14; padding:12px; font-size:0.95rem; }
   .gen-main-btn:hover { background:#ffffff; }
@@ -283,6 +298,45 @@
       </div>
     </div>
 
+    <!-- 사진 위치 팝업: 가로로 긴 사진을 세로 화면에 맞춰 자를 때 어느 부분을 남길지 정한다 -->
+    <div class="cap-modal" id="posModal">
+      <div class="cap-modal-box" style="max-width:340px;">
+        <button type="button" id="posX" class="trim-x" title="저장하지 않고 닫기">✕</button>
+        <div class="cap-modal-hint" style="font-size:0.85rem;font-weight:700;color:#fff;">사진 위치</div>
+        <div class="cap-modal-hint">초록 테두리 안이 영상에 나오는 부분이에요. 끌거나 누르면 옮겨져요</div>
+        <div id="posStage"></div>
+        <div class="cap-modal-val" id="posInfo" style="font-size:0.78rem;"></div>
+        <div class="trim-actions">
+          <button type="button" id="posSave" style="flex:2;">저장</button>
+          <button type="button" id="posReset" style="flex:1;background:#221a2e;">가운데</button>
+          <button type="button" id="posClose" style="flex:1;background:#221a2e;">닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 장면 미리보기 팝업: 이 카드의 소재·연출·자막·제목을 지금 설정 그대로 간이로 재생 (음성은 휴대폰 목소리) -->
+    <div class="cap-modal" id="prevModal">
+      <div class="cap-modal-box" style="max-width:320px;">
+        <button type="button" id="prevX" class="trim-x" title="닫기">✕</button>
+        <div class="cap-modal-hint" id="prevTitle" style="font-size:0.85rem;font-weight:700;color:#fff;">장면 미리보기</div>
+        <div class="cap-preview" id="prevStage">
+          <div class="pv-layer" id="prevMedia"></div>
+          <div class="cap-t1" id="prevT1"></div>
+          <div class="cap-t2" id="prevT2"></div>
+          <div class="cap-src" id="prevSrc"></div>
+          <div class="cap-lines" id="prevLines"><div class="cap-normal" id="prevCap"></div></div>
+        </div>
+        <div class="pv-bar"><div id="prevBar"></div></div>
+        <div class="cap-modal-val" id="prevInfo" style="font-size:0.78rem;"></div>
+        <label class="pv-opt"><input type="checkbox" id="prevVoice" checked> 휴대폰 목소리로 읽기 (실제 영상의 목소리와는 달라요)</label>
+        <div class="settings-note" style="margin:6px 0 0;">화면 배치·연출·자막 위치를 보는 간이 미리보기예요. 자막 타이밍은 추정이고, 컷이 부족한 장면은 영상 생성 때 Pexels 영상이 더 채워져요.</div>
+        <div class="trim-actions">
+          <button type="button" id="prevReplay" style="flex:2;">다시 재생</button>
+          <button type="button" id="prevClose" style="flex:1;background:#221a2e;">닫기</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 선택 팝업: 화면 구성/목소리/분위기 등을 굴려서 고름 -->
     <div class="cap-modal" id="pickModal">
       <div class="cap-modal-box" style="max-width:280px;">
@@ -377,6 +431,7 @@
     const paths = seg.asset_paths || [];
     const notes = seg.asset_notes || {};
     const trims = seg.asset_trims || {};
+    const focus = trims.__focus || {};   // 사진/영상을 화면 비율로 자를 때 남길 부분: { 소재경로: {x,y} } (0~1, 기본 가운데)
     if (!paths.length) return '<div class="seg-thumb-empty">비어있음 — 키워드로 자동 검색됨</div>';
     return `<div class="seg-thumbs">${paths.map((p) => {
       const n = notes[p];
@@ -388,6 +443,7 @@
           : `<video class="seg-thumb" src="${assetUrl(p)}" muted preload="metadata"></video>`}
         <button type="button" class="seg-thumb-del" data-path="${escapeAttr(p)}">×</button>
         ${isTrimmable(p) ? `<button type="button" class="seg-trim-btn${trims[p] ? " set" : ""}" data-path="${escapeAttr(p)}">✂ ${trims[p] ? `${trimLabel(trims[p])}` : "구간 지정"}</button>` : ""}
+        <button type="button" class="seg-pos-btn${focus[p] ? " set" : ""}" data-path="${escapeAttr(p)}">⌖ ${focus[p] ? "위치 조정됨" : "위치"}</button>
         ${n ? `<a class="seg-news-badge" href="${escapeAttr(n.articleUrl || "#")}" target="_blank" rel="noopener" title="${escapeAttr(tip)}">뉴스 · ${escapeHtml(n.source || "")}<br>저작권 확인 필요</a>` : ""}
       </div>`;
     }).join("")}</div>`;
@@ -399,6 +455,9 @@
     );
     el.querySelectorAll(".seg-trim-btn").forEach((btn) =>
       btn.addEventListener("click", () => openTrimModal(id, btn.dataset.path))
+    );
+    el.querySelectorAll(".seg-pos-btn").forEach((btn) =>
+      btn.addEventListener("click", () => openPosModal(id, btn.dataset.path))
     );
   }
 
@@ -669,7 +728,7 @@
         if (Math.abs(dy) > 4) drag.moved = true;
         if (drag.moved) {
           // 미리보기 높이 480px 기준, 자막 위치는 화면 아래에서 띄운 비율
-          $("capPos").value = Math.max(3, Math.min(70, Math.round(drag.pos - dy / 480 * 100)));
+          $("capPos").value = Math.max(3, Math.min(85, Math.round(drag.pos - dy / 480 * 100)));
           fireCtl($("capPos"));
         }
       }
@@ -1321,7 +1380,8 @@
             <input type="file" class="seg-file-input" accept="image/*,video/*" multiple>
           </label>
         </div>
-        <div style="color:#a89bb5;font-size:0.75rem;margin-bottom:10px;">이 카드 아무 곳이나 클릭한 뒤 Ctrl+V로도 이미지를 붙여넣을 수 있어요.</div>
+        <button type="button" class="prev-btn seg-prev-btn">▶ 이 장면 미리보기</button>
+        <div style="color:#a89bb5;font-size:0.75rem;margin:8px 0 10px;">이 카드 아무 곳이나 클릭한 뒤 Ctrl+V로도 이미지를 붙여넣을 수 있어요.</div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:14px 0 6px;color:#a89bb5;font-size:0.9rem;font-weight:600;">
           <span>대사 (영상의 음성·자막이 이 내용으로 만들어집니다)</span>
           <button type="button" class="seg-emph-btn" style="width:auto;padding:3px 10px;font-size:0.7rem;margin:0;background:#221a2e;flex-shrink:0;">선택한 글자 강조</button>
@@ -1761,6 +1821,303 @@
   $("trimX").addEventListener("click", closeTrimModal);
   $("trimModal").addEventListener("click", (e) => { if (e.target === $("trimModal")) closeTrimModal(); });
 
+  // ───── 사진 위치 팝업 ─────
+  // 소재를 화면 비율로 자를 때 남길 부분. asset_trims.__focus[경로] = {x, y} (0~1, 0.5가 가운데). 영상 만들 때 그대로 쓴다.
+  let posState = null;
+  function posAspect() { return $("layoutSel").value === "framed" ? 1080 / 1100 : 1080 / 1920; }
+  function layoutPos() {
+    const st = posState;
+    if (!st || !st.iw) return;
+    const stage = $("posStage");
+    const W = stage.clientWidth, H = W * st.ih / st.iw;
+    stage.style.height = H + "px";
+    const a = posAspect();
+    let ww, wh;
+    if (st.iw / st.ih > a) { wh = H; ww = H * a; } else { ww = W; wh = W / a; }
+    st.slackX = Math.max(0, W - ww); st.slackY = Math.max(0, H - wh);
+    const win = stage.querySelector(".pos-win");
+    win.style.width = ww + "px"; win.style.height = wh + "px";
+    win.style.left = (st.slackX * st.x) + "px"; win.style.top = (st.slackY * st.y) + "px";
+    $("posInfo").textContent = st.slackX < 2 && st.slackY < 2
+      ? "이 소재는 화면 비율과 거의 같아서 위치를 바꿀 부분이 없어요"
+      : `가로 ${Math.round(st.x * 100)}% · 세로 ${Math.round(st.y * 100)}% (화면 구성: ${$("layoutSel").value === "framed" ? "제목+영상+출처" : "전체 화면"})`;
+  }
+  function openPosModal(id, path) {
+    const seg = segments.find((s) => String(s.id) === id);
+    if (!seg) return;
+    const f = ((seg.asset_trims || {}).__focus || {})[path];
+    posState = { id, path, x: f ? f.x : 0.5, y: f ? f.y : 0.5, iw: 0, ih: 0, slackX: 0, slackY: 0 };
+    const stage = $("posStage");
+    stage.innerHTML = "";
+    stage.style.height = "160px";
+    const video = !isImage(path);
+    const media = document.createElement(video ? "video" : "img");
+    media.className = "pos-media";
+    if (video) { media.muted = true; media.preload = "auto"; media.playsInline = true; media.src = assetUrl(path) + "#t=0.1"; }
+    else media.src = assetUrl(path);
+    const win = document.createElement("div");
+    win.className = "pos-win";
+    stage.append(media, win);
+    const ready = () => { posState.iw = media.naturalWidth || media.videoWidth; posState.ih = media.naturalHeight || media.videoHeight; layoutPos(); };
+    if (video) media.addEventListener("loadeddata", ready); else media.addEventListener("load", ready);
+    $("posModal").classList.add("open");
+  }
+  function closePosModal() { $("posModal").classList.remove("open"); $("posStage").innerHTML = ""; posState = null; }
+  async function savePos(reset) {
+    const st = posState;
+    if (!st) return;
+    const seg = segments.find((s) => String(s.id) === st.id);
+    const trims = { ...(seg.asset_trims || {}) };
+    const focus = { ...(trims.__focus || {}) };
+    if (reset || (Math.abs(st.x - 0.5) < 0.01 && Math.abs(st.y - 0.5) < 0.01)) delete focus[st.path];
+    else focus[st.path] = { x: Number(st.x.toFixed(3)), y: Number(st.y.toFixed(3)) };
+    if (Object.keys(focus).length) trims.__focus = focus; else delete trims.__focus;
+    try {
+      await saveField(st.id, "asset_trims", trims);
+      const id = st.id;
+      closePosModal();
+      refreshThumbs(id);
+    } catch (err) {
+      $("posInfo").textContent = "저장 실패: " + err.message;
+    }
+  }
+  (function initPosDrag() {
+    const stage = $("posStage");
+    let drag = false;
+    const move = (e) => {
+      const st = posState;
+      if (!st || !st.iw) return;
+      const r = stage.getBoundingClientRect();
+      const win = stage.querySelector(".pos-win");
+      const ww = parseFloat(win.style.width), wh = parseFloat(win.style.height);
+      // 손가락 위치가 테두리의 가운데가 되도록 옮긴다
+      if (st.slackX > 1) st.x = Math.max(0, Math.min(1, (e.clientX - r.left - ww / 2) / st.slackX));
+      if (st.slackY > 1) st.y = Math.max(0, Math.min(1, (e.clientY - r.top - wh / 2) / st.slackY));
+      layoutPos();
+    };
+    stage.addEventListener("pointerdown", (e) => { drag = true; stage.setPointerCapture(e.pointerId); move(e); });
+    stage.addEventListener("pointermove", (e) => { if (drag) move(e); });
+    ["pointerup", "pointercancel"].forEach((t) => stage.addEventListener(t, () => { drag = false; }));
+    window.addEventListener("resize", layoutPos);
+  })();
+  $("posSave").addEventListener("click", () => savePos(false));
+  $("posReset").addEventListener("click", () => savePos(true));
+  $("posClose").addEventListener("click", closePosModal);
+  $("posX").addEventListener("click", closePosModal);
+  $("posModal").addEventListener("click", (e) => { if (e.target === $("posModal")) closePosModal(); });
+
+  // ───── 장면 미리보기 (간이) ─────
+  // 영상 쪽(03_build_visuals/04_assemble/05)과 같은 규칙을 브라우저에서 흉내낸다: 컷 수는 4.5초당 1컷, 연출 키워드, 자막은 6단어/18자 단위.
+  const PV_DIRECTIONS = [
+    ["zoom_out", ["줌아웃", "줌 아웃", "zoom out", "축소"]],
+    ["pan_right", ["좌에서 우", "왼쪽에서 오른쪽", "오른쪽으로", "pan right"]],
+    ["pan_left", ["우에서 좌", "오른쪽에서 왼쪽", "왼쪽으로", "pan left"]],
+    ["tilt_down", ["틸트 다운", "위에서 아래", "아래로", "tilt down"]],
+    ["tilt_up", ["틸트 업", "틸트", "아래에서 위", "위로", "tilt up"]],
+    ["zoom_in", ["줌인", "줌 인", "zoom in", "확대"]],
+  ];
+  function pvMode(direction, idx) {
+    const t = (direction || "").toLowerCase();
+    for (const [mode, words] of PV_DIRECTIONS) if (words.some((w) => t.includes(w.toLowerCase()))) return mode;
+    return idx % 2 === 0 ? "zoom_in" : "zoom_out";
+  }
+  function pvKenBurns(img, mode, len) {
+    const zin = Math.min(1 + 0.024 * len, 1.35), zout = Math.max(1.15 - 0.024 * len, 1);
+    const f = {
+      zoom_in: [{ transform: "scale(1)" }, { transform: `scale(${zin})` }],
+      zoom_out: [{ transform: "scale(1.15)" }, { transform: `scale(${zout})` }],
+      pan_right: [{ transform: "translateX(15%) scale(1.3)" }, { transform: "translateX(-15%) scale(1.3)" }],
+      pan_left: [{ transform: "translateX(-15%) scale(1.3)" }, { transform: "translateX(15%) scale(1.3)" }],
+      tilt_down: [{ transform: "translateY(15%) scale(1.3)" }, { transform: "translateY(-15%) scale(1.3)" }],
+      tilt_up: [{ transform: "translateY(-15%) scale(1.3)" }, { transform: "translateY(15%) scale(1.3)" }],
+    }[mode];
+    return img.animate(f, { duration: len * 1000, fill: "forwards", easing: "linear" });
+  }
+  // 대사를 자막 덩어리로: **강조** 단어와 숫자 단어는 단독, 그 밖에는 6단어/18자 또는 문장 끝에서 끊는다
+  function pvGroups(raw) {
+    const words = [];
+    String(raw || "").split(/(\*\*[^*]+\*\*)/).forEach((part) => {
+      const emph = /^\*\*[^*]+\*\*$/.test(part);
+      (emph ? part.slice(2, -2) : part).split(/\s+/).filter(Boolean).forEach((w) => words.push({ w, emph }));
+    });
+    const groups = [];
+    let cur = [], len = 0;
+    const flush = () => { if (cur.length) groups.push({ words: cur, emph: false }); cur = []; len = 0; };
+    words.forEach((x) => {
+      if (x.emph || /\d/.test(x.w)) { flush(); groups.push({ words: [x], emph: x.emph }); return; }
+      cur.push(x); len += x.w.length + 1;
+      if (cur.length >= 6 || len >= 18 || /[.?!。]$/.test(x.w)) flush();
+    });
+    flush();
+    // 글자 위치(음성 경계 이벤트용)와 글자 수 비율(시간 배분용)
+    let pos = 0, total = 0;
+    groups.forEach((g) => { g.text = g.words.map((x) => x.w).join(" "); g.chars = g.text.replace(/\s/g, "").length || 1; total += g.chars; });
+    let acc = 0;
+    groups.forEach((g) => { g.t0 = acc / total; acc += g.chars; g.t1 = acc / total; g.charStart = pos; pos += g.text.length + 1; });
+    return { groups, plain: groups.map((g) => g.text).join(" ") };
+  }
+
+  let pv = null, pvLast = null;
+  function stopPreview() {
+    if (!pv) return;
+    cancelAnimationFrame(pv.raf);
+    try { window.speechSynthesis.cancel(); } catch {}
+    $("prevMedia").querySelectorAll("video").forEach((v) => v.pause());
+    $("prevMedia").querySelectorAll("img").forEach((i) => i.getAnimations().forEach((a) => a.cancel()));
+    pv = null;
+  }
+  function closePreview() { stopPreview(); $("prevModal").classList.remove("open"); }
+
+  function startPreview(segId) {
+    stopPreview();
+    const el = document.querySelector(`.seg-item[data-id="${segId}"]`);
+    const seg = segments.find((x) => String(x.id) === String(segId));
+    if (!el || !seg) return;
+    pvLast = segId;
+    const text = el.querySelector(".seg-script").value;
+    const direction = el.querySelector(".seg-direction").value;
+    const keyword = el.querySelector(".seg-keyword").value.trim();
+    const secs = Math.max(2, effectiveSeconds(el, seg));
+    const part = partOf(el.querySelector(".seg-section").value);
+
+    // 화면 구성 / 제목 / 자막 모양: 지금 설정 그대로
+    const framed = $("layoutSel").value === "framed";
+    const media = $("prevMedia");
+    media.style.cssText = framed ? "top:105px;height:275px;bottom:auto;" : "";
+    [["prevT1", "title1"], ["prevT2", "title2"], ["prevSrc", "sourceText"]].forEach(([id, src]) => {
+      const v = $(src).value.trim();
+      $(id).style.display = framed && v ? "block" : "none";
+      $(id).textContent = v;
+    });
+    const size = Number($("capSize").value), wt = WEIGHTS[Number($("capWeight").value)];
+    const cap = $("prevCap");
+    cap.style.fontSize = (size * 0.25) + "px";
+    cap.style.fontFamily = `${wt.family}, sans-serif`;
+    cap.style.fontWeight = wt.weight;
+    $("prevLines").style.bottom = (Number($("capPos").value) / 100 * 480) + "px";
+    cap.textContent = "";
+
+    // 컷 구성
+    const assets = (seg.asset_paths || []).map((path) => ({ path, url: assetUrl(path), video: !isImage(path) }));
+    const nCuts = assets.length ? Math.min(assets.length, Math.max(2, Math.round(secs / 4.5))) : 0;
+    const cutLen = nCuts ? secs / nCuts : secs;
+    media.innerHTML = "";
+    const cuts = [];
+    for (let k = 0; k < nCuts; k++) {
+      const a = assets[k];
+      let node;
+      if (a.video) {
+        node = document.createElement("video");
+        node.muted = true; node.playsInline = true; node.preload = "auto"; node.src = a.url;
+        const tr = (seg.asset_trims || {})[a.path];
+        node.dataset.start = tr && tr.start ? tr.start : 0;
+      } else {
+        node = document.createElement("img");
+        node.src = a.url; node.alt = "";
+      }
+      node.className = "pv-cut";
+      const fc = ((seg.asset_trims || {}).__focus || {})[a.path];
+      if (fc) node.style.objectPosition = `${fc.x * 100}% ${fc.y * 100}%`;
+      media.appendChild(node);
+      cuts.push({ node, video: a.video, mode: pvMode(direction, k) });
+    }
+    if (!nCuts) {
+      const empty = document.createElement("div");
+      empty.className = "pv-empty";
+      empty.textContent = part === SUBSCRIBE_PART
+        ? "사진을 넣지 않아서 영상 생성 때 마녀 사진이 하나 자동으로 들어가요"
+        : `사진·영상이 없어요${keyword ? ` — 영상 생성 때 '${keyword}'로 Pexels 영상이 들어가요` : ""}`;
+      media.appendChild(empty);
+    }
+    const need = Math.max(2, Math.round(secs / 4.5));
+    const baseInfo = `약 ${secs.toFixed(0)}초 · 컷 ${nCuts}개` + (nCuts && secs > 7 && assets.length < need ? ` (영상 생성 때 Pexels 컷 ${need - assets.length}개가 더 붙어요)` : "");
+    $("prevTitle").textContent = `${seg.order_no}번 장면 · ${part || "장면"}`;
+    $("prevInfo").textContent = baseInfo;
+    $("prevBar").style.width = "0";
+    $("prevModal").classList.add("open");
+
+    const { groups, plain } = pvGroups(text);
+    const state = { raf: 0, t0: performance.now(), shown: -1, cutIdx: -1, boundary: false, speaking: false, bGroup: -1 };
+    pv = state;
+
+    // 음성: 휴대폰 목소리 (실제 영상의 목소리와 다르다). 낭독 위치를 알려주는 기기에서는 자막이 낭독을 따라간다.
+    if ($("prevVoice").checked && plain && "speechSynthesis" in window) {
+      try {
+        const u = new SpeechSynthesisUtterance(plain);
+        u.lang = "ko-KR";
+        const ko = (speechSynthesis.getVoices() || []).find((v) => /^ko/i.test(v.lang));
+        if (ko) u.voice = ko;
+        u.rate = Math.max(0.5, Math.min(2, 1 + (Number(currentSettings.tts_rate) || 0) / 100));
+        u.pitch = Math.max(0.5, Math.min(2, 1 + (Number(currentSettings.tts_pitch) || 0) / 100));
+        u.onstart = () => { state.speaking = true; };
+        u.onend = u.onerror = () => { state.speaking = false; };
+        u.onboundary = (e) => {
+          state.boundary = true;
+          let gi = 0;
+          groups.forEach((g, i) => { if (g.charStart <= e.charIndex) gi = i; });
+          state.bGroup = gi;
+        };
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      } catch {}
+    }
+
+    const tick = (now) => {
+      if (pv !== state) return;
+      const t = (now - state.t0) / 1000;
+      const inTime = t < secs;
+      $("prevBar").style.width = Math.min(100, t / secs * 100) + "%";
+      // 컷 전환
+      if (cuts.length) {
+        const ci = Math.min(cuts.length - 1, Math.floor(Math.min(t, secs - 0.001) / cutLen));
+        if (ci !== state.cutIdx) {
+          state.cutIdx = ci;
+          cuts.forEach((c, i) => {
+            c.node.style.display = i === ci ? "block" : "none";
+            if (i !== ci && c.video) c.node.pause();
+          });
+          const c = cuts[ci];
+          if (c.video) {
+            try { c.node.currentTime = Number(c.node.dataset.start) || 0; c.node.play().catch(() => {}); } catch {}
+          } else {
+            c.node.getAnimations().forEach((a) => a.cancel());
+            pvKenBurns(c.node, c.mode, cutLen);
+          }
+        }
+      }
+      // 자막
+      let gi = -1;
+      if (state.boundary && state.bGroup >= 0) gi = state.bGroup;
+      else if (inTime) gi = groups.findIndex((g) => t / secs >= g.t0 && t / secs < g.t1);
+      if (gi !== state.shown) {
+        state.shown = gi;
+        const g = groups[gi];
+        cap.textContent = g ? g.text : "";
+        cap.style.fontFamily = g && g.emph ? "'Black Han Sans', sans-serif" : `${wt.family}, sans-serif`;
+        cap.style.fontWeight = g && g.emph ? 400 : wt.weight;
+        cap.style.color = g && g.emph ? "#ffff00" : "#fff";
+        cap.style.fontSize = ((g && g.emph ? size * 1.15 : size) * 0.25) + "px";
+      }
+      if (inTime || (state.speaking && t < secs + 20)) state.raf = requestAnimationFrame(tick);
+      else { cap.textContent = ""; $("prevBar").style.width = "100%"; $("prevInfo").textContent = baseInfo + " · 재생 끝"; }
+    };
+    state.raf = requestAnimationFrame(tick);
+  }
+  $("segList").addEventListener("click", (e) => {
+    const b = e.target.closest(".seg-prev-btn");
+    const card = b && b.closest(".seg-item");
+    if (card) startPreview(card.dataset.id);
+  });
+  $("prevReplay").addEventListener("click", () => { if (pvLast) startPreview(pvLast); });
+  $("prevClose").addEventListener("click", closePreview);
+  $("prevX").addEventListener("click", closePreview);
+  $("prevModal").addEventListener("click", (e) => { if (e.target === $("prevModal")) closePreview(); });
+  try { $("prevVoice").checked = localStorage.getItem("pvVoice") !== "0"; } catch {}
+  $("prevVoice").addEventListener("change", () => {
+    try { localStorage.setItem("pvVoice", $("prevVoice").checked ? "1" : "0"); } catch {}
+    if (!$("prevVoice").checked) { try { speechSynthesis.cancel(); } catch {} }
+  });
+
   async function removeSegmentAsset(id, path) {
     if (!confirm("이 소재를 삭제할까요?")) return;
     const seg = segments.find((s) => String(s.id) === id);
@@ -1772,6 +2129,13 @@
     if (seg.asset_trims && seg.asset_trims[path]) {
       const { [path]: _t, ...restTrims } = seg.asset_trims;
       await saveField(id, "asset_trims", restTrims);
+    }
+    const focusMap = (seg.asset_trims || {}).__focus;
+    if (focusMap && focusMap[path]) {
+      const { [path]: _f, ...restFocus } = focusMap;
+      const next = { ...(seg.asset_trims || {}) };
+      if (Object.keys(restFocus).length) next.__focus = restFocus; else delete next.__focus;
+      await saveField(id, "asset_trims", next);
     }
     if (seg.asset_notes && seg.asset_notes[path]) {
       const { [path]: _removed, ...rest } = seg.asset_notes;

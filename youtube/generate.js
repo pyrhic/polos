@@ -56,7 +56,9 @@ function genBuildSegments(segRows) {
     weight_seconds: s.target_seconds > 0 ? Number(s.target_seconds) : genEstimateSeconds(s.script_text),
     asset_urls: (s.asset_paths || []).map(genAssetUrl),
     // 영상/GIF 소재별 사용 구간 (소재 주소 -> {start, end})
-    asset_trims: Object.fromEntries(Object.entries(s.asset_trims || {}).map(([path, t]) => [genAssetUrl(path), t])),
+    asset_trims: Object.fromEntries(Object.entries(s.asset_trims || {}).filter(([k]) => k !== "__focus").map(([path, t]) => [genAssetUrl(path), t])),
+    // 사진/영상을 화면 비율로 자를 때 남길 부분 (asset_trims.__focus에 소재별로 저장됨)
+    asset_focus: Object.fromEntries(Object.entries((s.asset_trims || {}).__focus || {}).map(([path, f]) => [genAssetUrl(path), f])),
   }));
 }
 
