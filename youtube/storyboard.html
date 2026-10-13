@@ -1135,6 +1135,21 @@
     }
   }
 
+  // "제목 + 영상 + 출처" 화면 구성에 쓰는 문구: 제목 두 줄은 AI 제안, 출처는 참고한 기사의 매체명 (화면 구성이 다르면 영상에는 안 나온다)
+  function draftScreenText(data, articles) {
+    const out = {};
+    if (data.title1) out.title1 = String(data.title1).slice(0, 20);
+    if (data.title2) out.title2 = String(data.title2).slice(0, 20);
+    const names = [];
+    [...((data.usedArticles || []).map((a) => a.source)), ...articles.map((a) => a.source)].forEach((n) => {
+      n = String(n || "").trim();
+      // 주소(도메인)만 있는 경우는 매체명이 아니라서 제외
+      if (n && !/^[\w.-]+\.[a-z]{2,}$/i.test(n) && !names.includes(n)) names.push(n);
+    });
+    if (names.length) out.source_text = ("출처: " + names.join(", ")).slice(0, 60);
+    return out;
+  }
+
   async function createDraft() {
     const topic = $("draftTopic").value.trim();
     if (!topic) { showDraftMsg("주제를 입력하세요.", false); return; }
@@ -1171,7 +1186,7 @@
           ].join("\n"),
           status: "approved",
           slug: `${new Date().toISOString().slice(0, 10)}_${topic.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20)}`,
-          video_settings: { ...(userDefaults || {}), name: (data.name || topic).slice(0, 40) },
+          video_settings: { ...(userDefaults || {}), name: (data.name || topic).slice(0, 40), ...draftScreenText(data, articles) },
         }),
       });
       if (!scriptRes.ok) throw new Error(await scriptRes.text());
