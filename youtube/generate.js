@@ -116,6 +116,7 @@ async function genStart(row, segRows, version) {
     title_text: vs.title_text,
     secs_per_photo: vs.secs_per_photo,
     caption_mode: vs.caption_mode,   // off / name / name_desc
+    caption_font: vs.caption_font,   // sans(고딕) / serif(명조)
   };
   const res = await fetch("/api/trigger-generation", {
     method: "POST",
