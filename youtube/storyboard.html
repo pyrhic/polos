@@ -50,7 +50,12 @@
   .trim-row label { margin:6px 0 0; font-size:0.75rem; }
   .trim-row input { padding:6px 8px; font-size:0.9rem; margin:0; }
   .trim-mini { width:auto; padding:6px 8px; margin:0; font-size:0.7rem; background:#221a2e; text-transform:none; letter-spacing:0; }
-  #trimMediaHost video, #trimMediaHost img { max-width:100%; max-height:300px; border-radius:3px; background:#000; }
+  #trimMediaHost video, #trimMediaHost img { max-width:100%; max-height:min(300px,34vh); border-radius:3px; background:#000; }
+  /* 작은 화면에서도 저장/닫기 버튼이 항상 보이게: 팝업 안에서 내용만 스크롤되고 버튼 줄은 아래에 붙어 있다 */
+  #trimModal .cap-modal-box { max-height:calc(100vh - 24px); overflow-y:auto; position:relative; padding-bottom:0; }
+  .trim-actions { position:sticky; bottom:0; background:#221a2e; padding:10px 0 14px; margin-top:6px; display:flex; gap:8px; }
+  .trim-actions button { margin:0; }
+  .trim-x { position:absolute; top:6px; right:8px; width:auto; margin:0; padding:2px 9px; font-size:1.1rem; line-height:1.2; background:transparent; color:#a89bb5; }
   .seg-trim-btn { display:block; width:90px; margin-top:3px; padding:3px 0; font-size:0.65rem; background:#0f0a14; color:#a89bb5; text-transform:none; letter-spacing:0; }
   .seg-trim-btn.set { color:#7cff4a; }
   .runtime-summary { background:#17141c; border-radius:3px; padding:10px 14px; margin-top:14px; font-size:0.85rem; color:#7cff4a; font-weight:700; }
@@ -256,6 +261,7 @@
     <!-- 구간 지정 팝업: 영상/GIF에서 쓸 부분(시작~끝 초)을 고른다 -->
     <div class="cap-modal" id="trimModal">
       <div class="cap-modal-box" style="max-width:340px;">
+        <button type="button" id="trimX" class="trim-x" title="저장하지 않고 닫기">✕</button>
         <div class="cap-modal-hint" style="font-size:0.85rem;font-weight:700;color:#fff;">사용할 구간 지정</div>
         <div id="trimMediaHost" style="text-align:center;"></div>
         <div id="trimBar" class="trim-bar"><div id="trimSel" class="trim-sel"></div></div>
@@ -270,7 +276,10 @@
           <button type="button" id="trimPreview" style="background:#16324a;color:#4fc3f7;">구간 미리보기</button>
           <button type="button" id="trimReset" style="background:#221a2e;">전체 사용</button>
         </div>
-        <button type="button" id="trimDone" style="margin-top:8px;">완료</button>
+        <div class="trim-actions">
+          <button type="button" id="trimDone" style="flex:2;">저장</button>
+          <button type="button" id="trimClose" style="flex:1;background:#221a2e;">닫기</button>
+        </div>
       </div>
     </div>
 
@@ -1715,7 +1724,7 @@
       refreshThumbs(id);
     } catch (err) {
       const needSql = /asset_trims/.test(err.message);
-      $("trimInfo").textContent = needSql ? "저장 실패: youtube_tables_12_asset_trims.sql을 Supabase에서 먼저 실행해야 합니다." : "저장 실패: " + err.message;
+      $("trimInfo").textContent = needSql ? "저장 실패: Supabase에 구간 저장용 칸(asset_trims)이 아직 없어요. youtube_tables_12_asset_trims.sql을 SQL Editor에서 한 번 실행해야 해요. 그때까지는 '닫기'로 나가세요." : "저장 실패: " + err.message;
     }
   }
   ["trimStart", "trimEnd"].forEach((k) => $(k).addEventListener("input", updateTrimBar));
@@ -1733,6 +1742,8 @@
   });
   $("trimReset").addEventListener("click", () => saveTrim(true));
   $("trimDone").addEventListener("click", () => saveTrim(false));
+  $("trimClose").addEventListener("click", closeTrimModal);
+  $("trimX").addEventListener("click", closeTrimModal);
   $("trimModal").addEventListener("click", (e) => { if (e.target === $("trimModal")) closeTrimModal(); });
 
   async function removeSegmentAsset(id, path) {
