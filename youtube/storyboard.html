@@ -1983,6 +1983,49 @@
     out.push(run.slice(start));
     return out;
   }
+  // 자막이 한 줄에 들어가는지 실제 글자 폭으로 잰다 (영상 쪽 02_tts.py의 CaptionFit과 같은 규칙: 조금 넘치면 자간 7%·장평 85%까지 줄여 한 줄로)
+  function capMeasurer() {
+    const size = Number($("capSize").value) || 80;
+    const wt = WEIGHTS[Number($("capWeight").value)] || WEIGHTS[0];
+    capMeasurer.ctx = capMeasurer.ctx || document.createElement("canvas").getContext("2d");
+    const ctx = capMeasurer.ctx;
+    ctx.font = `${wt.weight} ${size}px ${wt.family}, sans-serif`;
+    return { size, avail: (1080 - 40 - 2 * 3) * 0.98, width: (t) => ctx.measureText(t).width };
+  }
+  function capFits(m, text) {
+    const w = m.width(text);
+    if (w <= m.avail) return true;
+    const n = Math.max(1, text.length);
+    if ((w - m.avail) / n * 1.05 <= 0.07 * m.size) return true;
+    const w2 = w - 0.07 * m.size * n;
+    return w2 > 0 && m.avail / w2 >= 0.85;
+  }
+  function pvSplitRunWidth(run, m) {
+    const n = run.length;
+    if (n <= 1) return n ? [run] : [];
+    const textOf = (ws) => ws.map((x) => x.w).join(" ");
+    const total = m.width(textOf(run));
+    for (let k = Math.max(1, Math.ceil(total / (m.avail * 1.06))); k <= n; k++) {
+      const out = [];
+      let start = 0;
+      for (let part = 1; part < k; part++) {
+        const left = k - part + 1;
+        const target = m.width(textOf(run.slice(start))) / left;
+        let best = null;
+        for (let j = start; j < n - (left - 1); j++) {
+          const w = m.width(textOf(run.slice(start, j + 1)));
+          const cost = Math.abs(w - target) - (/[,，]$/.test(run[j].w) ? 0.6 * m.size : 0);
+          if (!best || cost < best.cost) best = { cost, j };
+          if (w > target * 1.6) break;
+        }
+        out.push(run.slice(start, best.j + 1));
+        start = best.j + 1;
+      }
+      out.push(run.slice(start));
+      if (out.every((g) => capFits(m, textOf(g)))) return out;
+    }
+    return run.map((x) => [x]);
+  }
   function pvGroups(raw) {
     const words = [];
     let pendingBreak = false;
@@ -1996,7 +2039,9 @@
     });
     const groups = [];
     let run = [];
-    const flush = () => { pvSplitRun(run, 6, 18).forEach((r) => groups.push({ words: r, emph: false })); run = []; };
+    let meas = null;
+    try { meas = capMeasurer(); } catch { meas = null; }
+    const flush = () => { (meas ? pvSplitRunWidth(run, meas) : pvSplitRun(run, 6, 18)).forEach((r) => groups.push({ words: r, emph: false })); run = []; };
     words.forEach((x, i) => {
       if (x.brk) flush();
       // 숫자 단어를 단독으로 띄우는 기능은 채널 설정(emphasize_numbers_standalone)에서 꺼져 있어서, **강조**한 글자만 단독 자막이 된다
