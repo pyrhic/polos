@@ -1217,7 +1217,7 @@
   // 장면 구분(대본 구조). section 칸에 구분 이름을 저장하고, 옛 콘티의 "트렌드 요약 (설명)" 같은 값은 앞부분으로 묶어 본다.
   const PARTS = ["트렌드 요약", "이슈 설명", "관점 정리", "내 의견", "마무리", "구독/좋아요"];
   const SUBSCRIBE_PART = "구독/좋아요";
-  const SUBSCRIBE_TEXT = "더 많은 이야기가 궁금하다면, 구독과 좋아요 부탁드립니다.";
+  const SUBSCRIBE_TEXT = "내 알고리즘 밖의 이야기가 궁금하다면 구독 좋아요 해주시면 나도 좋아요";
   function partOf(section) {
     const t = (section || "").trim();
     return PARTS.find((k) => t.includes(k)) || t;

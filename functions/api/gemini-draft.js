@@ -24,7 +24,7 @@ const researchUsable = (text) => !!text && text.trim().length > 0;
 // 트렌드 화면의 나라 선택 목록과 같은 코드(KR이면 국내). 모르는 코드는 국내처럼 처리한다
 const COUNTRY_NAMES = { US: "미국", JP: "일본", GB: "영국", DE: "독일", FR: "프랑스", IN: "인도", BR: "브라질", AU: "호주", CA: "캐나다", TW: "대만" };
 
-const SUBSCRIBE_TEXT = "더 많은 이야기가 궁금하다면, 구독과 좋아요 부탁드립니다.";
+const SUBSCRIBE_TEXT = "내 알고리즘 밖의 이야기가 궁금하다면 구독 좋아요 해주시면 나도 좋아요";
 
 function buildPrompt(topic, articles, researchText, note, traffic, country) {
   const refs = articles.length
