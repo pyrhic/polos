@@ -424,7 +424,11 @@
       if (!hint || !seg) return;
       const have = (seg.asset_paths || []).length;
       const need = Math.max(2, Math.round(seconds / 4.5));
-      if (seconds > 7 && have < need) {
+      if (partOf(el.querySelector(".seg-section").value) === SUBSCRIBE_PART) {
+        // 구독 안내 카드는 사진을 안 넣으면 영상 만들 때 마녀 사진이 자동으로 들어간다
+        hint.style.display = have ? "none" : "block";
+        hint.textContent = "사진을 따로 넣지 않으면 마녀 사진이 영상마다 하나씩 자동으로 들어가요. 원하는 사진을 넣으면 그 사진을 써요.";
+      } else if (seconds > 7 && have < need) {
         hint.style.display = "block";
         hint.textContent = `약 ${Math.round(seconds)}초 장면인데 사진·영상이 ${have}개예요. ${need - have}개 이상 더 넣으면 화면이 자주 바뀌어 덜 지루해요. (그대로 두면 아래 키워드로 Pexels 영상이 자동으로 채워져요)`;
       } else {
@@ -1211,7 +1215,9 @@
   }
 
   // 장면 구분(대본 구조). section 칸에 구분 이름을 저장하고, 옛 콘티의 "트렌드 요약 (설명)" 같은 값은 앞부분으로 묶어 본다.
-  const PARTS = ["트렌드 요약", "이슈 설명", "관점 정리", "내 의견", "마무리"];
+  const PARTS = ["트렌드 요약", "이슈 설명", "관점 정리", "내 의견", "마무리", "구독/좋아요"];
+  const SUBSCRIBE_PART = "구독/좋아요";
+  const SUBSCRIBE_TEXT = "더 많은 이야기가 궁금하다면, 구독과 좋아요 부탁드립니다.";
   function partOf(section) {
     const t = (section || "").trim();
     return PARTS.find((k) => t.includes(k)) || t;
@@ -1341,6 +1347,13 @@
       autoGrow(directionEl);
       el.querySelector(".seg-part").addEventListener("change", (e) => {
         el.querySelector(".seg-section").value = e.target.value;
+        // 구독/좋아요 카드를 고르면 안내 대사와 검색어를 기본값으로 채운다 (비어 있을 때만)
+        if (e.target.value === SUBSCRIBE_PART) {
+          const sc = el.querySelector(".seg-script");
+          if (!sc.value.trim()) { sc.value = SUBSCRIBE_TEXT; autoGrow(sc); updateRuntimeSummary(); }
+          const kw = el.querySelector(".seg-keyword");
+          if (!kw.value.trim()) kw.value = "witch";
+        }
         markDirty();
         refreshGroupHeaders();
       });
