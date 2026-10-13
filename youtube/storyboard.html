@@ -160,13 +160,13 @@
   .cap-normal { font-family:'IBM Plex Sans KR',sans-serif; font-weight:300; color:#fff; text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000; }
   .cap-emph { font-family:'Black Han Sans',sans-serif; color:#ffff00; margin-top:6px; text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000; }
   /* 미리보기는 영상 1080x1920을 0.25배(270x480)로 그린 것. 제목/출처/영상 영역 위치는 영상 쪽 값과 같은 비율 */
-  .cap-media { display:none; position:absolute; left:0; right:0; top:105px; height:275px; background:#222 center/cover no-repeat; }
+  .cap-media { display:none; position:absolute; left:0; right:0; top:105px; height:320px; background:#222 center/cover no-repeat; }
   .cap-t1, .cap-t2, .cap-src { display:none; position:absolute; left:4px; right:4px; text-align:center; line-height:1.2; }
   .cap-t1, .cap-t2 { font-family:'Black Han Sans',sans-serif; font-size:23px; text-shadow:-1.5px -1.5px 0 #000,1.5px -1.5px 0 #000,-1.5px 1.5px 0 #000,1.5px 1.5px 0 #000; }
   .cap-ph { opacity:.6; outline:1px dashed rgba(255,255,255,.7); outline-offset:1px; text-shadow:none !important; background:rgba(0,0,0,.35); }
   .cap-t1 { top:30px; color:#ffff00; }
   .cap-t2 { top:61px; color:#fff; }
-  .cap-src { bottom:75px; font-size:11.5px; color:#d0d0d0; font-family:'IBM Plex Sans KR',sans-serif; font-weight:300; }
+  .cap-src { bottom:27px; font-size:11.5px; color:#d0d0d0; font-family:'IBM Plex Sans KR',sans-serif; font-weight:300; }
   .cap-lines { z-index:2; }
   .bgm-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
   .bgm-row audio { flex:1; height:32px; min-width:0; }
@@ -1847,7 +1847,7 @@
   // ───── 사진 위치 팝업 ─────
   // 소재를 화면 비율로 자를 때 남길 부분. asset_trims.__focus[경로] = {x, y} (0~1, 0.5가 가운데). 영상 만들 때 그대로 쓴다.
   let posState = null;
-  function posAspect() { return $("layoutSel").value === "framed" ? 1080 / 1100 : 1080 / 1920; }
+  function posAspect() { return $("layoutSel").value === "framed" ? 1080 / 1280 : 1080 / 1920; }
   function layoutPos() {
     const st = posState;
     if (!st || !st.iw) return;
@@ -2084,7 +2084,7 @@
     // 화면 구성 / 제목 / 자막 모양: 지금 설정 그대로
     const framed = $("layoutSel").value === "framed";
     const media = $("prevMedia");
-    media.style.cssText = framed ? "top:105px;height:275px;bottom:auto;" : "";
+    media.style.cssText = framed ? "top:105px;height:320px;bottom:auto;" : "";
     [["prevT1", "title1"], ["prevT2", "title2"], ["prevSrc", "sourceText"]].forEach(([id, src]) => {
       const v = $(src).value.trim();
       $(id).style.display = framed && v ? "block" : "none";
