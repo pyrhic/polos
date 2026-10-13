@@ -10,7 +10,7 @@ function genAssetUrl(path) {
 
 // 콘티 페이지와 같은 기준(초당 4.3자) — 노출 시간을 직접 안 정했으면 대사 길이로 추정.
 function genEstimateSeconds(text) {
-  const len = (text || "").replace(/\*\*/g, "").replace(/\s+/g, "").length;
+  const len = (text || "").replace(/\*\*/g, "").replace(/(^|\s)\/(?=\s|$)/g, "").replace(/\s+/g, "").length;   // 자막 끊김 표시(/)는 읽지 않는다
   return Math.max(1, len / 4.3);
 }
 

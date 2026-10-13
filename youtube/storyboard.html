@@ -476,7 +476,7 @@
   const CHARS_PER_SEC = 4.3;
 
   function estimateSeconds(text) {
-    const len = (text || "").replace(/\*\*/g, "").replace(/\s+/g, "").length;
+    const len = (text || "").replace(/\*\*/g, "").replace(/(^|\s)\/(?=\s|$)/g, "").replace(/\s+/g, "").length;   // 자막 끊김 표시(/)는 읽지 않는다
     return Math.max(1, len / CHARS_PER_SEC);
   }
 
@@ -1384,10 +1384,14 @@
         <div style="color:#a89bb5;font-size:0.75rem;margin:8px 0 10px;">이 카드 아무 곳이나 클릭한 뒤 Ctrl+V로도 이미지를 붙여넣을 수 있어요.</div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:14px 0 6px;color:#a89bb5;font-size:0.9rem;font-weight:600;">
           <span>대사 (영상의 음성·자막이 이 내용으로 만들어집니다)</span>
-          <button type="button" class="seg-emph-btn" style="width:auto;padding:3px 10px;font-size:0.7rem;margin:0;background:#221a2e;flex-shrink:0;">선택한 글자 강조</button>
+          <span style="display:flex;gap:4px;flex-shrink:0;">
+            <button type="button" class="seg-brk-btn" style="width:auto;padding:3px 10px;font-size:0.7rem;margin:0;background:#221a2e;">여기서 자막 끊기</button>
+            <button type="button" class="seg-emph-btn" style="width:auto;padding:3px 10px;font-size:0.7rem;margin:0;background:#221a2e;">선택한 글자 강조</button>
+          </span>
         </div>
         <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 비워두면 이 장면은 거의 나오지 않습니다 (노출 시간 1초 기준)' : '이 장면에서 나오는 대본 문장'}">${escapeHtml(seg.script_text)}</textarea>
-        <div class="settings-note" style="margin:-4px 0 8px;">강조할 글자를 드래그해서 선택한 뒤 "선택한 글자 강조"를 누르면 <b>**글자**</b>로 표시되고, 자막에서 노란색으로 튀어 보입니다. (다시 누르면 해제)</div>
+        <div class="seg-capsplit" style="color:#7cff4a;font-size:0.78rem;line-height:1.6;margin:-2px 0 6px;"></div>
+        <div class="settings-note" style="margin:-4px 0 8px;">자막은 이렇게 끊겨 나와요(위 초록 글씨, ｜가 끊기는 자리). 어색하면 끊고 싶은 글자 사이에 커서를 놓고 "여기서 자막 끊기"를 누르세요. <b>/</b>로 표시되고 읽지는 않아요. · 강조할 글자를 드래그해서 선택한 뒤 "선택한 글자 강조"를 누르면 <b>**글자**</b>로 표시되고, 자막에서 노란색으로 튀어 보입니다. (다시 누르면 해제)</div>
         <label>ACTION (사진의 카메라 연출만 해당 — 줌인 / 줌아웃 / 좌에서 우로 패닝 / 틸트업 등. 글자 강조는 위 대사에서)</label>
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
         <input type="hidden" class="seg-section" value="${escapeAttr(seg.section)}">
@@ -1413,8 +1417,27 @@
       });
 
       const scriptEl = el.querySelector(".seg-script");
-      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); });
+      const capSplitEl = el.querySelector(".seg-capsplit");
+      const showCapSplit = () => { capSplitEl.textContent = "자막: " + pvGroups(scriptEl.value).groups.map((g) => g.text).join(" ｜ "); };
+      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); showCapSplit(); });
       autoGrow(scriptEl);
+      showCapSplit();
+      // 자막 끊기: 커서 위치에 " / " 를 넣는다 (한 번 더 누르면 그 자리의 표시를 지운다). 영상에서는 읽지 않고 자막만 끊는다.
+      el.querySelector(".seg-brk-btn").addEventListener("click", (e) => {
+        e.preventDefault();
+        const v = scriptEl.value, pos = scriptEl.selectionStart;
+        const near = /\s\/\s/.exec(v.slice(Math.max(0, pos - 3), pos + 3));
+        if (near) {
+          const at = Math.max(0, pos - 3) + near.index;
+          scriptEl.value = v.slice(0, at) + " " + v.slice(at + 3);
+        } else {
+          const before = v.slice(0, pos).replace(/\s+$/, ""), after = v.slice(pos).replace(/^\s+/, "");
+          if (!before || !after) { showMsg("자막을 끊을 자리(글자 사이)에 커서를 먼저 놓으세요.", false); return; }
+          scriptEl.value = before + " / " + after;
+          scriptEl.setSelectionRange(before.length + 3, before.length + 3);
+        }
+        scriptEl.dispatchEvent(new Event("input", { bubbles: true }));
+      });
       el.querySelector(".seg-emph-btn").addEventListener("click", (e) => {
         e.preventDefault();
         const start = scriptEl.selectionStart, end = scriptEl.selectionEnd;
@@ -1934,19 +1957,52 @@
     return img.animate(f, { duration: len * 1000, fill: "forwards", easing: "linear" });
   }
   // 대사를 자막 덩어리로: **강조** 단어와 숫자 단어는 단독, 그 밖에는 6단어/18자 또는 문장 끝에서 끊는다
+  // 한 문장(또는 끊김 사이)의 단어들을 비슷한 길이로 나눈다 (영상 쪽 02_tts.py의 _split_run과 같은 규칙)
+  function pvSplitRun(run, maxWords, maxChars) {
+    const n = run.length;
+    if (n <= 1) return n ? [run] : [];
+    const total = run.reduce((a, x) => a + x.w.length + 1, 0);
+    const k = Math.min(n, Math.max(Math.ceil(n / maxWords), Math.ceil(total / maxChars)));
+    if (k <= 1) return [run];
+    const out = [];
+    let start = 0;
+    for (let part = 1; part < k; part++) {
+      const left = k - part + 1;
+      const rest = run.slice(start).reduce((a, x) => a + x.w.length + 1, 0);
+      const target = rest / left;
+      let best = null, acc = 0;
+      for (let j = start; j < n - (left - 1); j++) {
+        acc += run[j].w.length + 1;
+        const cost = Math.abs(acc - target) - (/[,，]$/.test(run[j].w) ? 3 : 0);
+        if (!best || cost < best.cost) best = { cost, j };
+        if (acc > target * 1.6) break;
+      }
+      out.push(run.slice(start, best.j + 1));
+      start = best.j + 1;
+    }
+    out.push(run.slice(start));
+    return out;
+  }
   function pvGroups(raw) {
     const words = [];
+    let pendingBreak = false;
     String(raw || "").split(/(\*\*[^*]+\*\*)/).forEach((part) => {
       const emph = /^\*\*[^*]+\*\*$/.test(part);
-      (emph ? part.slice(2, -2) : part).split(/\s+/).filter(Boolean).forEach((w) => words.push({ w, emph }));
+      (emph ? part.slice(2, -2) : part).split(/\s+/).filter(Boolean).forEach((w) => {
+        if (!emph && w === "/") { pendingBreak = true; return; }   // " / " 는 자막을 끊는 표시 (읽지 않음)
+        words.push({ w, emph, brk: pendingBreak });
+        pendingBreak = false;
+      });
     });
     const groups = [];
-    let cur = [], len = 0;
-    const flush = () => { if (cur.length) groups.push({ words: cur, emph: false }); cur = []; len = 0; };
-    words.forEach((x) => {
-      if (x.emph || /\d/.test(x.w)) { flush(); groups.push({ words: [x], emph: x.emph }); return; }
-      cur.push(x); len += x.w.length + 1;
-      if (cur.length >= 6 || len >= 18 || /[.?!。]$/.test(x.w)) flush();
+    let run = [];
+    const flush = () => { pvSplitRun(run, 6, 18).forEach((r) => groups.push({ words: r, emph: false })); run = []; };
+    words.forEach((x, i) => {
+      if (x.brk) flush();
+      // 숫자 단어를 단독으로 띄우는 기능은 채널 설정(emphasize_numbers_standalone)에서 꺼져 있어서, **강조**한 글자만 단독 자막이 된다
+      if (x.emph) { flush(); groups.push({ words: [x], emph: true }); return; }
+      run.push(x);
+      if (/[.?!。]$/.test(x.w)) flush();
     });
     flush();
     // 글자 위치(음성 경계 이벤트용)와 글자 수 비율(시간 배분용)
