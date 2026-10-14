@@ -5,7 +5,8 @@ const GEN_SUPABASE_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
 const genHeaders = { apikey: GEN_SUPABASE_KEY, Authorization: `Bearer ${GEN_SUPABASE_KEY}` };
 
 function genAssetUrl(path) {
-  if (/^https?:\/\//.test(path)) return path;
+  // 전체 주소(Pexels 등)와 빈 화면 토큰(blank:black / blank:white / blank:bars)은 그대로 넘긴다
+  if (/^https?:\/\//.test(path) || /^blank:/.test(path)) return path;
   return `${GEN_SUPABASE_URL}/storage/v1/object/public/youtube-assets/${path}`;
 }
 
@@ -49,18 +50,24 @@ ${body}
 }
 
 function genBuildSegments(segRows) {
-  return [...segRows].sort((a, b) => a.order_no - b.order_no).map((s) => ({
-    section: s.section,
-    script_text: s.script_text,
-    keyword: s.keyword,
-    direction: s.direction,
-    weight_seconds: s.target_seconds > 0 ? Number(s.target_seconds) : genEstimateSeconds(s.script_text),
-    asset_urls: (s.asset_paths || []).map(genAssetUrl),
-    // 영상/GIF 소재별 사용 구간 (소재 주소 -> {start, end})
-    asset_trims: Object.fromEntries(Object.entries(s.asset_trims || {}).filter(([k]) => k !== "__focus").map(([path, t]) => [genAssetUrl(path), t])),
-    // 사진/영상을 화면 비율로 자를 때 남길 부분 (asset_trims.__focus에 소재별로 저장됨)
-    asset_focus: Object.fromEntries(Object.entries((s.asset_trims || {}).__focus || {}).map(([path, f]) => [genAssetUrl(path), f])),
-  }));
+  return [...segRows].sort((a, b) => a.order_no - b.order_no).map((s) => {
+    const trims = s.asset_trims || {};
+    const weights = trims.__weights || {};
+    return {
+      section: s.section,
+      script_text: s.script_text,
+      keyword: s.keyword,
+      direction: s.direction,
+      weight_seconds: s.target_seconds > 0 ? Number(s.target_seconds) : genEstimateSeconds(s.script_text),
+      asset_urls: (s.asset_paths || []).map(genAssetUrl),
+      // 영상/GIF 소재별 사용 구간 (소재 주소 -> {start, end}). __focus/__weights/__autofill/__cleared/__pexels 같은 "__" 칸은 소재가 아니라서 뺀다
+      asset_trims: Object.fromEntries(Object.entries(trims).filter(([k]) => !k.startsWith("__")).map(([path, t]) => [genAssetUrl(path), t])),
+      // 사진/영상을 화면 비율로 자를 때 남길 부분 (asset_trims.__focus에 소재별로 저장됨)
+      asset_focus: Object.fromEntries(Object.entries(trims.__focus || {}).filter(([k]) => !k.startsWith("__")).map(([path, f]) => [genAssetUrl(path), f])),
+      // 장면 안 클립별 비중 (asset_trims.__weights, 없으면 1 = 균등). 키는 asset_urls 값과 같은 문자열
+      asset_weights: Object.fromEntries((s.asset_paths || []).map((path) => [genAssetUrl(path), Number(weights[path]) > 0 ? Number(weights[path]) : 1])),
+    };
+  });
 }
 
 // 다음에 만들 영상 버전 번호
@@ -73,17 +80,26 @@ async function genNextVersion(scriptId) {
 
 // 상태와 마지막 실패 정보(어느 단계에서, 언제, 실행 기록 주소)
 async function genFetchInfo(scriptId) {
-  const res = await fetch(`${GEN_SUPABASE_URL}/rest/v1/youtube_scripts?select=generation_status,video_settings&id=eq.${scriptId}`, { headers: genHeaders });
+  const res = await fetch(`${GEN_SUPABASE_URL}/rest/v1/youtube_scripts?select=generation_status,video_settings,hook&id=eq.${scriptId}`, { headers: genHeaders });
   if (!res.ok) return null;
   const rows = await res.json();
   if (!rows[0]) return null;
-  return { status: rows[0].generation_status || "idle", lastError: (rows[0].video_settings || {}).last_error || null };
+  return { status: rows[0].generation_status || "idle", lastError: (rows[0].video_settings || {}).last_error || null, name: genVideoName(rows[0]) };
 }
 
-function genErrorText(le) {
-  if (!le) return "지난 영상 생성이 실패했습니다.";
+// 알림·실패 안내에 쓰는 영상 이름 (정한 이름이 없으면 후킹 앞 20자)
+function genVideoName(r) {
+  return (r && ((r.video_settings && r.video_settings.name) || (r.hook || "").slice(0, 20))) || "";
+}
+
+// 예: "이병철 영상생성이 소재부족으로 실패했습니다. (2번, 4번 비어있음)"
+// message(파이프라인이 남긴 실패 이유)가 없으면 실패 단계를 알려준다.
+function genErrorText(le, name) {
+  const who = name ? `${name} ` : "";
+  if (!le) return `${who}영상생성이 실패했습니다.`;
+  if (le.message) return `${who}영상생성이 ${le.message}`;
   const when = le.at ? new Date(le.at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" }) : "";
-  return `지난 영상 생성이 실패했습니다 — 실패 단계: ${le.step}${when ? " (" + when + ")" : ""}`;
+  return `${who}영상생성이 실패했습니다 — 실패 단계: ${le.step}${when ? " (" + when + ")" : ""}`;
 }
 
 async function genFetchStatus(scriptId) {

@@ -174,6 +174,41 @@
   #settingsSaveBtn.dirty { background:#3a2f14; color:#ffd93d; }
   .seg-pexels-pick { width:80px; margin-top:4px; padding:5px 0; font-size:0.7rem; }
   .seg-pexels-dur { position:absolute; bottom:2px; right:4px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.6rem; padding:1px 4px; border-radius:2px; }
+  /* 빈 화면 클립 (검정 / 흰색 / 화면조정) */
+  .blank-black { background:#000 !important; }
+  .blank-white { background:#fff !important; }
+  .blank-bars { background:linear-gradient(90deg,#c0c0c0 0 14.3%,#c0c000 0 28.6%,#00c0c0 0 42.9%,#00c000 0 57.1%,#c000c0 0 71.4%,#c00000 0 85.7%,#0000c0 0) !important; }
+  .seg-thumb.blank-thumb { display:flex; align-items:flex-end; justify-content:center; padding-bottom:4px; box-sizing:border-box; border:1px solid #3a2f4a; }
+  .seg-thumb.blank-thumb span { background:rgba(15,10,20,0.75); color:#fff; font-size:0.62rem; padding:1px 5px; border-radius:2px; }
+  .seg-thumb-wrap.short .seg-thumb { outline:2px solid #ffd93d; outline-offset:-2px; }
+  .seg-short-badge { position:absolute; left:2px; top:2px; background:#ffd93d; color:#0f0a14; font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:2px; pointer-events:none; }
+  .blank-pick { background:#0f0a14; border-radius:3px; padding:10px; margin-bottom:8px; }
+  .blank-pick-title { color:#cfc6d8; font-size:0.8rem; margin-bottom:8px; text-align:center; line-height:1.45; }
+  .blank-pick-row { display:flex; gap:6px; }
+  .blank-pick-row button { flex:1; margin:0; padding:8px 0; font-size:0.75rem; text-transform:none; letter-spacing:0; background:#221a2e; color:#fff; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .blank-pick-row button i { display:block; width:28px; height:20px; border-radius:2px; border:1px solid #3a2f4a; }
+  .blank-pick-row button:disabled { opacity:0.4; }
+  .seg-blank-btn { width:100%; margin:6px 0 0; padding:8px 10px; font-size:0.75rem; background:#221a2e; text-transform:none; letter-spacing:0; }
+  .seg-autofill-state { color:#a89bb5; font-size:0.75rem; margin:-2px 0 8px; }
+  .seg-autofill-state.err { color:#ff8a80; }
+  /* 비중 타임라인: 장면 안 클립들을 가로 막대로, 경계를 끌어 비율 조절 (EDITS 앱처럼) */
+  .seg-tl-wrap { margin:0 0 8px; }
+  .seg-tl-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#a89bb5; font-size:0.72rem; margin-bottom:4px; }
+  .seg-tl-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:#221a2e; color:#a89bb5; text-transform:none; letter-spacing:0; }
+  .seg-tl { position:relative; display:flex; height:38px; border-radius:3px; overflow:visible; background:#0f0a14; user-select:none; -webkit-user-select:none; }
+  .seg-tl-clip { position:relative; min-width:0; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#2d2140; border-right:1px solid #0f0a14; color:#fff; font-size:0.62rem; line-height:1.2; white-space:nowrap; }
+  .seg-tl-clip:first-child { border-radius:3px 0 0 3px; }
+  .seg-tl-clip:last-child { border-radius:0 3px 3px 0; border-right:none; }
+  .seg-tl-clip.img { background:#3b2a52; }
+  .seg-tl-clip.vid { background:#16324a; }
+  .seg-tl-clip.short { box-shadow:inset 0 -4px 0 #ffd93d; }
+  .seg-tl-clip b { font-weight:800; color:#7cff4a; }
+  .seg-tl-clip.blank-white, .seg-tl-clip.blank-bars { color:#0f0a14; }
+  .seg-tl-clip.blank-white b, .seg-tl-clip.blank-bars b { color:#0f0a14; }
+  .seg-tl-handle { position:absolute; top:-4px; bottom:-4px; width:26px; margin-left:-13px; touch-action:none; cursor:ew-resize; z-index:2; display:flex; justify-content:center; }
+  .seg-tl-handle::after { content:""; width:6px; border-radius:3px; background:#7cff4a; box-shadow:0 0 0 2px #0f0a14; }
+  .seg-tl-handle.drag::after { background:#ffffff; }
+  .seg-short-list { margin:6px 0 0; color:#ffd93d; font-size:0.72rem; line-height:1.45; }
 </style>
 </head>
 <body>
@@ -329,7 +364,7 @@
         <div class="pv-bar"><div id="prevBar"></div></div>
         <div class="cap-modal-val" id="prevInfo" style="font-size:0.78rem;"></div>
         <label class="pv-opt"><input type="checkbox" id="prevVoice" checked> 휴대폰 목소리로 읽기 (실제 영상의 목소리와는 달라요)</label>
-        <div class="settings-note" style="margin:6px 0 0;">화면 배치·연출·자막 위치를 보는 간이 미리보기예요. 자막 타이밍은 추정이고, 컷이 부족한 장면은 영상 생성 때 Pexels 영상이 더 채워져요.</div>
+        <div class="settings-note" style="margin:6px 0 0;">화면 배치·연출·자막 위치를 보는 간이 미리보기예요. 자막 타이밍은 추정이에요. 영상 생성 때는 이 장면의 클립이 전부 순서대로, 정한 비중만큼 나와요(몰래 채워지는 영상은 없어요).</div>
         <div class="trim-actions">
           <button type="button" id="prevReplay" style="flex:2;">다시 재생</button>
           <button type="button" id="prevClose" style="flex:1;background:#221a2e;">닫기</button>
@@ -420,9 +455,106 @@
     return isExternalUrl(path) ? path : publicUrl(path);
   }
 
-  // 구간을 고를 수 있는 소재: 영상과 GIF (사진은 해당 없음)
+  // 빈 화면 토큰: asset_paths 안에 일반 소재처럼 들어간다 (영상 생성 때 ffmpeg가 직접 만든다. docs/storyboard-contract.md 1절)
+  const BLANKS = [
+    { token: "blank:black", label: "검정" },
+    { token: "blank:white", label: "흰색" },
+    { token: "blank:bars", label: "화면조정" },
+  ];
+  function isBlank(path) {
+    return /^blank:/.test(path || "");
+  }
+  function blankClass(path) {
+    return "blank-" + String(path).slice(6).replace(/[^a-z]/g, "");
+  }
+  function blankLabel(path) {
+    return (BLANKS.find((b) => b.token === path) || {}).label || "빈 화면";
+  }
+  // 영상 소재 (사진·GIF·빈 화면이 아닌 것)
+  function isVideo(path) {
+    return !isBlank(path) && !isImage(path);
+  }
+  // 스토리지에 실제 파일이 있는 소재 (지울 때 파일도 같이 지운다)
+  function isStoragePath(path) {
+    return !isExternalUrl(path) && !isBlank(path);
+  }
+
+  // 구간을 고를 수 있는 소재: 영상과 GIF (사진·빈 화면은 해당 없음)
   function isTrimmable(path) {
+    if (isBlank(path)) return false;
     return !isImage(path) || /\.gif(\?|$)/i.test(path);
+  }
+
+  // ───── 클립 비중 / 원본 길이 (asset_trims.__weights / __pexels) ─────
+  const SHORT_CLIP_TEXT = "이 클립에 배정된 시간보다 영상의 길이가 짧아 마지막 장면이 지속 노출됩니다.";
+  const clipDurCache = {};   // 직접 올린 영상 등: 화면의 video 요소가 읽은 원본 길이 (소재 경로 -> 초)
+  const autofillBusy = new Set();   // 지금 Pexels 자동 배치 검색 중인 장면 id
+  function needClips(secs) {
+    return Math.max(2, Math.round(secs / 4.5));   // 영상 만들기 단계와 같은 기준 (4.5초당 1컷, 최소 2컷)
+  }
+  function isSubscribeSeg(seg) {
+    return partOf(seg.section) === SUBSCRIBE_PART;
+  }
+  // 장면 길이: 카드가 화면에 있으면 입력 중인 대사 기준, 없으면 저장된 값 기준
+  function segSecondsOf(seg) {
+    const el = document.querySelector(`.seg-item[data-id="${seg.id}"]`);
+    if (el) return effectiveSeconds(el, seg);
+    return seg.target_seconds > 0 ? Number(seg.target_seconds) : estimateSeconds(seg.script_text);
+  }
+  function clipWeights(seg) {
+    const w = (seg.asset_trims || {}).__weights || {};
+    return (seg.asset_paths || []).map((p) => (Number(w[p]) > 0 ? Number(w[p]) : 1));
+  }
+  // 영상 클립이 실제로 쓸 수 있는 길이(초). 구간을 지정했으면 그 구간 길이. 모르면 null
+  function clipSourceSeconds(seg, path) {
+    if (!isVideo(path)) return null;
+    const trims = seg.asset_trims || {};
+    const px = trims.__pexels || {};
+    let d = Number(px[path]) > 0 ? Number(px[path]) : clipDurCache[path];
+    if (!(d > 0)) return null;
+    const t = trims[path];
+    if (t) {
+      const end = t.end == null ? d : Math.min(d, Number(t.end));
+      d = Math.max(0, end - Number(t.start || 0));
+    }
+    return d;
+  }
+  // 클립별 배정 시간(장면초 × 비중비율)과 짧은 클립 여부
+  function clipPlan(seg, secs) {
+    const paths = seg.asset_paths || [];
+    const ws = clipWeights(seg);
+    const sum = ws.reduce((a, b) => a + b, 0) || 1;
+    return paths.map((p, i) => {
+      const alloc = secs * ws[i] / sum;
+      const src = clipSourceSeconds(seg, p);
+      return { path: p, weight: ws[i], frac: ws[i] / sum, alloc, src, short: src != null && src + 0.05 < alloc };
+    });
+  }
+
+  function blankButtonsHtml(seg) {
+    const have = new Set(seg.asset_paths || []);
+    return `<div class="blank-pick-row">${BLANKS.map((b) =>
+      `<button type="button" class="blank-pick-btn" data-token="${b.token}" ${have.has(b.token) ? "disabled" : ""}><i class="${blankClass(b.token)}"></i>${b.label}</button>`
+    ).join("")}</div>`;
+  }
+
+  // 장면에 클립이 하나도 없을 때: 자동 배치 상태 + 빈 화면 고르기
+  function emptyThumbsHtml(seg) {
+    if (isSubscribeSeg(seg)) return '<div class="seg-thumb-empty">비어있음 — 영상 생성 때 마녀 사진이 하나 자동으로 들어가요</div>';
+    if (autofillBusy.has(String(seg.id))) return '<div class="seg-thumb-empty">키워드로 Pexels 영상을 찾아 채우는 중…</div>';
+    const trims = seg.asset_trims || {};
+    const af = trims.__autofill;
+    let why;
+    if (trims.__cleared) why = "클립을 모두 지웠어요.";
+    else if (af && af.status === "quota") why = "Pexels 한도 초과입니다. 소재를 채워주세요.";
+    else if (af && af.status === "no_results") why = `'${af.query || ""}' 검색 결과가 없습니다. 소재를 채워주세요.`;
+    else if (af && af.status === "error") why = "Pexels 자동 배치에 실패했어요. 소재를 채워주세요.";
+    else if (!(seg.keyword || "").trim()) why = "검색 키워드가 없어서 자동 배치를 못 했어요.";
+    else why = "소재가 없어요.";
+    return `<div class="blank-pick">
+      <div class="blank-pick-title">${escapeHtml(why)}<br>빈 화면 종류를 고르세요 (검정 / 흰색 / 화면조정)<br><span style="color:#a89bb5;font-size:0.72rem;">사진·영상을 넣어도 돼요. 이대로는 영상을 생성할 수 없어요.</span></div>
+      ${blankButtonsHtml(seg)}
+    </div>`;
   }
   function trimLabel(t) {
     return `${Number(t.start || 0).toFixed(1)}~${t.end == null ? "끝" : Number(t.end).toFixed(1)}초`;
@@ -433,8 +565,15 @@
     const notes = seg.asset_notes || {};
     const trims = seg.asset_trims || {};
     const focus = trims.__focus || {};   // 사진/영상을 화면 비율로 자를 때 남길 부분: { 소재경로: {x,y} } (0~1, 기본 가운데)
-    if (!paths.length) return '<div class="seg-thumb-empty">비어있음 — 키워드로 자동 검색됨</div>';
+    if (!paths.length) return emptyThumbsHtml(seg);
     return `<div class="seg-thumbs">${paths.map((p) => {
+      if (isBlank(p)) {
+        return `
+      <div class="seg-thumb-wrap" data-path="${escapeAttr(p)}">
+        <div class="seg-thumb blank-thumb ${blankClass(p)}"><span>${escapeHtml(blankLabel(p))}</span></div>
+        <button type="button" class="seg-thumb-del" data-path="${escapeAttr(p)}">×</button>
+      </div>`;
+      }
       const n = notes[p];
       const tip = n ? `${n.articleTitle || ""}${n.caption ? " / 사진 설명: " + n.caption : ""}` : "";
       return `
@@ -456,6 +595,15 @@
     el.querySelectorAll(".seg-thumb-del").forEach((btn) =>
       btn.addEventListener("click", () => removeSegmentAsset(id, btn.dataset.path))
     );
+    // 영상 썸네일이 원본 길이를 읽으면 짧은 클립 경고를 다시 계산한다 (직접 올린 영상은 __pexels에 길이가 없다)
+    el.querySelectorAll("video.seg-thumb").forEach((v) => {
+      const path = v.closest(".seg-thumb-wrap").dataset.path;
+      v.addEventListener("loadedmetadata", () => {
+        if (!(v.duration > 0) || !isFinite(v.duration) || clipDurCache[path] === v.duration) return;
+        clipDurCache[path] = v.duration;
+        refreshClipView(id);
+      });
+    });
     el.querySelectorAll(".seg-trim-btn").forEach((btn) =>
       btn.addEventListener("click", () => openTrimModal(id, btn.dataset.path))
     );
@@ -471,7 +619,123 @@
     if (!el || !seg) return;
     el.querySelector(".seg-thumbs-area").innerHTML = thumbsHtml(seg);
     bindThumbDeletes(el, id);
+    const addBox = el.querySelector(".seg-blank-add");
+    if (addBox && addBox.style.display !== "none") addBox.innerHTML = blankButtonsHtml(seg);
     updateSettingsPreview();
+    updateRuntimeSummary();   // 안내 문구·비중 타임라인·짧은 클립 경고도 다시 그린다
+  }
+
+  // ───── 비중 타임라인: 장면 안 클립들을 가로 막대로 보여주고, 경계를 끌어 비율을 바꾼다 ─────
+  function refreshClipView(id) {
+    const el = document.querySelector(`.seg-item[data-id="${id}"]`);
+    const seg = segments.find((s) => String(s.id) === String(id));
+    if (el && seg) updateClipView(el, seg, effectiveSeconds(el, seg));
+  }
+  function updateClipView(el, seg, secs) {
+    const plan = clipPlan(seg, secs);
+    // 썸네일에 짧은 클립 표시
+    el.querySelectorAll(".seg-thumb-wrap").forEach((w) => {
+      const c = plan.find((x) => x.path === w.dataset.path);
+      const short = !!(c && c.short);
+      w.classList.toggle("short", short);
+      let b = w.querySelector(".seg-short-badge");
+      if (short && !b) { b = document.createElement("span"); b.className = "seg-short-badge"; b.textContent = "⚠ 짧음"; w.appendChild(b); }
+      if (!short && b) b.remove();
+    });
+    const host = el.querySelector(".seg-tl-area");
+    if (!host || host.dataset.dragging) return;
+    if (!plan.length) { host.innerHTML = ""; return; }
+    const custom = Object.keys((seg.asset_trims || {}).__weights || {}).length > 0;
+    let acc = 0;
+    const handles = plan.slice(0, -1).map((c, k) => {
+      acc += c.frac;
+      return `<div class="seg-tl-handle" data-k="${k}" style="left:${acc * 100}%;"></div>`;
+    }).join("");
+    const kind = (p) => (isBlank(p) ? blankClass(p) : isImage(p) ? "img" : "vid");
+    const shorts = plan.map((c, i) => ({ c, i })).filter(({ c }) => c.short);
+    host.innerHTML = `<div class="seg-tl-wrap">
+      <div class="seg-tl-head">
+        <span>${plan.length > 1 ? "화면 비중 — 클립 사이 경계를 끌어 조절" : "클립 1개가 장면 전체에 나와요"}</span>
+        ${custom ? '<button type="button" class="seg-tl-reset">균등하게</button>' : ""}
+      </div>
+      <div class="seg-tl">
+        ${plan.map((c, i) => `<div class="seg-tl-clip ${kind(c.path)}${c.short ? " short" : ""}" style="flex:0 0 ${c.frac * 100}%;"><b>${i + 1}</b><span class="seg-tl-sec">${c.alloc.toFixed(1)}초</span></div>`).join("")}
+        ${handles}
+      </div>
+      ${shorts.length ? `<div class="seg-short-list">${shorts.map(({ c, i }) =>
+        `<div>⚠ ${i + 1}번 클립: ${SHORT_CLIP_TEXT} (영상 ${c.src.toFixed(1)}초 / 배정 ${c.alloc.toFixed(1)}초)</div>`).join("")}</div>` : ""}
+    </div>`;
+    host.querySelectorAll(".seg-tl-handle").forEach((h) =>
+      h.addEventListener("pointerdown", (e) => startTimelineDrag(e, el, String(seg.id), Number(h.dataset.k)))
+    );
+    const reset = host.querySelector(".seg-tl-reset");
+    if (reset) reset.addEventListener("click", () => saveWeights(String(seg.id), null));
+  }
+  function startTimelineDrag(e, el, id, k) {
+    const seg = segments.find((s) => String(s.id) === id);
+    const host = el.querySelector(".seg-tl-area");
+    const bar = host && host.querySelector(".seg-tl");
+    if (!seg || !bar) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    try { handle.setPointerCapture(e.pointerId); } catch {}
+    handle.classList.add("drag");
+    host.dataset.dragging = "1";
+    const secs = effectiveSeconds(el, seg);
+    const ws = clipWeights(seg);
+    const sum = ws.reduce((a, b) => a + b, 0) || 1;
+    const fr = ws.map((w) => w / sum);
+    const pair = fr[k] + fr[k + 1];
+    const minF = Math.min(pair / 2, Math.max(0.03, 0.5 / Math.max(secs, 0.1)));   // 클립 하나가 0.5초(또는 3%)보다 짧아지지 않게
+    const width = bar.getBoundingClientRect().width || 1;
+    const x0 = e.clientX, a0 = fr[k];
+    const clips = bar.querySelectorAll(".seg-tl-clip");
+    let moved = false;
+    const paint = () => {
+      [k, k + 1].forEach((i) => {
+        clips[i].style.flex = `0 0 ${fr[i] * 100}%`;
+        const s = clips[i].querySelector(".seg-tl-sec");
+        if (s) s.textContent = (secs * fr[i]).toFixed(1) + "초";
+      });
+      handle.style.left = fr.slice(0, k + 1).reduce((a, b) => a + b, 0) * 100 + "%";
+    };
+    const move = (ev) => {
+      if (Math.abs(ev.clientX - x0) > 2) moved = true;
+      fr[k] = Math.max(minF, Math.min(pair - minF, a0 + (ev.clientX - x0) / width));
+      fr[k + 1] = pair - fr[k];
+      paint();
+    };
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+      handle.classList.remove("drag");
+      delete host.dataset.dragging;
+      if (moved) saveWeights(id, fr); else refreshClipView(id);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
+  // fr: 클립별 비율 배열 (null이면 균등으로 되돌림). 평균이 1이 되게 바꿔 asset_trims.__weights에 저장한다
+  async function saveWeights(id, fr) {
+    const seg = segments.find((s) => String(s.id) === id);
+    if (!seg) return;
+    const paths = seg.asset_paths || [];
+    const next = { ...(seg.asset_trims || {}) };
+    if (fr && paths.length > 1) {
+      const w = {};
+      paths.forEach((p, i) => { w[p] = Number((fr[i] * paths.length).toFixed(3)); });
+      if (Object.values(w).every((v) => Math.abs(v - 1) < 0.02)) delete next.__weights; else next.__weights = w;
+    } else {
+      delete next.__weights;
+    }
+    try {
+      await saveField(id, "asset_trims", next);
+    } catch (err) {
+      showMsg("비중 저장 실패: " + err.message, false);
+    }
+    refreshClipView(id);
   }
 
   // 한국어 내레이션 기준 대략적인 발화 속도 추정치(초당 글자 수) — 정확한 값은
@@ -488,22 +752,27 @@
     return estimateSeconds(el.querySelector(".seg-script").value);
   }
 
-  // 장면이 길어서 사진 하나가 오래 머물면 지루하다. 영상 생성 때는 모자란 컷을 키워드로 Pexels 영상으로 채우지만,
-  // 직접 고른 사진이 더 낫다 -> 카드에 미리 알려준다. (기준은 영상 만들기 단계와 같은 4.5초당 1컷, 7초 넘는 장면부터)
+  // 장면이 길어서 사진 하나가 오래 머물면 지루하다. 콘티를 열 때 모자란 컷을 키워드로 Pexels 영상으로 자동 배치하지만
+  // (영상 생성 때는 더 채우지 않는다), 그래도 모자라면 카드에 알려준다. (기준은 4.5초당 1컷, 7초 넘는 장면부터)
   function updateMediaHints(perCard) {
     perCard.forEach(({ el, seconds }) => {
       const seg = segments.find((s) => String(s.id) === el.dataset.id);
       const hint = el.querySelector(".seg-media-hint");
       if (!hint || !seg) return;
+      updateClipView(el, seg, seconds);
       const have = (seg.asset_paths || []).length;
-      const need = Math.max(2, Math.round(seconds / 4.5));
+      const need = needClips(seconds);
+      const af = (seg.asset_trims || {}).__autofill;
       if (partOf(el.querySelector(".seg-section").value) === SUBSCRIBE_PART) {
         // 구독 안내 카드는 사진을 안 넣으면 영상 만들 때 마녀 사진이 자동으로 들어간다
         hint.style.display = have ? "none" : "block";
         hint.textContent = "사진을 따로 넣지 않으면 마녀 사진이 영상마다 하나씩 자동으로 들어가요. 원하는 사진을 넣으면 그 사진을 써요.";
-      } else if (seconds > 7 && have < need) {
+      } else if (have > 0 && seconds > 7 && have < need && !autofillBusy.has(String(seg.id))) {
+        const why = af && af.status === "quota" ? " Pexels 한도 초과로 자동 배치를 못 했어요."
+          : af && af.status === "no_results" ? " 키워드 검색 결과가 없어 자동 배치를 못 했어요."
+          : af && af.status === "error" ? " 자동 배치에 실패했어요." : "";
         hint.style.display = "block";
-        hint.textContent = `약 ${Math.round(seconds)}초 장면인데 사진·영상이 ${have}개예요. ${need - have}개 이상 더 넣으면 화면이 자주 바뀌어 덜 지루해요. (그대로 두면 아래 키워드로 Pexels 영상이 자동으로 채워져요)`;
+        hint.textContent = `약 ${Math.round(seconds)}초 장면인데 사진·영상이 ${have}개예요. ${need - have}개 이상 더 넣으면 화면이 자주 바뀌어 덜 지루해요.${why} (영상 생성 때 따로 채워지지 않고, 지금 클립들이 비중대로 나뉘어요)`;
       } else {
         hint.style.display = "none";
       }
@@ -1304,6 +1573,7 @@
     document.getElementById("regenBtn").textContent = segments.length ? "콘티 다시 생성" : "콘티 생성";
     render();
     updateSettingsPreview();
+    startAutofill(scriptId);   // 비었거나 모자란 장면을 키워드로 Pexels 영상 자동 배치 (한 장면씩 순서대로)
   }
 
   // 장면 구분(대본 구조). section 칸에 구분 이름을 저장하고, 옛 콘티의 "트렌드 요약 (설명)" 같은 값은 앞부분으로 묶어 본다.
@@ -1376,12 +1646,15 @@
           <button type="button" class="seg-icon-btn seg-delete-btn" title="이 장면 삭제">×</button>
         </div>
         <div class="seg-thumbs-area">${thumbsHtml(seg)}</div>
+        <div class="seg-tl-area"></div>
         <div class="seg-media-hint" style="display:none;color:#ffd93d;font-size:0.78rem;margin:2px 0 8px;"></div>
         <div class="seg-actions" style="margin-bottom:4px;">
           <label class="seg-file-label">
             + 사진/영상 추가 (여러 개 선택 가능)
             <input type="file" class="seg-file-input" accept="image/*,video/*" multiple>
           </label>
+          <button type="button" class="seg-blank-btn">+ 빈 화면 추가 (검정 / 흰색 / 화면조정)</button>
+          <div class="seg-blank-add blank-pick" style="display:none;margin:6px 0 0;"></div>
         </div>
         <button type="button" class="prev-btn seg-prev-btn">▶ 이 장면 미리보기</button>
         <div style="color:#a89bb5;font-size:0.75rem;margin:8px 0 10px;">이 카드 아무 곳이나 클릭한 뒤 Ctrl+V로도 이미지를 붙여넣을 수 있어요.</div>
@@ -1488,6 +1761,12 @@
       });
 
       el.querySelector(".seg-file-input").addEventListener("change", (e) => uploadSegmentAssets(id, e.target.files));
+      el.querySelector(".seg-blank-btn").addEventListener("click", () => {
+        const box = el.querySelector(".seg-blank-add");
+        const open = box.style.display === "none";
+        box.style.display = open ? "block" : "none";
+        if (open) box.innerHTML = blankButtonsHtml(segments.find((s) => String(s.id) === id) || {});
+      });
       bindThumbDeletes(el, id);
       el.querySelector(".seg-revert-btn").addEventListener("click", () => { clearTimeout(el._autoTimer); revertSegmentCard(id, el); });
       el.querySelector(".seg-delete-btn").addEventListener("click", () => { clearTimeout(el._autoTimer); deleteSegmentCard(id, el); });
@@ -1546,14 +1825,17 @@
     el.style.height = el.scrollHeight + "px";
   }
 
-  async function selectPexelsResult(id, hdUrl, btn) {
+  async function selectPexelsResult(id, hdUrl, btn, duration) {
     const seg = segments.find((s) => String(s.id) === id);
     if (!seg || !hdUrl) return;
     const paths = seg.asset_paths || [];
     if (paths.includes(hdUrl)) { showMsg("이미 이 장면에 추가된 영상입니다.", false); return; }
     btn.disabled = true;
     try {
-      await saveField(id, "asset_paths", [...paths, hdUrl]);
+      // 원본 길이는 짧은 클립 경고용으로 asset_trims.__pexels에 같이 저장한다
+      const trims = { ...(seg.asset_trims || {}) };
+      if (Number(duration) > 0) trims.__pexels = { ...(trims.__pexels || {}), [hdUrl]: Number(duration) };
+      await saveFields(id, { asset_paths: [...paths, hdUrl], asset_trims: trims });
       refreshThumbs(id);
       btn.textContent = "추가됨 ✓";
       showMsg("선택한 영상을 이 장면 소재로 추가했습니다.", true);
@@ -1568,7 +1850,8 @@
     box.innerHTML = '<div class="seg-pexels-loading">Pexels에서 검색 중...</div>';
     try {
       const res = await fetch(`/api/pexels-search?q=${encodeURIComponent(query)}&orientation=portrait`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 429) throw new Error("Pexels 한도 초과입니다. 잠시 뒤에 다시 검색하세요.");
       if (!res.ok) throw new Error(data.error || "검색 실패");
       if (!data.results.length) {
         box.innerHTML = '<div class="seg-pexels-loading">검색 결과가 없습니다.</div>';
@@ -1582,7 +1865,7 @@
             <img src="${r.thumbnail}?w=200" alt="" loading="lazy">
             <span class="seg-pexels-dur">${Math.round(r.duration)}s</span>
           </div>
-          <button type="button" class="seg-pexels-pick" data-hd="${escapeAttr(r.hd_url)}" ${already.has(r.hd_url) ? "disabled" : ""}>
+          <button type="button" class="seg-pexels-pick" data-hd="${escapeAttr(r.hd_url)}" data-dur="${Number(r.duration) || ""}" ${already.has(r.hd_url) ? "disabled" : ""}>
             ${already.has(r.hd_url) ? "추가됨 ✓" : "선택"}
           </button>
         </div>
@@ -1596,7 +1879,7 @@
         });
       });
       box.querySelectorAll(".seg-pexels-pick").forEach((btn) =>
-        btn.addEventListener("click", () => selectPexelsResult(id, btn.dataset.hd, btn))
+        btn.addEventListener("click", () => selectPexelsResult(id, btn.dataset.hd, btn, btn.dataset.dur))
       );
     } catch (err) {
       box.innerHTML = `<div class="seg-pexels-loading">미리보기 실패: ${escapeHtml(err.message)}</div>`;
@@ -1614,15 +1897,19 @@
   }
 
   async function saveField(id, field, value) {
+    return saveFields(id, { [field]: value });
+  }
+  // 여러 칸을 한 번에 저장 (소재 목록과 asset_trims를 같이 바꿀 때 중간 상태가 남지 않게)
+  async function saveFields(id, fields) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
       method: "PATCH",
       headers: jsonHeaders,
-      body: JSON.stringify({ [field]: value }),
+      body: JSON.stringify(fields),
     });
     if (!res.ok) throw new Error(await res.text());
-    const seg = segments.find((s) => String(s.id) === id);
-    if (seg) seg[field] = value;
-    if (field === "asset_paths") updateRuntimeSummary();   // 사진 개수가 바뀌면 "사진을 더 넣으세요" 안내도 갱신
+    const seg = segments.find((s) => String(s.id) === String(id));
+    if (seg) Object.assign(seg, fields);
+    if ("asset_paths" in fields) updateRuntimeSummary();   // 사진 개수가 바뀌면 "사진을 더 넣으세요" 안내도 갱신
   }
 
   async function saveSegmentCard(id, el) {
@@ -1645,7 +1932,9 @@
       });
       if (!res.ok) throw new Error(await res.text());
       const seg = segments.find((s) => String(s.id) === id);
+      const keywordChanged = seg && (seg.keyword || "").trim() !== keyword.trim();
       if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
+      if (keywordChanged) enqueueAutofill(id);   // 키워드를 바꿨으면 (모자란 장면이고 직접 지운 적 없으면) 새 키워드로 자동 배치
       // 저장하는 동안 또 고쳤다면 다시 수정됨 상태로 둔다
       if (el.dataset.dirty) { stateEl.textContent = "수정됨"; return; }
       stateEl.className = "seg-save-state ok";
@@ -1665,7 +1954,7 @@
     if (!confirm(`${seg.order_no}번 장면을 삭제할까요? 직접 올린 사진/영상도 함께 지워집니다.`)) return;
 
     try {
-      for (const path of (seg.asset_paths || []).filter((p) => !isExternalUrl(p))) {
+      for (const path of (seg.asset_paths || []).filter(isStoragePath)) {
         await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
       }
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, { method: "DELETE", headers });
@@ -2105,16 +2394,21 @@
     $("prevLines").style.bottom = (Number($("capPos").value) / 100 * 480) + "px";
     cap.textContent = "";
 
-    // 컷 구성
-    const assets = (seg.asset_paths || []).map((path) => ({ path, url: assetUrl(path), video: !isImage(path) }));
-    const nCuts = assets.length ? Math.min(assets.length, Math.max(2, Math.round(secs / 4.5))) : 0;
-    const cutLen = nCuts ? secs / nCuts : secs;
+    // 컷 구성: 영상 생성과 같이 장면의 클립을 전부 순서대로, 비중(__weights)만큼 나눠서 보여준다
+    const assets = (seg.asset_paths || []).map((path) => ({ path, blank: isBlank(path), url: isBlank(path) ? null : assetUrl(path), video: isVideo(path) }));
+    const plan = clipPlan(seg, secs);
+    const nCuts = assets.length;
+    const cutEnds = [];
+    plan.reduce((acc, c) => { cutEnds.push(acc + c.alloc); return acc + c.alloc; }, 0);
     media.innerHTML = "";
     const cuts = [];
     for (let k = 0; k < nCuts; k++) {
       const a = assets[k];
       let node;
-      if (a.video) {
+      if (a.blank) {
+        node = document.createElement("div");
+        node.classList.add(blankClass(a.path));
+      } else if (a.video) {
         node = document.createElement("video");
         node.muted = true; node.playsInline = true; node.preload = "auto"; node.src = a.url;
         const tr = (seg.asset_trims || {})[a.path];
@@ -2123,8 +2417,10 @@
         node = document.createElement("img");
         node.src = a.url; node.alt = "";
       }
-      node.className = "pv-cut";
-      if (framed) {
+      node.classList.add("pv-cut");
+      if (framed && a.blank) {
+        node.style.bottom = "auto"; node.style.height = "320px";
+      } else if (framed) {
         // 세로로 긴 소재는 맨 아래까지(375px), 그 밖은 320px. 크기를 알게 되면 정한다
         const fit = () => {
           const w = node.naturalWidth || node.videoWidth, h = node.naturalHeight || node.videoHeight;
@@ -2137,18 +2433,18 @@
       const fc = ((seg.asset_trims || {}).__focus || {})[a.path];
       if (fc) node.style.objectPosition = `${fc.x * 100}% ${fc.y * 100}%`;
       media.appendChild(node);
-      cuts.push({ node, video: a.video, mode: pvMode(direction, k) });
+      cuts.push({ node, video: a.video, blank: a.blank, mode: pvMode(direction, k), len: plan[k].alloc });
     }
     if (!nCuts) {
       const empty = document.createElement("div");
       empty.className = "pv-empty";
       empty.textContent = part === SUBSCRIBE_PART
         ? "사진을 넣지 않아서 영상 생성 때 마녀 사진이 하나 자동으로 들어가요"
-        : `사진·영상이 없어요${keyword ? ` — 영상 생성 때 '${keyword}'로 Pexels 영상이 들어가요` : ""}`;
+        : `사진·영상이 없어요 — 이대로는 영상을 생성할 수 없어요. 소재나 빈 화면을 넣어주세요${keyword ? ` (키워드: '${keyword}')` : ""}`;
       media.appendChild(empty);
     }
-    const need = Math.max(2, Math.round(secs / 4.5));
-    const baseInfo = `약 ${secs.toFixed(0)}초 · 컷 ${nCuts}개` + (nCuts && secs > 7 && assets.length < need ? ` (영상 생성 때 Pexels 컷 ${need - assets.length}개가 더 붙어요)` : "");
+    const shortCnt = plan.filter((c) => c.short).length;
+    const baseInfo = `약 ${secs.toFixed(0)}초 · 컷 ${nCuts}개` + (shortCnt ? ` · ⚠ 짧은 영상 ${shortCnt}개(마지막 장면이 이어져요)` : "");
     $("prevTitle").textContent = `${seg.order_no}번 장면 · ${part || "장면"}`;
     $("prevInfo").textContent = baseInfo;
     $("prevBar").style.width = "0";
@@ -2187,7 +2483,9 @@
       $("prevBar").style.width = Math.min(100, t / secs * 100) + "%";
       // 컷 전환
       if (cuts.length) {
-        const ci = Math.min(cuts.length - 1, Math.floor(Math.min(t, secs - 0.001) / cutLen));
+        const tt = Math.min(t, secs - 0.001);
+        let ci = cutEnds.findIndex((e) => tt < e);
+        if (ci < 0) ci = cuts.length - 1;
         if (ci !== state.cutIdx) {
           state.cutIdx = ci;
           cuts.forEach((c, i) => {
@@ -2197,9 +2495,9 @@
           const c = cuts[ci];
           if (c.video) {
             try { c.node.currentTime = Number(c.node.dataset.start) || 0; c.node.play().catch(() => {}); } catch {}
-          } else {
+          } else if (!c.blank) {
             c.node.getAnimations().forEach((a) => a.cancel());
-            pvKenBurns(c.node, c.mode, cutLen);
+            pvKenBurns(c.node, c.mode, c.len);
           }
         }
       }
@@ -2240,26 +2538,172 @@
     if (!confirm("이 소재를 삭제할까요?")) return;
     const seg = segments.find((s) => String(s.id) === id);
     const paths = (seg.asset_paths || []).filter((p) => p !== path);
-    if (!isExternalUrl(path)) {
-      await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
-    }
-    await saveField(id, "asset_paths", paths);
-    if (seg.asset_trims && seg.asset_trims[path]) {
-      const { [path]: _t, ...restTrims } = seg.asset_trims;
-      await saveField(id, "asset_trims", restTrims);
-    }
-    const focusMap = (seg.asset_trims || {}).__focus;
-    if (focusMap && focusMap[path]) {
-      const { [path]: _f, ...restFocus } = focusMap;
+    try {
+      if (isStoragePath(path)) {
+        await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
+      }
+      // 이 소재의 구간/위치/비중/원본 길이 기록도 같이 지운다
       const next = { ...(seg.asset_trims || {}) };
-      if (Object.keys(restFocus).length) next.__focus = restFocus; else delete next.__focus;
-      await saveField(id, "asset_trims", next);
-    }
-    if (seg.asset_notes && seg.asset_notes[path]) {
-      const { [path]: _removed, ...rest } = seg.asset_notes;
-      await saveField(id, "asset_notes", rest);
+      delete next[path];
+      ["__focus", "__weights", "__pexels"].forEach((key) => {
+        if (!next[key] || next[key][path] === undefined) return;
+        const { [path]: _x, ...rest } = next[key];
+        if (Object.keys(rest).length) next[key] = rest; else delete next[key];
+      });
+      // X로 직접 지운 장면은 다시 자동 배치하지 않는다 (docs/storyboard-contract.md 2절 3)
+      next.__cleared = true;
+      await saveFields(id, { asset_paths: paths, asset_trims: next });
+      if (seg.asset_notes && seg.asset_notes[path]) {
+        const { [path]: _removed, ...rest } = seg.asset_notes;
+        await saveField(id, "asset_notes", rest);
+      }
+    } catch (err) {
+      showMsg("소재 삭제 실패: " + err.message, false);
     }
     refreshThumbs(id);
+  }
+
+  // 장면에 빈 화면 클립(blank:black / blank:white / blank:bars) 1개를 맨 뒤에 넣는다
+  async function addBlankClip(id, token) {
+    const seg = segments.find((s) => String(s.id) === String(id));
+    if (!seg || !BLANKS.some((b) => b.token === token)) return;
+    const paths = seg.asset_paths || [];
+    if (paths.includes(token)) { showMsg("이 장면에 이미 같은 빈 화면이 있어요. (한 장면에 같은 빈 화면은 하나만 넣을 수 있어요)", false); return; }
+    try {
+      await saveField(String(id), "asset_paths", [...paths, token]);
+      const el = document.querySelector(`.seg-item[data-id="${id}"]`);
+      const box = el && el.querySelector(".seg-blank-add");
+      if (box) box.style.display = "none";
+      refreshThumbs(String(id));
+      showMsg(`빈 화면(${blankLabel(token)})을 추가했습니다.`, true);
+    } catch (err) {
+      showMsg("빈 화면 추가 실패: " + err.message, false);
+    }
+  }
+  $("segList").addEventListener("click", (e) => {
+    const b = e.target.closest(".blank-pick-btn");
+    const card = b && b.closest(".seg-item");
+    if (card && !b.disabled) addBlankClip(card.dataset.id, b.dataset.token);
+  });
+
+  // ───── 자동 배치: 비었거나 모자란 장면을 키워드로 Pexels 영상으로 채운다 (콘티를 열 때, 한 장면씩 순서대로) ─────
+  // 결과는 asset_trims.__autofill = {status: ok|quota|no_results|error, at, query} 로 남긴다 (생성 전 검사가 이 값을 읽는다)
+  let autofillQueue = [];
+  let autofillScript = null;
+  let autofillWorking = false;
+  function autofillWanted(seg) {
+    if (!seg || isSubscribeSeg(seg)) return false;   // 구독/좋아요 장면은 파이프라인이 사진을 고른다
+    const trims = seg.asset_trims || {};
+    if (trims.__cleared) return false;
+    const q = (seg.keyword || "").trim();
+    if (!q) return false;
+    if ((seg.asset_paths || []).length >= needClips(segSecondsOf(seg))) return false;
+    // 같은 검색어로 이미 찾아봤는데 결과가 없었거나 더 넣을 게 없었으면 다시 부르지 않는다 (무료 API 한도 보호)
+    const af = trims.__autofill;
+    if (af && af.query === q && (af.status === "ok" || af.status === "no_results")) return false;
+    return true;
+  }
+  function startAutofill(scriptId) {
+    autofillScript = String(scriptId);
+    autofillQueue = [...segments].sort((a, b) => a.order_no - b.order_no).filter(autofillWanted).map((s) => String(s.id));
+    runAutofillQueue();
+  }
+  function enqueueAutofill(id) {
+    if (autofillScript !== String($("scriptSelect").value)) return;
+    if (!autofillQueue.includes(String(id))) autofillQueue.push(String(id));
+    runAutofillQueue();
+  }
+  function autofillPending() {
+    return autofillWorking || autofillQueue.length > 0;
+  }
+  async function runAutofillQueue() {
+    if (autofillWorking) return;
+    autofillWorking = true;
+    try {
+      while (autofillQueue.length) {
+        if (autofillScript !== String($("scriptSelect").value)) { autofillQueue = []; break; }
+        const seg = segments.find((s) => String(s.id) === autofillQueue[0]);
+        autofillQueue.shift();
+        if (!autofillWanted(seg)) continue;
+        const status = await autofillSegment(seg);
+        if (status === "quota") {
+          // 한도가 찼으면 남은 장면은 부르지 않고 "한도 초과"로만 기록한다
+          const rest = autofillQueue.splice(0).map((id) => segments.find((s) => String(s.id) === id)).filter(autofillWanted);
+          for (const s of rest) await recordAutofill(s, "quota");
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 400));   // 장면 사이에 잠깐 쉰다
+      }
+    } finally {
+      autofillWorking = false;
+    }
+  }
+  async function recordAutofill(seg, status) {
+    const trims = { ...(seg.asset_trims || {}) };
+    trims.__autofill = { status, at: new Date().toISOString(), query: (seg.keyword || "").trim() };
+    try { await saveField(String(seg.id), "asset_trims", trims); } catch { /* 기록 실패는 생성 전 검사에서 "콘티를 확인해주세요"로 잡힌다 */ }
+    refreshThumbs(String(seg.id));
+  }
+  async function autofillSegment(seg) {
+    const id = String(seg.id);
+    const q = (seg.keyword || "").trim();
+    autofillBusy.add(id);
+    refreshThumbs(id);
+    let status = "error", results = [];
+    try {
+      const res = await fetch(`/api/pexels-search?q=${encodeURIComponent(q)}&orientation=portrait`);
+      if (res.status === 429) status = "quota";
+      else {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) status = data.quota ? "quota" : "error";
+        else {
+          results = (data.results || []).filter((r) => r.hd_url);
+          status = results.length ? "ok" : "no_results";
+        }
+      }
+    } catch {
+      status = "error";
+    }
+    autofillBusy.delete(id);
+    if (!segments.includes(seg)) return status;   // 그 사이 다른 콘티로 넘어갔다
+    const trims = { ...(seg.asset_trims || {}) };
+    if (trims.__cleared) { refreshThumbs(id); return status; }   // 검색하는 사이 사용자가 직접 지웠다
+    // 저장 직전의 최신 소재 목록에 더한다 (검색하는 사이 올린 사진이 있어도 지워지지 않게)
+    const paths = [...(seg.asset_paths || [])];
+    const used = new Set(segments.flatMap((s) => s.asset_paths || []));   // 이 장면·다른 장면에 이미 있는 영상은 넣지 않는다
+    const pex = { ...(trims.__pexels || {}) };
+    let want = needClips(segSecondsOf(seg)) - paths.length;
+    let added = 0;
+    for (const r of results) {
+      if (want <= 0) break;
+      if (used.has(r.hd_url)) continue;
+      paths.push(r.hd_url);
+      used.add(r.hd_url);
+      if (Number(r.duration) > 0) pex[r.hd_url] = Number(r.duration);
+      want--; added++;
+    }
+    if (added) trims.__pexels = pex;
+    trims.__autofill = { status, at: new Date().toISOString(), query: q };
+    try {
+      await saveFields(id, added ? { asset_paths: paths, asset_trims: trims } : { asset_trims: trims });
+    } catch (err) {
+      showMsg(`${seg.order_no}번 장면 자동 배치 저장 실패: ${err.message}`, false);
+    }
+    refreshThumbs(id);
+    return status;
+  }
+
+  // ───── 생성 전 검사: 소재가 하나도 없는 장면이 있으면 생성하지 않는다 (구독/좋아요 장면 제외) ─────
+  function emptySceneProblems() {
+    return [...segments].sort((a, b) => a.order_no - b.order_no)
+      .filter((s) => !isSubscribeSeg(s) && !(s.asset_paths || []).length)
+      .map((s) => {
+        const af = (s.asset_trims || {}).__autofill;
+        const why = af && af.status === "quota" ? "Pexels 한도 초과입니다. 소재를 채워주세요."
+          : af && af.status === "no_results" ? "검색 결과가 없습니다. 소재를 채워주세요."
+          : "콘티를 확인해주세요.";
+        return `${s.order_no}번 장면: ${why}`;
+      });
   }
 
   let lastScriptId = "";
@@ -2399,7 +2843,7 @@
     if (String($("scriptSelect").value) !== String(scriptId)) return status;
     const noteEl = $("genNote");
     if (status === "error") {
-      noteEl.innerHTML = `${escapeHtml(genErrorText(info.lastError))}${info.lastError && info.lastError.url ? ` · <a href="${escapeAttr(info.lastError.url)}" target="_blank" rel="noopener" style="color:#ffd93d;">실행 기록 보기</a>` : ""}<br>버튼을 다시 누르면 재시도합니다 (일시적인 서버 오류는 재시도로 해결되는 경우가 많습니다).`;
+      noteEl.innerHTML = `${escapeHtml(genErrorText(info.lastError, info.name))}${info.lastError && info.lastError.url ? ` · <a href="${escapeAttr(info.lastError.url)}" target="_blank" rel="noopener" style="color:#ffd93d;">실행 기록 보기</a>` : ""}<br>버튼을 다시 누르면 재시도합니다 (일시적인 서버 오류는 재시도로 해결되는 경우가 많습니다).`;
       noteEl.style.display = "block";
     } else {
       noteEl.style.display = "none";
@@ -2441,6 +2885,17 @@
     try {
       await flushDirtyCards();
       if (cardsDirty()) throw new Error("장면 저장이 끝나지 않았습니다. 잠시 후 다시 눌러주세요.");
+      // 콘티에서 보이는 것 = 생성되는 영상: 자동 배치가 끝나기 전이거나 빈 장면이 있으면 생성하지 않는다
+      if (autofillPending()) throw new Error("Pexels 자동 배치가 아직 진행 중입니다. 끝난 뒤 다시 눌러주세요.");
+      const problems = emptySceneProblems();
+      if (problems.length) {
+        const noteEl = $("genNote");
+        noteEl.innerHTML = problems.map(escapeHtml).join("<br>");
+        noteEl.style.display = "block";
+        btn.disabled = false;
+        showMsg("소재가 없는 장면이 있어 영상을 생성하지 않았습니다. " + problems.join(" / "), false);
+        return;
+      }
       const version = await genNextVersion(scriptId);
       if (!confirm(`v${version} 영상 생성을 시작할까요? 몇 분 걸리고, 완성되면 알려드립니다. 영상은 Studio에서 확인하세요.`)) { btn.disabled = false; return; }
       genRequestPermission();
@@ -2517,7 +2972,7 @@
       if (!res.ok) throw new Error(data.error || "콘티 생성 실패");
 
       for (const seg of segments) {
-        for (const path of (seg.asset_paths || []).filter((p) => !isExternalUrl(p))) {
+        for (const path of (seg.asset_paths || []).filter(isStoragePath)) {
           await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
         }
       }

@@ -519,7 +519,7 @@
     if (info.status === "running") { btn.disabled = true; btn.textContent = "영상 생성 중... (몇 분 걸려요)"; watchGeneration(cur.id); }
     else { btn.disabled = false; btn.textContent = `영상 생성 (v${await genNextVersion(cur.id)})`; }
     if (info.status === "error") {
-      note.innerHTML = `${esc(genErrorText(info.lastError))}${info.lastError && info.lastError.url ? ` · <a href="${esc(info.lastError.url)}" target="_blank" rel="noopener" style="color:#ffd93d;">실행 기록 보기</a>` : ""}<br>버튼을 다시 누르면 재시도합니다.`;
+      note.innerHTML = `${esc(genErrorText(info.lastError, (curRow && curRow.video_settings && curRow.video_settings.name) || info.name))}${info.lastError && info.lastError.url ? ` · <a href="${esc(info.lastError.url)}" target="_blank" rel="noopener" style="color:#ffd93d;">실행 기록 보기</a>` : ""}<br>버튼을 다시 누르면 재시도합니다.`;
       note.style.display = "block";
     } else note.style.display = "none";
   }
