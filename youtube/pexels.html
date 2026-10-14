@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pexels — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .px-row { display:flex; gap:8px; }
+  .px-row input { flex:1; margin:0; min-width:0; }
+  .px-row button { width:auto; padding:0 18px; margin:0; }
+  .px-opts { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0; }
+  .px-opts select { width:auto; margin:0; }
+  .px-note { color:#a89bb5; font-size:0.78rem; line-height:1.5; margin:6px 0 12px; }
+  .px-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-top:10px; }
+  .px-ph { position:relative; aspect-ratio:3/4; background:#221a2e center/cover no-repeat; border-radius:3px; cursor:pointer; border:2px solid transparent; overflow:hidden; }
+  .px-ph.sel { border-color:#7cff4a; }
+  .px-ph .chk { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; font-size:0.8rem; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  .px-ph.sel .chk { background:#7cff4a; color:#0f0a14; }
+  .px-ph .by { position:absolute; left:0; right:0; bottom:0; padding:12px 4px 3px; font-size:0.6rem; color:#ddd; background:linear-gradient(transparent, rgba(0,0,0,.7)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .px-bar { position:sticky; bottom:0; background:#0f0a14; padding:10px 0 14px; margin-top:14px; border-top:1px solid #221a2e; }
+  .px-bar button { margin:0; }
+  .px-more { background:#221a2e; margin-top:10px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/search.html">← Search</a>
+    <h1 style="font-size:1.4rem;margin-bottom:0.6rem;">Pexels</h1>
+    <p class="px-note">무료 사진 사이트 Pexels에서 사진을 찾아 고르세요. 여러 번 검색해도 고른 사진은 계속 남아요. 고른 사진으로 <b>이름·설명 자막이 들어간 슬라이드쇼 영상</b>을 만들어요. (영어로 검색하면 결과가 훨씬 좋아요)</p>
+
+    <div class="px-row">
+      <input type="text" id="q" placeholder="영어 검색어 예: Maldives beach aerial" maxlength="80">
+      <button type="button" id="searchBtn">검색</button>
+    </div>
+    <div class="px-opts">
+      <label style="margin:0;">모양</label>
+      <select id="orient">
+        <option value="portrait" selected>세로 (쇼츠에 맞음)</option>
+        <option value="landscape">가로</option>
+        <option value="square">정사각</option>
+      </select>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div class="px-grid" id="grid"></div>
+    <button type="button" class="px-more" id="moreBtn" style="display:none;">더 보기</button>
+
+    <div class="px-bar">
+      <button type="button" id="makeBtn" style="background:#7cff4a;color:#0f0a14;" disabled>사진을 골라주세요</button>
+      <div class="px-note" style="margin:6px 0 0;">사진 출처(촬영자)는 영상 설명에 자동으로 적혀요.</div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const picked = new Map();         // id -> 사진 (여러 검색에 걸쳐 유지)
+  let page = 1, query = "", orient = "portrait", total = 0, shown = 0;
+
+  function updateBar() {
+    const n = picked.size;
+    $("makeBtn").disabled = !n;
+    $("makeBtn").textContent = n ? `고른 사진 ${n}장으로 슬라이드쇼 만들기` : "사진을 골라주세요";
+  }
+  function card(p) {
+    const el = document.createElement("div");
+    el.className = "px-ph" + (picked.has(p.id) ? " sel" : "");
+    el.style.backgroundImage = `url("${p.thumb}")`;
+    el.innerHTML = `<div class="chk">✓</div><div class="by">${esc(p.photographer)}</div>`;
+    el.addEventListener("click", () => {
+      if (picked.has(p.id)) { picked.delete(p.id); el.classList.remove("sel"); }
+      else { if (picked.size >= 30) { alert("한 영상에는 사진 30장까지 고를 수 있어요."); return; } picked.set(p.id, p); el.classList.add("sel"); }
+      updateBar();
+    });
+    return el;
+  }
+  async function load(more) {
+    if (!more) { page = 1; shown = 0; $("grid").innerHTML = ""; query = $("q").value.trim(); orient = $("orient").value; }
+    else page++;
+    if (!query) return;
+    $("searchBtn").disabled = true; $("moreBtn").disabled = true;
+    $("msg").style.display = "none";
+    try {
+      const res = await fetch(`/api/pexels-photos?q=${encodeURIComponent(query)}&page=${page}&orientation=${orient}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "검색 실패");
+      total = d.total || 0;
+      d.results.forEach((p) => { $("grid").appendChild(card(p)); });
+      shown += d.results.length;
+      $("moreBtn").style.display = shown < total && page < 10 ? "block" : "none";
+      if (!shown) { $("msg").className = "msg err"; $("msg").textContent = "검색 결과가 없어요. 영어 검색어로 바꿔보세요."; }
+    } catch (e) { $("msg").className = "msg err"; $("msg").textContent = "검색 실패: " + e.message; }
+    finally { $("searchBtn").disabled = false; $("moreBtn").disabled = false; }
+  }
+  $("searchBtn").addEventListener("click", () => load(false));
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") load(false); });
+  $("moreBtn").addEventListener("click", () => load(true));
+
+  $("makeBtn").addEventListener("click", () => {
+    if (!picked.size) return;
+    const photos = [...picked.values()].map((p) => ({ id: p.id, url: p.url, thumb: p.thumb, page_url: p.page_url, photographer: p.photographer, photographer_url: p.photographer_url, alt: p.alt || "" }));
+    try { sessionStorage.setItem("pexelsPick", JSON.stringify({ query, photos })); } catch { alert("선택을 저장하지 못했어요. 다시 시도해주세요."); return; }
+    location.href = "/youtube/curation.html";
+  });
+})();
+</script>
+</body>
+</html>

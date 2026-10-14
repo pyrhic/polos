@@ -19,16 +19,18 @@ function ytDefaultDescription(row) {
 // 웹페이지는 PC 터미널을 직접 실행할 수 없으므로, 명령을 복사해주는 버튼으로 대신한다.
 // 슬래시 경로라서 명령 프롬프트/PowerShell/Git Bash 어디서든 그대로 붙여넣어 실행된다.
 const YT_REAUTH_CMD = "python C:/Users/PC/youtube-automation/core/reauth_youtube.py";
-const YT_REAUTH_CMD_2 = "python C:/Users/PC/youtube-automation/core/reauth_youtube.py --slot 2";   // 두 번째 채널
+const YT_REAUTH_CMDS = { 2: "python C:/Users/PC/youtube-automation/core/reauth_youtube.py --slot 2", 3: "python C:/Users/PC/youtube-automation/core/reauth_youtube.py --slot 3" };
 
 // 올릴 수 있는 채널 목록 (config.js의 YT_CHANNELS, 없으면 기본값)
 function ytChannels() {
   const list = (globalThis.POLOS_CONFIG || {}).YT_CHANNELS;
-  return Array.isArray(list) && list.length ? list : [{ slot: "1", label: "기존 채널" }, { slot: "2", label: "새 채널" }];
+  // ready: false 인 채널(아직 로그인 승인 전)은 목록에 보이지 않는다
+  return (Array.isArray(list) && list.length ? list : [{ slot: "1", label: "기존 채널" }, { slot: "2", label: "새 채널" }]).filter((c) => c.ready !== false);
 }
 // 기본 채널: 마지막으로 올린 채널 (처음이면 1번). 올리기 전에 언제든 바꿀 수 있다.
 function ytDefaultSlot(row) {
   if (row && String(row.category || "").startsWith("위키")) return "1";   // 위키 이야기(인물·사건·지식)는 Wicked Wiki 채널
+  if (row && row.category === "큐레이션" && ytChannels().some((c) => c.slot === "3")) return "3";   // 사진 슬라이드쇼는 OUTSTAGRAM 채널(준비되면)
   try { return localStorage.getItem("ytSlot") === "2" ? "2" : "1"; } catch { return "1"; }
 }
 
@@ -36,8 +38,8 @@ function ytReauthHelpHtml() {
   return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:#17141c;border-radius:3px;font-size:0.78rem;color:#a89bb5;">
     <div style="color:#ffd93d;font-weight:700;margin-bottom:4px;">⚠ 프로그래밍 폴더가 있는 PC에서 실행해주세요</div>
     유튜브 인증이 만료되면(7일마다) 업로드가 실패합니다. 아래 버튼으로 명령을 복사해 PC 터미널에 붙여넣고 Enter를 누른 뒤, 브라우저에서 "허용"만 누르면 됩니다. (폰에서는 실행할 수 없습니다)
-    <button type="button" class="yt-reauth-copy" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사 (기존 채널)</button>
-    <button type="button" class="yt-reauth-copy" data-slot="2" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사 (두 번째 채널 · 채널 선택 화면에서 그 채널을 고르세요)</button>
+    <button type="button" class="yt-reauth-copy" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사 (${escapeHtml((ytChannels().find((c) => c.slot === "1") || { label: "기존 채널" }).label)})</button>
+    ${ytChannels().filter((c) => c.slot !== "1").map((c) => `<button type="button" class="yt-reauth-copy" data-slot="${escapeHtml(c.slot)}" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사 (${escapeHtml(c.label)} · 채널 선택 화면에서 그 채널을 고르세요)</button>`).join("")}
   </div>`;
 }
 
@@ -83,7 +85,7 @@ function uploadBlockHtml(o, row) {
 function bindUploadBlocks(reload) {
   document.querySelectorAll(".yt-reauth-copy").forEach((btn) =>
     btn.addEventListener("click", async () => {
-      const cmd = btn.dataset.slot === "2" ? YT_REAUTH_CMD_2 : YT_REAUTH_CMD;
+      const cmd = YT_REAUTH_CMDS[btn.dataset.slot] || YT_REAUTH_CMD;
       const label = btn.textContent;
       try {
         await navigator.clipboard.writeText(cmd);

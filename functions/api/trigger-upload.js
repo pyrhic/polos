@@ -18,7 +18,7 @@ export async function onRequestPost(context) {
   try {
     const { outputId, videoUrl, title, description, tags, channelSlot } = await request.json();
     const slot = String(channelSlot || "1");
-    if (slot !== "1" && slot !== "2") return json({ error: "올릴 채널 번호가 올바르지 않습니다" }, 400);
+    if (!["1", "2", "3"].includes(slot)) return json({ error: "올릴 채널 번호가 올바르지 않습니다" }, 400);
     if (!outputId || !videoUrl || !clean(title)) {
       return json({ error: "outputId, videoUrl, title이 필요합니다" }, 400);
     }

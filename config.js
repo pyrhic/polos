@@ -16,5 +16,7 @@ globalThis.POLOS_CONFIG = {
   YT_CHANNELS: [
     { slot: "1", label: "Wicked Wiki" },
     { slot: "2", label: "연예계중개" },
+    // OUTSTAGRAM(사진 소개 채널)을 만들고 `python core/reauth_youtube.py --slot 3`으로 승인한 뒤 ready를 true로 바꾸세요.
+    { slot: "3", label: "OUTSTAGRAM", ready: false },
   ],
 };

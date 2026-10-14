@@ -77,6 +77,10 @@
         <div class="cu-note" id="planMsg"></div>
       </div>
 
+      <div class="cu-card" id="capCard" style="display:none;">
+        <button type="button" id="capBtn" style="background:#2f2440;">AI로 이름·설명 쓰기</button>
+        <div class="cu-note" id="capMsg">사진 설명을 바탕으로 이름과 한 줄 설명을 써요. 비어 있는 칸만 채우고, 직접 쓴 건 그대로 둬요.</div>
+      </div>
       <div id="items"></div>
       <button type="button" id="addItemBtn" style="background:#221a2e;margin-bottom:12px;">+ 항목 추가</button>
 
@@ -267,7 +271,7 @@
         const n = (s.asset_notes || {})[url] || {};
         return {
           name: s.section || "", comment: s.script_text || "", keyword: s.keyword || "",
-          photo: url ? { url, thumb: n.thumb || url, page_url: n.articleUrl || "", photographer: n.photographer || "", photographer_url: n.photographer_url || "" } : null,
+          photo: url ? { url, thumb: n.thumb || url, page_url: n.articleUrl || "", photographer: n.photographer || "", photographer_url: n.photographer_url || "", alt: n.alt || "" } : null,
         };
       }),
     };
@@ -310,7 +314,7 @@
           <div class="cu-photo" ${it.photo ? `style="background-image:url('${esc(it.photo.thumb)}')"` : ""}><span>${it.photo ? "사진 바꾸기" : "사진 고르기"}</span></div>
           <div class="cu-fields">
             <div class="k">이름</div><input type="text" class="f-name" value="${esc(it.name)}" maxlength="40" placeholder="예: 몰디브">
-            <div class="k">선정 이유 메모 (영상에는 안 나옴)</div><input type="text" class="f-comment" value="${esc(it.comment)}" maxlength="80">
+            <div class="k">한 줄 설명 (사진 밑 자막에 나와요)</div><input type="text" class="f-comment" value="${esc(it.comment)}" maxlength="80">
             <div class="k">사진 검색어 (영어)</div><input type="text" class="f-kw" value="${esc(it.keyword)}" maxlength="80">
           </div>
         </div>
@@ -421,7 +425,7 @@
       const rows = cur.items.map((it, i) => ({
         script_id: cur.id, order_no: i + 1, section: it.name, script_text: it.comment, keyword: it.keyword, direction: "",
         target_seconds: cur.secs, asset_paths: it.photo ? [it.photo.url] : [],
-        asset_notes: it.photo ? { [it.photo.url]: { source: "Pexels", photographer: it.photo.photographer, photographer_url: it.photo.photographer_url, articleUrl: it.photo.page_url, thumb: it.photo.thumb } } : {},
+        asset_notes: it.photo ? { [it.photo.url]: { source: "Pexels", photographer: it.photo.photographer, photographer_url: it.photo.photographer_url, articleUrl: it.photo.page_url, thumb: it.photo.thumb, alt: it.photo.alt || "" } } : {},
       }));
       if (rows.length) {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, { method: "POST", headers: jsonHeaders, body: JSON.stringify(rows) });
@@ -468,7 +472,7 @@
 
   // ───────── 사진 고르기 ─────────
   let pickIdx = -1, pickPage = 1, pickQ = "";
-  const toPhoto = (p) => ({ url: p.url, thumb: p.thumb, page_url: p.page_url, photographer: p.photographer, photographer_url: p.photographer_url, id: p.id });
+  const toPhoto = (p) => ({ url: p.url, thumb: p.thumb, page_url: p.page_url, photographer: p.photographer, photographer_url: p.photographer_url, id: p.id, alt: p.alt || "" });
   async function searchPhotos(q, page) {
     const res = await fetch(`/api/pexels-photos?q=${encodeURIComponent(q)}&page=${page}&orientation=portrait`);
     const data = await res.json();
@@ -553,7 +557,41 @@
     } catch (err) { btn.disabled = false; showMsg("영상 생성 실패: " + err.message, false); }
   });
 
+  // ───────── Pexels 검색에서 고른 사진으로 새 슬라이드쇼 시작 ─────────
+  let pickTheme = "";
+  function startFromPexelsPick() {
+    let pick = null;
+    try { pick = JSON.parse(sessionStorage.getItem("pexelsPick") || "null"); sessionStorage.removeItem("pexelsPick"); } catch { /* 없음 */ }
+    if (!pick || !Array.isArray(pick.photos) || !pick.photos.length) return false;
+    pickTheme = pick.query || "";
+    newCuration();
+    cur.count = pick.photos.length;
+    cur.items = pick.photos.map((p) => ({ name: "", comment: "", keyword: pick.query || "", photo: toPhoto(p) }));
+    showEdit();
+    renderItems();
+    queueSave();
+    return true;
+  }
+  const refreshCapCard = () => { $("capCard").style.display = cur && cur.items.some((it) => it.photo) ? "block" : "none"; };
+  const origRenderItems = renderItems;
+  renderItems = function () { origRenderItems(); refreshCapCard(); };
+  $("capBtn").addEventListener("click", async () => {
+    const targets = cur.items.map((it, i) => ({ it, i })).filter(({ it }) => it.photo && (!it.name.trim() || !it.comment.trim()));
+    if (!targets.length) { $("capMsg").textContent = "채울 빈 칸이 없어요."; return; }
+    const btn = $("capBtn"); btn.disabled = true; btn.textContent = "쓰는 중… (10~20초)";
+    try {
+      const res = await fetch("/api/gemini-photo-captions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme: cur.title.trim() || pickTheme, photos: targets.map(({ it }) => ({ alt: it.photo.alt || "" })) }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "실패");
+      targets.forEach(({ it }, k) => { const r = d.items[k] || {}; if (!it.name.trim() && r.name) it.name = r.name; if (!it.comment.trim() && r.comment) it.comment = r.comment; });
+      renderItems(); queueSave();
+      $("capMsg").textContent = `이름·설명을 ${targets.length}장에 채웠어요. 마음에 안 드는 건 직접 고쳐 보세요.`;
+    } catch (e) { $("capMsg").textContent = "실패: " + e.message; }
+    finally { btn.disabled = false; btn.textContent = "AI로 이름·설명 쓰기"; }
+  });
+
   loadList();
+  startFromPexelsPick();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 </script>
 <script src="/hub-nav.js"></script>
