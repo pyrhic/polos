@@ -17,8 +17,10 @@ async function feed(lang, type, mm, dd) {
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const langParam = url.searchParams.get("lang") || "both";
-  const langs = langParam === "both" ? ["ko", "en"] : [langParam];
-  if (!langs.every((l) => ["ko", "en"].includes(l))) return json({ error: "언어가 올바르지 않습니다" }, 400);
+  if (!["ko", "en", "both"].includes(langParam)) return json({ error: "언어가 올바르지 않습니다" }, 400);
+  // "이 날의 역사" 목록은 영어판이 충실하고 한국어판은 비어 있어서, 영어판 목록으로 찾고 한국어 문서는 위키데이터로 연결한다.
+  // 언어 선택은 "그 언어 문서가 있는 인물만" 보여주는 필터로 쓴다.
+  const langs = ["en"];
   const kst = new Date(Date.now() + 9 * 3600e3);
   const mm = String(kst.getUTCMonth() + 1).padStart(2, "0"), dd = String(kst.getUTCDate()).padStart(2, "0");
 
@@ -45,7 +47,9 @@ export async function onRequestGet(context) {
     }
     // 한국어·영어 문서가 모두 있는 인물을 먼저(널리 알려진 인물일 가능성이 높다), 그다음 사진이 있는 인물
     const rank = (p) => (p.langs.ko && p.langs.en ? 2 : 0) + (p.thumb ? 1 : 0);
-    const items = [...byKey.values()].sort((a, b) => rank(b) - rank(a));
+    const items = [...byKey.values()]
+      .filter((p) => langParam === "both" || p.langs[langParam])
+      .sort((a, b) => rank(b) - rank(a));
     const res = json({
       date: `${mm}월 ${dd}일`,
       births: items.filter((p) => p.type === "births").slice(0, 30),
