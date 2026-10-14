@@ -15,7 +15,18 @@ const decodeHtml = (s) => String(s || "")
   .replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&amp;/g, "&")
   .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 
-// 위키데이터 항목에서 인물 여부 / 사망 여부 / 출생·사망 연도를 읽는다
+// 영상 소재로 쓰지 않는 문서 종류(위키데이터 "무엇의 한 종류인가" 번호): 동음이의어, 목록, 틀, 분류, 그리고 영화·드라마·음반·노래·게임 같은 작품류
+// (작품류는 조회수 순위를 다 차지해서 "지식" 목록이 연예 작품으로 가득 차는 걸 막는다)
+const SKIP_KINDS = new Set([
+  "Q4167410", "Q13406463", "Q11266439", "Q4167836", "Q17633526",
+  "Q11424", "Q5398426", "Q1983062", "Q15416", "Q202866", "Q63952888", "Q482994", "Q134556", "Q7366", "Q7889", "Q95074", "Q15632617",
+  // 방송사·웹사이트·플랫폼·인터넷 주소 끝자리·음악 그룹·기업 같은 것도 "지식" 소재가 아니라서 제외
+  "Q1616075", "Q15265344", "Q35127", "Q118140435", "Q559856", "Q6576792", "Q122759350", "Q29380", "Q14296",
+  "Q641066", "Q216337", "Q215380", "Q43229", "Q4830453",
+]);
+
+// 위키데이터 항목에서 종류(인물/사건/지식) / 사망 여부 / 출생·사망 연도를 읽는다
+//  kind: "person"(인물) / "event"(사건: 일어난 때가 적힌 문서) / "thing"(지식: 그 밖의 개념·사물·장소) / null(쓰지 않는 문서)
 export function entityFacts(ent) {
   const claims = (ent && ent.claims) || {};
   const human = (claims.P31 || []).some((s) => s.mainsnak?.datavalue?.value?.id === "Q5");
@@ -36,7 +47,13 @@ export function entityFacts(ent) {
   const diedTime = (claims.P570 || [])[0]?.mainsnak?.datavalue?.value?.time || "";
   const dm = /^[+-](\d{4})-(\d{2})-(\d{2})/.exec(diedTime);
   const diedAt = dm && dm[2] !== "00" && dm[3] !== "00" ? `${dm[1]}-${dm[2]}-${dm[3]}` : (dm ? dm[1] : null);
-  return { human, deceased, born: year("P569"), died: year("P570"), diedAt, label, links };
+  const types = (claims.P31 || []).map((s) => s.mainsnak?.datavalue?.value?.id).filter(Boolean);
+  const dated = (claims.P585 || []).length > 0 || (claims.P580 || []).length > 0;   // 일어난 때 / 시작 시점이 적혀 있으면 사건으로 본다
+  let kind = "thing";
+  if (human) kind = "person";
+  else if (types.some((t) => SKIP_KINDS.has(t))) kind = null;
+  else if (dated) kind = "event";
+  return { human, kind, deceased, born: year("P569"), died: year("P570"), diedAt, label, links };
 }
 
 const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));

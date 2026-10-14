@@ -38,6 +38,7 @@
   .wk-tab { width:auto; flex:1; padding:9px 6px; font-size:0.8rem; text-transform:none; letter-spacing:0; }
   .wk-tab.active { background:#7cff4a; color:#0f0a14; }
   .wk-recent { background:#3a2f14; color:#ffd93d; }
+  .wk-kind { background:#2d2146; color:#c9a7ff; }
   .wk-group { color:#a89bb5; font-size:0.85rem; font-weight:700; margin:16px 0 8px; }
   .wk-views { color:#a89bb5; font-size:0.72rem; margin-top:4px; }
 </style>
@@ -46,7 +47,7 @@
   <div class="wrap">
     <a class="back" href="/youtube/search.html">← Search</a>
     <h1 style="font-size:1.4rem;margin-bottom:0.6rem;">Wikipedia</h1>
-    <p class="wk-note">인물 이름을 검색하면 한국어·영어 위키피디아를 함께 찾아요. 지금은 <b>사망한 인물</b>만 다뤄요. 이야기 후보를 고르면 한 편씩 콘티가 만들어져요.</p>
+    <p class="wk-note">한국어·영어 위키피디아에서 <b>인물 · 사건 · 지식</b> 이야기를 찾아요. 인물은 지금 <b>사망한 인물</b>만 다뤄요. 이야기 후보를 고르면 한 편씩 콘티가 만들어져요.</p>
 
     <div class="wk-tabs">
       <button type="button" class="wk-tab active" data-tab="search">검색</button>
@@ -56,13 +57,27 @@
 
     <div id="panelSearch" class="wk-panel">
       <div class="wk-row">
-        <input type="text" id="q" placeholder="예: 이순신, Marie Curie" maxlength="80">
+        <input type="text" id="q" placeholder="예: 이순신, 임진왜란, 블랙홀" maxlength="80">
         <button type="button" id="searchBtn">검색</button>
+      </div>
+      <div class="wk-opts">
+        <label style="margin:0;">종류</label>
+        <select id="kindFilter">
+          <option value="all">전체</option>
+          <option value="person">인물</option>
+          <option value="event">사건</option>
+          <option value="thing">지식</option>
+        </select>
       </div>
     </div>
     <div id="panelPopular" class="wk-panel" style="display:none;">
-      <div class="wk-note">위키피디아에서 많이 읽힌 <b>사망 인물</b> 순위예요. (위키피디아는 검색어 통계를 공개하지 않아서 "많이 읽힌 문서" 기준이에요.) 기간이 길수록 불러오는 데 시간이 걸려요(최대 10초 안팎).</div>
+      <div class="wk-note">위키피디아에서 많이 읽힌 <b>사망 인물 / 사건</b> 순위예요. (위키피디아는 검색어 통계를 공개하지 않아서 "많이 읽힌 문서" 기준이에요.) 기간이 길수록 불러오는 데 시간이 걸려요(최대 10초 안팎). <b>지식</b>은 조회수 순위에 성인 주제·방송사 같은 게 많이 섞여서, 검색으로 찾는 걸 권해요.</div>
       <div class="wk-opts">
+        <label style="margin:0;">종류</label>
+        <select id="popType">
+          <option value="person">인물(사망)</option>
+          <option value="event">사건</option>
+        </select>
         <label style="margin:0;">기간</label>
         <select id="popPeriod">
           <option value="day">가장 최근 하루</option>
@@ -82,8 +97,13 @@
       </div>
     </div>
     <div id="panelToday" class="wk-panel" style="display:none;">
-      <div class="wk-note">오늘(한국 날짜)이 <b>기일이거나 생일</b>인 사망 인물이에요. 한국어·영어 문서가 모두 있는 인물을 위쪽에 보여줘요.</div>
+      <div class="wk-note">오늘(한국 날짜)이 <b>기일이거나 생일</b>인 사망 인물, 또는 <b>오늘 있었던 사건</b>이에요. 한국어·영어 문서가 모두 있는 것을 위쪽에 보여줘요.</div>
       <div class="wk-opts">
+        <label style="margin:0;">종류</label>
+        <select id="todayType">
+          <option value="person">인물(기일·생일)</option>
+          <option value="event">오늘의 사건</option>
+        </select>
         <label style="margin:0;">언어</label>
         <select id="todayLang">
           <option value="both">한국어+영어</option>
@@ -134,7 +154,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const LANG_NAME = { ko: "한국어", en: "English" };
-  let results = [], person = null, ideasData = null, userDefaults = null;
+  let results = [], allResults = [], person = null, ideasData = null, userDefaults = null;
 
   function msg(el, text, ok) { el.className = "msg " + (ok ? "ok" : "err"); el.textContent = text; }
 
@@ -158,15 +178,17 @@
       const res = await fetch(`/api/wiki-search?q=${encodeURIComponent(q)}`);
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "검색 실패");
-      results = d.results || [];
-      renderResults();
+      allResults = d.results || [];
+      applyKindFilter();
     } catch (e) { msg($("msg"), "검색 실패: " + e.message, false); }
     finally { $("searchBtn").disabled = false; $("searchBtn").textContent = "검색"; }
   }
   function status(r) {
-    if (!r.human) return { cls: "wk-other", text: "인물 아님", ok: false };
+    if (r.kind === "event") return { cls: "wk-kind", text: "사건", ok: true };
+    if (r.kind === "thing") return { cls: "wk-kind", text: "지식", ok: true };
+    if (r.kind !== "person") return { cls: "wk-other", text: "소재로 쓰지 않는 문서", ok: false };
     if (!r.deceased) return { cls: "wk-live", text: "생존 인물(아직 지원 안 함)", ok: false };
-    return { cls: "wk-dead", text: "사망", ok: true };
+    return { cls: "wk-dead", text: "인물 · 사망", ok: true };
   }
   // 검색 / 인기 인물 / 오늘의 기일·생일이 같은 카드 모양을 쓴다. groups = [{title, items}]
   function renderResults(groups) {
@@ -177,7 +199,7 @@
     $("results").innerHTML = groups.map((g) => (g.items.length ? (g.title ? `<div class="wk-group">${esc(g.title)}</div>` : "") + g.items.map((r) => {
       const i = idx++;
       const st = status(r);
-      const years = r.human && (r.born || r.died) ? ` (${r.born ?? "?"}–${r.died ?? ""})` : "";
+      const years = r.kind === "person" && (r.born || r.died) ? ` (${r.born ?? "?"}–${r.died ?? ""})` : "";
       const views = r.views ? `<div class="wk-views">조회수 ${Object.entries(r.views).map(([l, v]) => `${LANG_NAME[l]} ${Number(v).toLocaleString()}`).join(" · ")}</div>` : "";
       return `<div class="card-box wk-item${st.ok ? "" : " off"}" data-i="${i}">
         ${r.thumb ? `<img class="wk-thumb" src="${esc(r.thumb)}" alt="">` : '<div class="wk-thumb"></div>'}
@@ -208,13 +230,15 @@
     } catch (e) { $("results").innerHTML = ""; msg($("msg"), label + " 실패: " + e.message, false); }
     finally { btn.disabled = false; btn.textContent = keep; }
   }
-  $("popBtn").addEventListener("click", () => loadList($("popBtn"), `/api/wiki-popular?period=${$("popPeriod").value}&lang=${$("popLang").value}`, "인기 인물",
-    (d) => [{ title: `${d.label} · 많이 읽힌 사망 인물 ${d.people.length}명`, items: d.people.map((p) => ({ ...p, human: true, deceased: true })) }]));
-  $("todayBtn").addEventListener("click", () => loadList($("todayBtn"), `/api/wiki-today?lang=${$("todayLang").value}`, "오늘의 인물",
-    (d) => [
-      { title: `${d.date}이 기일인 인물`, items: d.deaths.map((p) => ({ ...p, human: true, deceased: true, snippet: `${p.year}년 사망 · ${p.description || ""}` })) },
-      { title: `${d.date}이 생일인 인물`, items: d.births.map((p) => ({ ...p, human: true, deceased: true, snippet: `${p.year}년 출생 · ${p.description || ""}` })) },
-    ]));
+  $("popBtn").addEventListener("click", () => loadList($("popBtn"), `/api/wiki-popular?period=${$("popPeriod").value}&lang=${$("popLang").value}&type=${$("popType").value}`, "인기 순위",
+    (d) => [{ title: `${d.label} · 많이 읽힌 ${d.type === "event" ? "사건" : "사망 인물"} ${d.people.length}개`, items: d.people.map((p) => ({ ...p, deceased: true })) }]));
+  $("todayBtn").addEventListener("click", () => loadList($("todayBtn"), `/api/wiki-today?lang=${$("todayLang").value}`, "오늘의 목록",
+    (d) => $("todayType").value === "event"
+      ? [{ title: `${d.date}에 있었던 사건`, items: d.events.map((p) => ({ ...p, snippet: `${p.year}년 · ${p.summary || p.description || ""}` })) }]
+      : [
+        { title: `${d.date}이 기일인 인물`, items: d.deaths.map((p) => ({ ...p, deceased: true, snippet: `${p.year}년 사망 · ${p.description || ""}` })) },
+        { title: `${d.date}이 생일인 인물`, items: d.births.map((p) => ({ ...p, deceased: true, snippet: `${p.year}년 출생 · ${p.description || ""}` })) },
+      ]));
   $("results").addEventListener("click", (e) => {
     const el = e.target.closest(".wk-item");
     if (!el || el.classList.contains("off")) return;
@@ -222,7 +246,7 @@
     el.classList.add("sel");
     person = results[Number(el.dataset.i)];
     $("personTitle").textContent = person.name;
-    $("personMeta").textContent = `${person.born ?? "?"}–${person.died ?? ""}`;
+    $("personMeta").textContent = person.kind === "person" ? `${person.born ?? "?"}–${person.died ?? ""}` : (person.kind === "event" ? "사건" : "지식");
     const langs = Object.keys(person.langs);
     $("langSel").innerHTML = langs.map((l) => `<option value="${l}">${LANG_NAME[l]} 「${esc(person.langs[l].title)}」</option>`).join("");
     if (langs.includes("en")) $("langSel").value = "en";
@@ -233,6 +257,13 @@
   $("searchBtn").addEventListener("click", search);
   $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
 
+  function applyKindFilter() {
+    const k = $("kindFilter").value;
+    results = k === "all" ? allResults : allResults.filter((r) => r.kind === k);
+    renderResults();
+  }
+  $("kindFilter").addEventListener("change", () => { if (allResults.length) { $("ideaBox").style.display = "none"; applyKindFilter(); } });
+
   // ───── 이야기 후보 ─────
   $("ideaBtn").addEventListener("click", async () => {
     if (!person) return;
@@ -240,10 +271,11 @@
     $("ideaBtn").disabled = true; $("ideaBtn").textContent = "문서를 읽는 중… (10~30초)";
     msg($("msg2"), "", true); $("msg2").style.display = "none";
     try {
-      const res = await fetch("/api/wiki-ideas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang, title: person.langs[lang].title }) });
+      const res = await fetch("/api/wiki-ideas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang, title: person.langs[lang].title, kind: person.kind || "person" }) });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "실패");
       ideasData = d;
+      ideasData.kind = person.kind || "person";
       $("ideas").innerHTML = d.ideas.map((it, i) => `<label class="card-box wk-idea">
         <input type="checkbox" class="idea-chk" data-i="${i}">
         <div><div class="t">${esc(it.title)}</div><div class="h">${esc(it.hook)}</div><div class="f">${(it.facts || []).map(esc).join(" · ")}</div></div></label>`).join("");
@@ -258,7 +290,7 @@
     const lang = ideasData.article.lang;
     const res = await fetch("/api/gemini-wiki-draft", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lang, title: ideasData.article.title, idea, seconds: secs, personName: ideasData.person.name_ko }),
+      body: JSON.stringify({ lang, title: ideasData.article.title, idea, seconds: secs, personName: ideasData.person.name_ko, kind: ideasData.kind }),
     });
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || "대본 생성 실패");
@@ -271,7 +303,7 @@
     const sRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts`, {
       method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
       body: JSON.stringify({
-        category: "위키 인물", hook: texts[0], story: texts.slice(1).join("\n"), closing: "",
+        category: { person: "위키 인물", event: "위키 사건", thing: "위키 지식" }[ideasData.kind] || "위키 인물", hook: texts[0], story: texts.slice(1).join("\n"), closing: "",
         fact_sources: sourceLines.join("\n"), status: "approved",
         slug: `${new Date().toISOString().slice(0, 10)}_wiki-${slugOf(ideasData.person.name_ko)}-${Date.now() % 10000}`,
         video_settings: { ...(userDefaults || {}), name: (d.name || idea.title).slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과" },

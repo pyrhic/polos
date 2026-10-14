@@ -7,6 +7,13 @@ const json = (obj, status) => new Response(JSON.stringify(obj), {
   status, headers: { "Content-Type": "application/json" },
 });
 
+const KIND_NAME = { person: "인물", event: "사건", thing: "주제" };
+const KIND_STORY = { person: "인물", event: "사건", thing: "지식" };
+const KIND_RULE = {
+  person: "- 사망한 인물이지만 평가·조롱·추측을 붙이지 않는다. 논란은 사실만 담담하게.",
+  event: "- 사건은 원인 → 전개 → 결과 순서로 쉽게 풀고, 사망자 수·날짜·장소는 문서 그대로 쓴다. 해석이 갈리는 부분은 \"~라는 해석도 있다\"로 균형 있게 전하고, 어느 한쪽 편을 들거나 평가·조롱하지 않는다. 특정 개인·집단을 비난하는 표현은 쓰지 않는다.",
+  thing: "- 처음 듣는 사람도 이해하도록 쉬운 말로 풀되, 용어는 한 번에 하나씩 소개한다. 비유는 사실을 바꾸지 않는 선에서만 쓰고, 문서에 없는 원리·수치를 덧붙이지 않는다.",
+};
 const SUBSCRIBE_TEXT = "내 알고리즘 밖의 이야기가 궁금하다면 구독 좋아요 해주시면 나도 좋아요";
 const DIRECTIONS = ["천천히 줌인", "줌아웃", "좌에서 우로 패닝", "우에서 좌로 패닝", "틸트업", "틸트다운"];
 
@@ -14,7 +21,9 @@ export async function onRequestPost(context) {
   const apiKey = context.env.GEMINI_API_KEY;
   if (!apiKey) return json({ error: "GEMINI_API_KEY 환경변수가 설정되지 않았습니다" }, 500);
   try {
-    const { lang, title, idea, seconds, personName } = await context.request.json();
+    const body = await context.request.json();
+    const { lang, title, idea, seconds, personName } = body;
+    const kind = ["person", "event", "thing"].includes(body.kind) ? body.kind : "person";
     if (!["ko", "en"].includes(lang) || !title || !idea || !idea.title) return json({ error: "lang, title, idea가 필요합니다" }, 400);
     const secs = [60, 120, 180].includes(Number(seconds)) ? Number(seconds) : 120;
     const targetChars = Math.round(secs * 4.3);                 // 내레이션 초당 약 4.3자 (앱의 길이 추정과 같은 기준)
@@ -29,9 +38,9 @@ export async function onRequestPost(context) {
     const imgList = images.length
       ? images.map((im, i) => `[${i}] ${im.file}${im.caption ? " — " + im.caption : ""}`).join("\n")
       : "(사용할 수 있는 사진 없음)";
-    const prompt = `너는 한국어 유튜브 채널 "Wicked Wiki"의 작가다. 위키피디아의 신선하고 재미있는 인물 이야기를 차분하지만 흥미롭게 들려준다. 인사말("안녕하세요")과 자극적인 후킹, 과장은 쓰지 않는다.
+    const prompt = `너는 한국어 유튜브 채널 "Wicked Wiki"의 작가다. 위키피디아의 신선하고 재미있는 ${KIND_STORY[kind]} 이야기를 차분하지만 흥미롭게 들려준다. 인사말("안녕하세요")과 자극적인 후킹, 과장은 쓰지 않는다.
 
-[인물] ${personName || main.title}
+[${KIND_NAME[kind]}] ${personName || main.title}
 [이 영상의 주제] ${idea.title}
 [첫 문장 후보] ${idea.hook || ""}
 [핵심 사실] ${(idea.facts || []).join(" / ")}
@@ -44,7 +53,7 @@ ${imgList}
 
 [대본 규칙]
 - 사실은 위 문서에 있는 것만 쓴다. 날짜·이름·숫자는 문서 그대로. 없는 일화, 지어낸 대사·인용은 절대 쓰지 않는다. 문서에서 불확실하게 적힌 것은 "~라고 전해진다", "~로 알려져 있다"로 표현한다.
-- 사망한 인물이지만 평가·조롱·추측을 붙이지 않는다. 논란은 사실만 담담하게.
+${KIND_RULE[kind]}
 - 입으로 읽는 대본이다. 한 문장은 짧게, 한 카드에 1~2문장, 공백 제외 약 40~70자. 외국어 이름은 한글로 쓰고 처음 한 번만 괄호로 원어를 병기한다.
 - 전체 분량: 카드 합쳐 공백 제외 약 ${targetChars}자 (영상 약 ${secs}초), 카드는 ${nCards}장 안팎.
 - 구성: 도입 1~2장(궁금하게 시작) → 전개 여러 장(시간 순으로 한 가지씩) → 의미 1~2장(이 이야기가 남기는 것) → 마무리 1장(시청자가 생각해볼 질문 한 줄). "구독", "좋아요"라는 말은 쓰지 않는다.
@@ -52,7 +61,7 @@ ${imgList}
 - keyword: Pexels 검색용 영어 단어 2~4개 (사진이 없을 때 쓰는 분위기 영상 검색어). 실존 인물 이름·한국어 고유명사는 쓰지 말고 분위기/사물/장소를 묘사. 카드마다 다르게.
 - direction: 카메라 연출 하나, 반드시 다음 중에서: ${DIRECTIONS.map((d) => `"${d}"`).join(", ")} (같은 연출이 연속되지 않게)
 - image: 이 카드에 어울리는 사진 번호(위 목록). 적당한 사진이 없으면 -1. 같은 사진을 너무 반복해서 쓰지 말고, 첫 카드에는 인물 대표 사진이 있으면 쓴다.
-- name: 콘티 이름 (인물과 주제, 20자 이내). title1: 인물 이름(또는 핵심 키워드) 공백 포함 12자 이내, title2: 이 이야기를 한 줄로 14자 이내. 둘 다 낚시·과장·물음표·느낌표 없이.`;
+- name: 콘티 이름 (인물과 주제, 20자 이내). title1: ${KIND_NAME[kind]} 이름(또는 핵심 키워드) 공백 포함 12자 이내, title2: 이 이야기를 한 줄로 14자 이내. 둘 다 낚시·과장·물음표·느낌표 없이.`;
 
     const requestBody = {
       contents: [{ parts: [{ text: prompt }] }],

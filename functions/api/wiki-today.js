@@ -1,4 +1,4 @@
-// 오늘(한국 날짜)이 생일 또는 기일인 사망 인물. 위키미디어 "이 날의 역사(On this day)" 목록을 쓴다.
+// 오늘(한국 날짜)이 생일 또는 기일인 사망 인물, 그리고 오늘 있었던 역사적 사건. 위키미디어 "이 날의 역사(On this day)" 목록을 쓴다.
 // GET /api/wiki-today?lang=ko|en|both
 import { getEntities, entityFacts } from "../_lib/wiki.js";
 
@@ -11,7 +11,8 @@ async function feed(lang, type, mm, dd) {
   const r = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/${lang}/onthisday/${type}/${mm}/${dd}`, { headers: { "User-Agent": UA, "Api-User-Agent": UA } });
   if (!r.ok) return [];
   const j = await r.json();
-  return (j[type] || []).map((e) => ({ year: e.year, page: (e.pages || [])[0], lang, type })).filter((e) => e.page && e.page.wikibase_item);
+  // 사건 항목은 관련 문서가 여러 개라서, 첫 번째 문서를 대표로 쓴다 (사건 문서가 아니면 아래에서 걸러진다)
+  return (j[type] || []).map((e) => ({ year: e.year, text: e.text || "", page: (e.pages || [])[0], lang, type })).filter((e) => e.page && e.page.wikibase_item);
 }
 
 export async function onRequestGet(context) {
@@ -25,10 +26,10 @@ export async function onRequestGet(context) {
   const mm = String(kst.getUTCMonth() + 1).padStart(2, "0"), dd = String(kst.getUTCDate()).padStart(2, "0");
 
   const cache = typeof caches !== "undefined" ? caches.default : null;
-  const cacheKey = new Request(`${url.origin}${url.pathname}?v=2&lang=${langParam}&d=${mm}${dd}`);   // 날짜가 바뀌면 새로 만든다
+  const cacheKey = new Request(`${url.origin}${url.pathname}?v=3&lang=${langParam}&d=${mm}${dd}`);   // 날짜가 바뀌면 새로 만든다
   if (cache) { const hit = await cache.match(cacheKey); if (hit) return hit; }
   try {
-    const lists = await Promise.all(langs.flatMap((l) => ["births", "deaths"].map((t) => feed(l, t, mm, dd).catch(() => []))));
+    const lists = await Promise.all(langs.flatMap((l) => ["births", "deaths", "events"].map((t) => feed(l, t, mm, dd).catch(() => []))));
     const all = lists.flat();
     const ents = await getEntities(all.map((e) => e.page.wikibase_item));
     const byKey = new Map();
@@ -37,9 +38,10 @@ export async function onRequestGet(context) {
       const ent = ents[qid];
       if (!ent) continue;
       const f = entityFacts(ent);
-      if (!f.human || !f.deceased) continue;          // 태어난 날이 오늘이어도 생존 인물은 제외
+      if (e.type === "events") { if (f.kind !== "event") continue; }       // 사건 목록에서는 사건 문서만
+      else if (!f.human || !f.deceased) continue;                          // 태어난 날이 오늘이어도 생존 인물은 제외
       const key = `${e.type}:${qid}`;
-      const cur = byKey.get(key) || { type: e.type, qid, year: e.year, name: f.label || e.page.title, born: f.born, died: f.died, description: "", thumb: "", langs: {} };
+      const cur = byKey.get(key) || { type: e.type, kind: f.kind, qid, year: e.year, name: f.label || e.page.title, born: f.born, died: f.died, description: "", summary: e.text, thumb: "", langs: {} };
       cur.langs[e.lang] = { title: e.page.title, url: e.page.content_urls?.desktop?.page || `https://${e.lang}.wikipedia.org/wiki/${encodeURIComponent(e.page.title.replace(/ /g, "_"))}` };
       for (const [l, v] of Object.entries(f.links || {})) if (!cur.langs[l]) cur.langs[l] = v;
       if (!cur.description || e.lang === "ko") cur.description = e.page.description || cur.description;
@@ -55,6 +57,7 @@ export async function onRequestGet(context) {
       date: `${mm}월 ${dd}일`,
       births: items.filter((p) => p.type === "births").slice(0, 30),
       deaths: items.filter((p) => p.type === "deaths").slice(0, 30),
+      events: items.filter((p) => p.type === "events").slice(0, 30),
     }, 200, { "Cache-Control": "public, max-age=21600" });
     if (cache && items.length) context.waitUntil(cache.put(cacheKey, res.clone()));
     return res;
