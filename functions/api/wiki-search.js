@@ -29,9 +29,10 @@ export async function onRequestGet(context) {
     const merged = new Map();
     for (const r of all) {
       const key = r.qid || `${r.lang}:${r.title}`;
-      const facts = r.qid && ents[r.qid] ? entityFacts(ents[r.qid]) : { human: false, deceased: false, born: null, died: null, label: "" };
+      const facts = r.qid && ents[r.qid] ? entityFacts(ents[r.qid]) : { human: false, deceased: false, born: null, died: null, label: "", links: {} };
       const cur = merged.get(key) || { qid: r.qid, name: facts.label || r.title, human: facts.human, deceased: facts.deceased, born: facts.born, died: facts.died, thumb: "", snippet: "", langs: {} };
       cur.langs[r.lang] = { title: r.title, url: r.url };
+      for (const [l, v] of Object.entries(facts.links || {})) if (!cur.langs[l]) cur.langs[l] = v;   // 검색에 안 걸린 다른 언어판도 연결
       if (!cur.thumb && r.thumb) cur.thumb = r.thumb;
       if (!cur.snippet || r.lang === "ko") cur.snippet = r.snippet || cur.snippet;
       merged.set(key, cur);

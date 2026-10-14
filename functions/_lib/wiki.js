@@ -27,13 +27,19 @@ export function entityFacts(ent) {
   // 사망일이 "알 수 없음"으로 적힌 경우(somevalue)도 사망으로 본다
   const deceased = (claims.P570 || []).some((s) => s.mainsnak?.snaktype !== "novalue");
   const label = (ent.labels?.ko?.value) || (ent.labels?.en?.value) || "";
-  return { human, deceased, born: year("P569"), died: year("P570"), label };
+  // 한국어/영어 위키피디아 문서 제목 (한쪽 언어로 검색해도 다른 쪽 문서를 알 수 있다)
+  const links = {};
+  for (const [lang, site] of [["ko", "kowiki"], ["en", "enwiki"]]) {
+    const t = ent.sitelinks?.[site]?.title;
+    if (t) links[lang] = { title: t, url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}` };
+  }
+  return { human, deceased, born: year("P569"), died: year("P570"), label, links };
 }
 
 export async function getEntities(qids) {
   const ids = [...new Set(qids.filter(Boolean))].slice(0, 40);
   if (!ids.length) return {};
-  const d = await wikiGet("www.wikidata.org", { action: "wbgetentities", ids: ids.join("|"), props: "claims|labels", languages: "ko|en" });
+  const d = await wikiGet("www.wikidata.org", { action: "wbgetentities", ids: ids.join("|"), props: "claims|labels|sitelinks", languages: "ko|en", sitefilter: "kowiki|enwiki" });
   return d.entities || {};
 }
 
