@@ -1,6 +1,7 @@
 // 위키피디아 / 위키데이터 / 위키미디어 커먼즈 조회 도구 (모두 무료 공개 API).
 // 위키미디어는 앱 이름이 들어간 User-Agent를 요구한다.
-const UA = "WickedWiki/1.0 (https://polos-cxn.pages.dev)";
+import "../../config.js";
+export const UA = globalThis.POLOS_CONFIG.WIKI_USER_AGENT || "PolosYoutube/1.0 (set WIKI_USER_AGENT in config.js)";
 
 export const WIKI_LANGS = ["ko", "en"];
 

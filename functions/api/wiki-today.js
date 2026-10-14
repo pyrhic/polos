@@ -1,8 +1,7 @@
 // 오늘(한국 날짜)이 생일 또는 기일인 사망 인물, 그리고 오늘 있었던 역사적 사건. 위키미디어 "이 날의 역사(On this day)" 목록을 쓴다.
 // GET /api/wiki-today?lang=ko|en|both
-import { getEntities, entityFacts } from "../_lib/wiki.js";
+import { getEntities, entityFacts, UA } from "../_lib/wiki.js";
 
-const UA = "WickedWiki/1.0 (https://polos-cxn.pages.dev)";
 const json = (obj, status, extra = {}) => new Response(JSON.stringify(obj), {
   status, headers: { "Content-Type": "application/json", ...extra },
 });

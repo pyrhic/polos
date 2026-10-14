@@ -77,6 +77,7 @@
     const rows = await res.json();
     if (!res.ok) throw new Error(rows.message || "대본을 불러올 수 없습니다");
     const outputsByScript = await loadOutputsByScript(rows.map((r) => r.id));
+    await ytPrimeChannels();
     lastRows = rows;
     lastOutputs = outputsByScript;
 

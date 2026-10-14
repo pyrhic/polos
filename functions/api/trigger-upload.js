@@ -1,5 +1,6 @@
 // 완성 영상(버전)을 유튜브에 업로드하는 깃허브 액션(upload-youtube.yml)을 실행시킨다. 항상 비공개로 올린다.
 import "../../config.js"; // 주소/키/저장소 이름은 루트의 config.js 한 곳에서 관리한다
+import { loadChannels, isValidSlot } from "../_lib/channels.js";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, GITHUB_REPO: REPO } = globalThis.POLOS_CONFIG;
 const WORKFLOW = "upload-youtube.yml";
 
@@ -18,7 +19,9 @@ export async function onRequestPost(context) {
   try {
     const { outputId, videoUrl, title, description, tags, channelSlot } = await request.json();
     const slot = String(channelSlot || "1");
-    if (!["1", "2", "3"].includes(slot)) return json({ error: "올릴 채널 번호가 올바르지 않습니다" }, 400);
+    const channel = isValidSlot(slot) && (await loadChannels()).find((c) => c.slot === slot);
+    if (!channel) return json({ error: "올릴 채널 번호가 올바르지 않습니다" }, 400);
+    if (!channel.ready) return json({ error: "이 채널은 아직 로그인 연결이 끝나지 않았습니다" }, 400);
     if (!outputId || !videoUrl || !clean(title)) {
       return json({ error: "outputId, videoUrl, title이 필요합니다" }, 400);
     }
