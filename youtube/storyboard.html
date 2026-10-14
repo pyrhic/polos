@@ -2075,17 +2075,18 @@
           <div class="seg-pexels-preview"></div>
         </div>
         <div class="seg-media-hint" style="display:none;color:#ffd93d;font-size:0.78rem;margin:2px 0 8px;"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:14px 0 6px;color:#a89bb5;font-size:0.9rem;font-weight:600;">
-          <span>대사 (영상의 음성·자막이 이 내용으로 만들어집니다)</span>
-          <span style="display:flex;gap:4px;flex-shrink:0;">
-            <button type="button" class="seg-brk-btn" style="width:auto;padding:3px 10px;font-size:0.7rem;margin:0;background:#221a2e;">여기서 자막 끊기</button>
-            <button type="button" class="seg-emph-btn" style="width:auto;padding:3px 10px;font-size:0.7rem;margin:0;background:#221a2e;">선택한 글자 강조</button>
-          </span>
+        <!-- 제목은 한 줄로, 버튼은 그 아래 줄에 반반 (폰 폭에서 제목이 버튼에 밀려 접히지 않게) -->
+        <div style="margin:14px 0 6px;">
+          <div style="color:#a89bb5;font-size:0.9rem;font-weight:600;">대사 <span style="font-weight:400;font-size:0.75rem;">— 영상의 음성·자막이 이 내용으로 만들어져요</span></div>
+          <div style="display:flex;gap:6px;margin-top:6px;">
+            <button type="button" class="seg-brk-btn" style="flex:1;padding:7px 8px;font-size:0.72rem;margin:0;background:#2d2240;border:1px solid #4a3a63;color:#e8def5;">여기서 자막 끊기</button>
+            <button type="button" class="seg-emph-btn" style="flex:1;padding:7px 8px;font-size:0.72rem;margin:0;background:#2d2240;border:1px solid #4a3a63;color:#e8def5;">선택한 글자 강조</button>
+          </div>
         </div>
         <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 비워두면 이 장면은 거의 나오지 않습니다 (노출 시간 1초 기준)' : '이 장면에서 나오는 대본 문장'}">${escapeHtml(seg.script_text)}</textarea>
         <div class="seg-capsplit" style="color:#7cff4a;font-size:0.78rem;line-height:1.6;margin:-2px 0 6px;"></div>
         <div class="settings-note" style="margin:-4px 0 8px;">자막은 이렇게 끊겨 나와요(위 초록 글씨, ｜가 끊기는 자리). 어색하면 끊고 싶은 글자 사이에 커서를 놓고 "여기서 자막 끊기"를 누르세요. <b>/</b>로 표시되고 읽지는 않아요. · 강조할 글자를 드래그해서 선택한 뒤 "선택한 글자 강조"를 누르면 <b>**글자**</b>로 표시되고, 자막에서 노란색으로 튀어 보입니다. (다시 누르면 해제)</div>
-        <label>ACTION (사진의 카메라 연출만 해당 — 줌인 / 줌아웃 / 좌에서 우로 패닝 / 틸트업 등. 글자 강조는 위 대사에서)</label>
+        <label>ACTION <span style="font-weight:400;font-size:0.75rem;text-transform:none;letter-spacing:0;">— 사진의 카메라 연출 (줌인 · 줌아웃 · 패닝 · 틸트업)</span></label>
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
         <input type="hidden" class="seg-section" value="${escapeAttr(seg.section)}">
         <label>자료사진/영상 검색 키워드</label>
