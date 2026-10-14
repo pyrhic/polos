@@ -66,7 +66,8 @@ export async function onRequestGet(context) {
 
   // 같은 요청은 6시간 동안 저장해 둔 결과를 쓴다 (순위는 하루 단위로만 바뀜)
   const cache = typeof caches !== "undefined" ? caches.default : null;
-  if (cache) { const hit = await cache.match(context.request); if (hit) return hit; }
+  const cacheKey = new Request(`${url.origin}${url.pathname}?v=2&period=${url.searchParams.get("period") || "month"}&lang=${langParam}`);
+  if (cache) { const hit = await cache.match(cacheKey); if (hit) return hit; }
   try {
     const perLang = await Promise.all(langs.map((l) => rankLang(l, period)));
     const byQid = new Map();
@@ -83,7 +84,7 @@ export async function onRequestGet(context) {
     const people = [...byQid.values()].sort((a, b) => b.score - a.score).slice(0, 40)
       .map((p) => ({ ...p, recent: !!p.diedAt && p.diedAt >= yearAgo }));
     const res = json({ period: url.searchParams.get("period") || "month", label: period.label, people }, 200, { "Cache-Control": "public, max-age=21600" });
-    if (cache) context.waitUntil(cache.put(context.request, res.clone()));
+    if (cache && people.length) context.waitUntil(cache.put(cacheKey, res.clone()));
     return res;
   } catch (err) {
     return json({ error: err.message }, 502);

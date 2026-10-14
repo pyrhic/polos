@@ -25,7 +25,8 @@ export async function onRequestGet(context) {
   const mm = String(kst.getUTCMonth() + 1).padStart(2, "0"), dd = String(kst.getUTCDate()).padStart(2, "0");
 
   const cache = typeof caches !== "undefined" ? caches.default : null;
-  if (cache) { const hit = await cache.match(context.request); if (hit) return hit; }
+  const cacheKey = new Request(`${url.origin}${url.pathname}?v=2&lang=${langParam}&d=${mm}${dd}`);   // 날짜가 바뀌면 새로 만든다
+  if (cache) { const hit = await cache.match(cacheKey); if (hit) return hit; }
   try {
     const lists = await Promise.all(langs.flatMap((l) => ["births", "deaths"].map((t) => feed(l, t, mm, dd).catch(() => []))));
     const all = lists.flat();
@@ -55,7 +56,7 @@ export async function onRequestGet(context) {
       births: items.filter((p) => p.type === "births").slice(0, 30),
       deaths: items.filter((p) => p.type === "deaths").slice(0, 30),
     }, 200, { "Cache-Control": "public, max-age=21600" });
-    if (cache) context.waitUntil(cache.put(context.request, res.clone()));
+    if (cache && items.length) context.waitUntil(cache.put(cacheKey, res.clone()));
     return res;
   } catch (err) {
     return json({ error: err.message }, 502);
