@@ -21,8 +21,10 @@ function ytChannels() {
   const list = (globalThis.POLOS_CONFIG || {}).YT_CHANNELS;
   return Array.isArray(list) && list.length ? list : [{ slot: "1", label: "기존 채널" }, { slot: "2", label: "새 채널" }];
 }
-// Curation 영상은 두 번째 채널로 올리는 경우가 많아 기본값을 2번으로 둔다 (올리기 전에 언제든 바꿀 수 있다)
-function ytDefaultSlot(row) { return row && row.category === "큐레이션" ? "2" : "1"; }
+// 기본 채널: 마지막으로 올린 채널 (처음이면 1번). 올리기 전에 언제든 바꿀 수 있다.
+function ytDefaultSlot() {
+  try { return localStorage.getItem("ytSlot") === "2" ? "2" : "1"; } catch { return "1"; }
+}
 
 function ytReauthHelpHtml() {
   return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:#17141c;border-radius:3px;font-size:0.78rem;color:#a89bb5;">
@@ -98,6 +100,7 @@ function bindUploadBlocks(reload) {
       const chSel = block.querySelector(".yt-channel");
       const chLabel = chSel.options[chSel.selectedIndex].textContent;
       if (!confirm(`이 영상을 "${chLabel}" 채널에 (비공개로) 업로드할까요?`)) return;
+      try { localStorage.setItem("ytSlot", chSel.value); } catch {}
       e.target.disabled = true;
       e.target.textContent = "요청 중...";
       try {

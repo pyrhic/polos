@@ -15,6 +15,6 @@ globalThis.POLOS_CONFIG = {
   // label은 화면에 보이는 채널 이름 - 새 채널 이름을 여기에 적으세요.
   YT_CHANNELS: [
     { slot: "1", label: "Wicked Wiki" },
-    { slot: "2", label: "새 채널" },
+    { slot: "2", label: "연예계중개" },
   ],
 };
