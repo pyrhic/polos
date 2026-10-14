@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wikipedia — Wicked Wiki</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f0a14">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  .wk-row { display:flex; gap:8px; }
+  .wk-row input { flex:1; margin:0; }
+  .wk-row button { width:auto; padding:0 18px; margin:0; }
+  .wk-item { display:flex; gap:12px; align-items:flex-start; cursor:pointer; border:2px solid transparent; }
+  .wk-item:hover, .wk-item.sel { border-color:#7cff4a; }
+  .wk-item.off { opacity:.5; cursor:not-allowed; }
+  .wk-item.off:hover { border-color:transparent; }
+  .wk-thumb { width:64px; height:64px; border-radius:3px; object-fit:cover; background:#0f0a14; flex-shrink:0; }
+  .wk-name { font-weight:800; font-size:1rem; }
+  .wk-snip { color:#a89bb5; font-size:0.78rem; line-height:1.4; margin-top:4px; }
+  .wk-badge { display:inline-block; font-size:0.68rem; padding:1px 7px; border-radius:9px; margin-left:6px; vertical-align:middle; font-weight:700; }
+  .wk-dead { background:#17331a; color:#7cff4a; }
+  .wk-live { background:#3a1414; color:#ff8a80; }
+  .wk-other { background:#2a2a2a; color:#bbb; }
+  .wk-lang { background:#16324a; color:#4fc3f7; }
+  .wk-idea { display:flex; gap:10px; align-items:flex-start; cursor:pointer; }
+  .wk-idea input { width:auto; margin:4px 0 0; flex-shrink:0; }
+  .wk-idea .t { font-weight:800; }
+  .wk-idea .h { color:#ffd93d; font-size:0.82rem; margin-top:3px; }
+  .wk-idea .f { color:#a89bb5; font-size:0.75rem; margin-top:4px; line-height:1.4; }
+  .wk-note { color:#a89bb5; font-size:0.78rem; line-height:1.5; margin:6px 0 12px; }
+  .wk-opts { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0; }
+  .wk-opts select { width:auto; margin:0; }
+  .wk-done a { color:#7cff4a; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/search.html">← Search</a>
+    <h1 style="font-size:1.4rem;margin-bottom:0.6rem;">Wikipedia</h1>
+    <p class="wk-note">인물 이름을 검색하면 한국어·영어 위키피디아를 함께 찾아요. 지금은 <b>사망한 인물</b>만 다뤄요. 이야기 후보를 고르면 한 편씩 콘티가 만들어져요.</p>
+
+    <div class="wk-row">
+      <input type="text" id="q" placeholder="예: 이순신, Marie Curie" maxlength="80">
+      <button type="button" id="searchBtn">검색</button>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div id="results" style="margin-top:12px;"></div>
+
+    <div id="ideaBox" style="display:none;">
+      <div class="card-box">
+        <div class="title" id="personTitle"></div>
+        <div class="meta" id="personMeta"></div>
+        <div class="wk-opts">
+          <label style="margin:0;">원문</label>
+          <select id="langSel"></select>
+          <button type="button" id="ideaBtn" style="width:auto;padding:8px 14px;margin:0;">이야기 후보 찾기</button>
+        </div>
+        <div class="wk-note" style="margin:0;">영어 문서가 더 길고 일화가 많은 편이에요. 다른 언어판이 있으면 함께 읽어요.</div>
+      </div>
+      <div id="ideas"></div>
+      <div id="makeBox" style="display:none;">
+        <div class="wk-opts">
+          <label style="margin:0;">영상 길이</label>
+          <select id="secSel">
+            <option value="60">약 1분</option>
+            <option value="120" selected>약 2분</option>
+            <option value="180">약 3분</option>
+          </select>
+        </div>
+        <button type="button" id="makeBtn" style="background:#7cff4a;color:#0f0a14;">선택한 이야기로 콘티 만들기</button>
+        <div class="wk-note">이야기 하나마다 제미나이를 1번 써요(무료 한도: 하루 약 20회). 사진은 위키피디아 문서에 실린 자유 라이선스 사진만 가져오고, 출처와 라이선스는 영상 설명에 자동으로 적혀요.</div>
+      </div>
+    </div>
+    <div class="msg" id="msg2"></div>
+    <div id="done" class="wk-done"></div>
+  </div>
+
+<script src="/config.js"></script>
+<script>
+(function () {
+  const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL, KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
+  const headers = { apikey: KEY, Authorization: `Bearer ${KEY}` };
+  const jsonHeaders = { ...headers, "Content-Type": "application/json" };
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const LANG_NAME = { ko: "한국어", en: "English" };
+  let results = [], person = null, ideasData = null, userDefaults = null;
+
+  function msg(el, text, ok) { el.className = "msg " + (ok ? "ok" : "err"); el.textContent = text; }
+
+  // 콘티 전체 설정의 "기본값으로 저장"해 둔 값을 새 콘티에도 적용한다 (Scenes의 대본+콘티 생성과 같은 방식)
+  const userDefaultsReady = (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_default_settings?select=settings&id=eq.1`, { headers });
+      if (res.ok) { const rows = await res.json(); if (rows[0] && rows[0].settings && Object.keys(rows[0].settings).length) { userDefaults = rows[0].settings; return; } }
+    } catch { /* 이 기기 복사본으로 */ }
+    try { userDefaults = JSON.parse(localStorage.getItem("polos_youtube_default_settings")); } catch { userDefaults = null; }
+  })();
+
+  // ───── 검색 ─────
+  async function search() {
+    const q = $("q").value.trim();
+    if (!q) return;
+    $("searchBtn").disabled = true; $("searchBtn").textContent = "검색 중…";
+    msg($("msg"), "", true); $("msg").style.display = "none";
+    $("ideaBox").style.display = "none"; $("done").innerHTML = ""; person = null;
+    try {
+      const res = await fetch(`/api/wiki-search?q=${encodeURIComponent(q)}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "검색 실패");
+      results = d.results || [];
+      renderResults();
+    } catch (e) { msg($("msg"), "검색 실패: " + e.message, false); }
+    finally { $("searchBtn").disabled = false; $("searchBtn").textContent = "검색"; }
+  }
+  function status(r) {
+    if (!r.human) return { cls: "wk-other", text: "인물 아님", ok: false };
+    if (!r.deceased) return { cls: "wk-live", text: "생존 인물(아직 지원 안 함)", ok: false };
+    return { cls: "wk-dead", text: "사망", ok: true };
+  }
+  function renderResults() {
+    if (!results.length) { $("results").innerHTML = '<div class="empty" style="margin-top:20px;">검색 결과가 없어요</div>'; return; }
+    $("results").innerHTML = results.map((r, i) => {
+      const st = status(r);
+      const years = r.human && (r.born || r.died) ? ` (${r.born ?? "?"}–${r.died ?? ""})` : "";
+      return `<div class="card-box wk-item${st.ok ? "" : " off"}" data-i="${i}">
+        ${r.thumb ? `<img class="wk-thumb" src="${esc(r.thumb)}" alt="">` : '<div class="wk-thumb"></div>'}
+        <div style="min-width:0;">
+          <div class="wk-name">${esc(r.name)}${esc(years)}<span class="wk-badge ${st.cls}">${st.text}</span>${Object.keys(r.langs).map((l) => `<span class="wk-badge wk-lang">${LANG_NAME[l]}</span>`).join("")}</div>
+          <div class="wk-snip">${esc(r.snippet)}</div>
+        </div></div>`;
+    }).join("");
+  }
+  $("results").addEventListener("click", (e) => {
+    const el = e.target.closest(".wk-item");
+    if (!el || el.classList.contains("off")) return;
+    document.querySelectorAll(".wk-item").forEach((x) => x.classList.remove("sel"));
+    el.classList.add("sel");
+    person = results[Number(el.dataset.i)];
+    $("personTitle").textContent = person.name;
+    $("personMeta").textContent = `${person.born ?? "?"}–${person.died ?? ""}`;
+    const langs = Object.keys(person.langs);
+    $("langSel").innerHTML = langs.map((l) => `<option value="${l}">${LANG_NAME[l]} 「${esc(person.langs[l].title)}」</option>`).join("");
+    if (langs.includes("en")) $("langSel").value = "en";
+    $("ideas").innerHTML = ""; $("makeBox").style.display = "none"; ideasData = null; $("done").innerHTML = "";
+    $("ideaBox").style.display = "block";
+    $("ideaBox").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  $("searchBtn").addEventListener("click", search);
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
+
+  // ───── 이야기 후보 ─────
+  $("ideaBtn").addEventListener("click", async () => {
+    if (!person) return;
+    const lang = $("langSel").value;
+    $("ideaBtn").disabled = true; $("ideaBtn").textContent = "문서를 읽는 중… (10~30초)";
+    msg($("msg2"), "", true); $("msg2").style.display = "none";
+    try {
+      const res = await fetch("/api/wiki-ideas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang, title: person.langs[lang].title }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "실패");
+      ideasData = d;
+      $("ideas").innerHTML = d.ideas.map((it, i) => `<label class="card-box wk-idea">
+        <input type="checkbox" class="idea-chk" data-i="${i}">
+        <div><div class="t">${esc(it.title)}</div><div class="h">${esc(it.hook)}</div><div class="f">${(it.facts || []).map(esc).join(" · ")}</div></div></label>`).join("");
+      $("makeBox").style.display = "block";
+    } catch (e) { msg($("msg2"), "이야기 후보를 만들지 못했어요: " + e.message, false); }
+    finally { $("ideaBtn").disabled = false; $("ideaBtn").textContent = "이야기 후보 다시 찾기"; }
+  });
+
+  // ───── 콘티 만들기 ─────
+  const slugOf = (s) => String(s).replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 24);
+  async function createOne(idea, secs) {
+    const lang = ideasData.article.lang;
+    const res = await fetch("/api/gemini-wiki-draft", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lang, title: ideasData.article.title, idea, seconds: secs, personName: ideasData.person.name_ko }),
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || "대본 생성 실패");
+    await userDefaultsReady;
+    const texts = d.segments.map((s) => s.script_text);
+    const sourceLines = [
+      ...d.sources.map((s) => `${s.title} (CC BY-SA 4.0) ${s.url}`),
+      ...(d.credits || []),
+    ];
+    const sRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts`, {
+      method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
+      body: JSON.stringify({
+        category: "위키 인물", hook: texts[0], story: texts.slice(1).join("\n"), closing: "",
+        fact_sources: sourceLines.join("\n"), status: "approved",
+        slug: `${new Date().toISOString().slice(0, 10)}_wiki-${slugOf(ideasData.person.name_ko)}-${Date.now() % 10000}`,
+        video_settings: { ...(userDefaults || {}), name: (d.name || idea.title).slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과" },
+      }),
+    });
+    if (!sRes.ok) throw new Error(await sRes.text());
+    const script = (await sRes.json())[0];
+    const gRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
+      method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
+      body: JSON.stringify(d.segments.map((s, i) => ({ script_id: script.id, order_no: i + 1, section: s.section, script_text: s.script_text, keyword: s.keyword, direction: s.direction }))),
+    });
+    if (!gRes.ok) throw new Error(await gRes.text());
+    const segs = (await gRes.json()).sort((a, b) => a.order_no - b.order_no);
+
+    // 사진 배정: 제미나이가 고른 번호를 우선, 남는 사진은 사진 없는 카드에 차례로 (구독/좋아요 카드는 제외)
+    const assign = new Map();   // 카드 index -> [사진 index]
+    const used = new Set();
+    d.segments.forEach((s, i) => { if (s.image >= 0 && !used.has(s.image)) { assign.set(i, [s.image]); used.add(s.image); } });
+    const free = d.images.map((_, k) => k).filter((k) => !used.has(k));
+    for (let i = 0; i < d.segments.length - 1 && free.length; i++) { if (!assign.has(i)) assign.set(i, [free.shift()]); }
+    let ok = 0, n = 0;
+    for (const [i, list] of assign) {
+      const seg = segs[i];
+      const paths = [], notes = {};
+      for (const k of list) {
+        const im = d.images[k];
+        try {
+          const r = await fetch("/api/save-article-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: im.url, referer: im.page, scriptId: script.id, segId: seg.id, n: n++ }) });
+          const j = await r.json();
+          if (!r.ok) continue;
+          paths.push(j.path);
+          notes[j.path] = { source: "위키미디어 커먼즈", license: im.license, artist: im.artist, articleUrl: im.page, articleTitle: im.file, caption: im.caption, origUrl: im.url };
+          ok++;
+        } catch { /* 한 장 실패해도 계속 */ }
+      }
+      if (paths.length) await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${seg.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ asset_paths: paths, asset_notes: notes }) });
+    }
+    return { id: script.id, name: d.name || idea.title, cards: d.segments.length, photos: ok, totalPhotos: d.images.length, chars: d.totalChars };
+  }
+
+  $("makeBtn").addEventListener("click", async () => {
+    const picked = [...document.querySelectorAll(".idea-chk:checked")].map((c) => ideasData.ideas[Number(c.dataset.i)]);
+    if (!picked.length) { msg($("msg2"), "만들 이야기를 하나 이상 고르세요.", false); return; }
+    if (picked.length > 3 && !confirm(`${picked.length}편을 만들면 제미나이를 ${picked.length}번 써요 (하루 약 20회 한도). 계속할까요?`)) return;
+    const secs = Number($("secSel").value);
+    $("makeBtn").disabled = true;
+    const made = [];
+    for (let i = 0; i < picked.length; i++) {
+      $("makeBtn").textContent = `콘티 만드는 중… (${i + 1}/${picked.length}) — 한 편에 20~40초`;
+      try { made.push(await createOne(picked[i], secs)); }
+      catch (e) { msg($("msg2"), `"${picked[i].title}" 실패: ${e.message}` + (made.length ? ` (앞의 ${made.length}편은 만들어졌어요)` : ""), false); break; }
+    }
+    $("makeBtn").disabled = false; $("makeBtn").textContent = "선택한 이야기로 콘티 만들기";
+    if (made.length) {
+      msg($("msg2"), `콘티 ${made.length}개를 만들었어요. Scenes에서 대본·사진을 확인하고 영상을 만드세요.`, true);
+      $("done").innerHTML = made.map((m) => `<div class="card-box"><div class="title">${esc(m.name)}</div>
+        <div class="meta">카드 ${m.cards}장 · 글자 ${m.chars}자 · 사진 ${m.photos}/${m.totalPhotos}장</div>
+        <a href="#" class="open-conti" data-id="${m.id}">Scenes에서 열기 →</a></div>`).join("");
+    }
+  });
+  $("done").addEventListener("click", (e) => {
+    const a = e.target.closest(".open-conti");
+    if (!a) return;
+    e.preventDefault();
+    try { sessionStorage.setItem("openConti", a.dataset.id); } catch { /* 무시 */ }
+    location.href = "/youtube/storyboard.html";
+  });
+})();
+</script>
+</body>
+</html>

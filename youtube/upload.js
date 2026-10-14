@@ -7,6 +7,11 @@ function ytDefaultDescription(row) {
   const sources = (row.fact_sources || "").split("\n").map((s) => s.trim()).filter(Boolean);
   // 큐레이션(사진+음악) 영상은 뉴스형 안내 문구 없이 사진·음악 출처만 적는다
   if (row.category === "큐레이션") return sources.length ? "출처:\n" + sources.join("\n") : "";
+  // 위키피디아 인물 영상: 글은 위키백과(CC BY-SA 4.0)를 바탕으로 재구성한 것이라 출처와 라이선스, 사진 저작자를 반드시 적는다
+  if (row.category === "위키 인물") {
+    return ["이 영상의 이야기는 위키백과의 글(CC BY-SA 4.0)을 바탕으로 다시 쓴 것입니다.", sources.length ? "출처:\n" + sources.join("\n") : ""]
+      .filter(Boolean).join("\n\n");
+  }
   return [YT_DISCLAIMER, YT_RESPONSIBILITY, sources.length ? "출처:\n" + sources.join("\n") : ""]
     .filter(Boolean).join("\n\n");
 }
@@ -22,7 +27,8 @@ function ytChannels() {
   return Array.isArray(list) && list.length ? list : [{ slot: "1", label: "기존 채널" }, { slot: "2", label: "새 채널" }];
 }
 // 기본 채널: 마지막으로 올린 채널 (처음이면 1번). 올리기 전에 언제든 바꿀 수 있다.
-function ytDefaultSlot() {
+function ytDefaultSlot(row) {
+  if (row && row.category === "위키 인물") return "1";   // 위키 인물 이야기는 Wicked Wiki 채널
   try { return localStorage.getItem("ytSlot") === "2" ? "2" : "1"; } catch { return "1"; }
 }
 
