@@ -142,10 +142,11 @@
     </div>
   </div>
 
+<script src="/config.js"></script>
 <script src="/youtube/generate.js"></script>
 <script>
-  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
+  const SUPABASE_ANON_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
   const BUCKET = "youtube-assets";
   const CATEGORY = "큐레이션";
   const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };

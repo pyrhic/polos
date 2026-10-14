@@ -27,11 +27,12 @@
         <div id="list"><div class="empty">불러오는 중...</div></div>
   </div>
 
+<script src="/config.js"></script>
 <script src="/youtube/upload.js"></script>
 <script src="/youtube/generate.js"></script>
 <script>
-  const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+  const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
+  const SUPABASE_ANON_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
   const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 
   function escapeHtml(s) {

@@ -1,7 +1,6 @@
 // 완성 영상(버전)을 유튜브에 업로드하는 깃허브 액션(upload-youtube.yml)을 실행시킨다. 항상 비공개로 올린다.
-const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
-const REPO = "pyrhic/youtube-automation";
+import "../../config.js"; // 주소/키/저장소 이름은 루트의 config.js 한 곳에서 관리한다
+const { SUPABASE_URL, SUPABASE_ANON_KEY, GITHUB_REPO: REPO } = globalThis.POLOS_CONFIG;
 const WORKFLOW = "upload-youtube.yml";
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {

@@ -1,7 +1,7 @@
 // 기사에서 찾은 사진(또는 mp4/webm 영상) 한 개를 내려받아 Supabase Storage(youtube-assets)에 저장하고 경로를 돌려준다.
 // 저작권 문제가 있는지는 사용자가 콘티에서 사진별 출처를 보고 직접 판단해 삭제한다.
-const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+import "../../config.js"; // 주소/키는 루트의 config.js 한 곳에서 관리한다
+const { SUPABASE_URL, SUPABASE_ANON_KEY } = globalThis.POLOS_CONFIG;
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
 const MIN_BYTES = 8 * 1024; // 아이콘/픽셀 같은 너무 작은 파일은 사진이 아니므로 제외

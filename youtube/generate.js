@@ -1,6 +1,7 @@
 // 영상 생성 시작(콘티 페이지)과 완료 알림(콘티/Studio 페이지)에 같이 쓰는 도구.
-const GEN_SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
-const GEN_SUPABASE_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
+// 주소/키는 /config.js 에서 읽는다 (이 파일을 쓰는 페이지에서 config.js를 먼저 불러와야 한다)
+const GEN_SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
+const GEN_SUPABASE_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
 const genHeaders = { apikey: GEN_SUPABASE_KEY, Authorization: `Bearer ${GEN_SUPABASE_KEY}` };
 
 function genAssetUrl(path) {

@@ -1,7 +1,6 @@
 // 깃허브 액션(youtube-automation 레포)의 "영상 생성" 워크플로우를 원격으로 실행시킨다.
-const SUPABASE_URL = "https://oenqrlgmnkpzxsavnfyo.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5";
-const REPO = "pyrhic/youtube-automation";
+import "../../config.js"; // 주소/키/저장소 이름은 루트의 config.js 한 곳에서 관리한다
+const { SUPABASE_URL, SUPABASE_ANON_KEY, GITHUB_REPO: REPO } = globalThis.POLOS_CONFIG;
 const WORKFLOW = "generate-video.yml";
 
 export async function onRequestPost(context) {
