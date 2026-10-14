@@ -11,4 +11,10 @@ globalThis.POLOS_CONFIG = {
   SUPABASE_URL: "https://oenqrlgmnkpzxsavnfyo.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_sZ4wQgaC5f-i40pVzf0vIA_R7iJWDf5",
   GITHUB_REPO: "pyrhic/youtube-automation",
+  // 유튜브에 올릴 채널 목록 (slot 번호는 GitHub 비밀값 YOUTUBE_OAUTH_TOKEN / YOUTUBE_OAUTH_TOKEN_2와 짝).
+  // label은 화면에 보이는 채널 이름 - 새 채널 이름을 여기에 적으세요.
+  YT_CHANNELS: [
+    { slot: "1", label: "Wicked Wiki" },
+    { slot: "2", label: "새 채널" },
+  ],
 };

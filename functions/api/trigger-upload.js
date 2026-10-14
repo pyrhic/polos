@@ -16,7 +16,9 @@ export async function onRequestPost(context) {
   if (!pat) return json({ error: "GITHUB_PAT 환경변수가 설정되지 않았습니다" }, 500);
 
   try {
-    const { outputId, videoUrl, title, description, tags } = await request.json();
+    const { outputId, videoUrl, title, description, tags, channelSlot } = await request.json();
+    const slot = String(channelSlot || "1");
+    if (slot !== "1" && slot !== "2") return json({ error: "올릴 채널 번호가 올바르지 않습니다" }, 400);
     if (!outputId || !videoUrl || !clean(title)) {
       return json({ error: "outputId, videoUrl, title이 필요합니다" }, 400);
     }
@@ -59,6 +61,7 @@ export async function onRequestPost(context) {
           title: cleanTitle,
           description: cleanDesc,
           tags: clean(tags),
+          channel_slot: slot,
         },
       }),
     });

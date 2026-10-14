@@ -14,12 +14,22 @@ function ytDefaultDescription(row) {
 // 웹페이지는 PC 터미널을 직접 실행할 수 없으므로, 명령을 복사해주는 버튼으로 대신한다.
 // 슬래시 경로라서 명령 프롬프트/PowerShell/Git Bash 어디서든 그대로 붙여넣어 실행된다.
 const YT_REAUTH_CMD = "python C:/Users/PC/youtube-automation/core/reauth_youtube.py";
+const YT_REAUTH_CMD_2 = "python C:/Users/PC/youtube-automation/core/reauth_youtube.py --slot 2";   // 두 번째 채널
+
+// 올릴 수 있는 채널 목록 (config.js의 YT_CHANNELS, 없으면 기본값)
+function ytChannels() {
+  const list = (globalThis.POLOS_CONFIG || {}).YT_CHANNELS;
+  return Array.isArray(list) && list.length ? list : [{ slot: "1", label: "기존 채널" }, { slot: "2", label: "새 채널" }];
+}
+// Curation 영상은 두 번째 채널로 올리는 경우가 많아 기본값을 2번으로 둔다 (올리기 전에 언제든 바꿀 수 있다)
+function ytDefaultSlot(row) { return row && row.category === "큐레이션" ? "2" : "1"; }
 
 function ytReauthHelpHtml() {
   return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:#17141c;border-radius:3px;font-size:0.78rem;color:#a89bb5;">
     <div style="color:#ffd93d;font-weight:700;margin-bottom:4px;">⚠ 프로그래밍 폴더가 있는 PC에서 실행해주세요</div>
     유튜브 인증이 만료되면(7일마다) 업로드가 실패합니다. 아래 버튼으로 명령을 복사해 PC 터미널에 붙여넣고 Enter를 누른 뒤, 브라우저에서 "허용"만 누르면 됩니다. (폰에서는 실행할 수 없습니다)
-    <button type="button" class="yt-reauth-copy" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사</button>
+    <button type="button" class="yt-reauth-copy" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사 (기존 채널)</button>
+    <button type="button" class="yt-reauth-copy" data-slot="2" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사 (두 번째 채널 · 채널 선택 화면에서 그 채널을 고르세요)</button>
   </div>`;
 }
 
@@ -44,6 +54,8 @@ function uploadBlockHtml(o, row) {
     ${errorNote}
     <button type="button" class="yt-open-btn" style="background:#221a2e;">${o.youtube_status === "error" ? "다시 업로드" : "유튜브에 업로드"}</button>
     <div class="yt-form" style="display:none;margin-top:8px;">
+      <label>올릴 채널</label>
+      <select class="yt-channel">${ytChannels().map((c) => `<option value="${escapeHtml(c.slot)}"${c.slot === ytDefaultSlot(row) ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")}</select>
       <label>제목 (100자 이내)</label>
       <input type="text" class="yt-title" maxlength="100" value="${escapeHtml(ytTitleFor(row, o))}">
       <label>설명</label>
@@ -63,12 +75,14 @@ function uploadBlockHtml(o, row) {
 function bindUploadBlocks(reload) {
   document.querySelectorAll(".yt-reauth-copy").forEach((btn) =>
     btn.addEventListener("click", async () => {
+      const cmd = btn.dataset.slot === "2" ? YT_REAUTH_CMD_2 : YT_REAUTH_CMD;
+      const label = btn.textContent;
       try {
-        await navigator.clipboard.writeText(YT_REAUTH_CMD);
+        await navigator.clipboard.writeText(cmd);
         btn.textContent = "복사됨 ✓ — PC 터미널에 붙여넣고 Enter";
-        setTimeout(() => { btn.textContent = "재로그인 명령 복사"; }, 3500);
+        setTimeout(() => { btn.textContent = label; }, 3500);
       } catch {
-        prompt("이 명령을 복사해서 PC 터미널에서 실행하세요:", YT_REAUTH_CMD);
+        prompt("이 명령을 복사해서 PC 터미널에서 실행하세요:", cmd);
       }
     })
   );
@@ -81,7 +95,9 @@ function bindUploadBlocks(reload) {
     block.querySelector(".yt-start-btn").addEventListener("click", async (e) => {
       const title = block.querySelector(".yt-title").value.trim();
       if (!title) { alert("제목을 입력하세요."); return; }
-      if (!confirm("이 영상을 유튜브에 (비공개로) 업로드할까요?")) return;
+      const chSel = block.querySelector(".yt-channel");
+      const chLabel = chSel.options[chSel.selectedIndex].textContent;
+      if (!confirm(`이 영상을 "${chLabel}" 채널에 (비공개로) 업로드할까요?`)) return;
       e.target.disabled = true;
       e.target.textContent = "요청 중...";
       try {
@@ -94,6 +110,7 @@ function bindUploadBlocks(reload) {
             title,
             description: block.querySelector(".yt-desc").value,
             tags: block.querySelector(".yt-tags").value,
+            channelSlot: block.querySelector(".yt-channel").value,
           }),
         });
         const data = await res.json();
