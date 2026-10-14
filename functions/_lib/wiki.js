@@ -33,14 +33,40 @@ export function entityFacts(ent) {
     const t = ent.sitelinks?.[site]?.title;
     if (t) links[lang] = { title: t, url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}` };
   }
-  return { human, deceased, born: year("P569"), died: year("P570"), label, links };
+  const diedTime = (claims.P570 || [])[0]?.mainsnak?.datavalue?.value?.time || "";
+  const dm = /^[+-](\d{4})-(\d{2})-(\d{2})/.exec(diedTime);
+  const diedAt = dm && dm[2] !== "00" && dm[3] !== "00" ? `${dm[1]}-${dm[2]}-${dm[3]}` : (dm ? dm[1] : null);
+  return { human, deceased, born: year("P569"), died: year("P570"), diedAt, label, links };
 }
 
+const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
+
 export async function getEntities(qids) {
-  const ids = [...new Set(qids.filter(Boolean))].slice(0, 40);
+  const ids = [...new Set(qids.filter(Boolean))];
   if (!ids.length) return {};
-  const d = await wikiGet("www.wikidata.org", { action: "wbgetentities", ids: ids.join("|"), props: "claims|labels|sitelinks", languages: "ko|en", sitefilter: "kowiki|enwiki" });
-  return d.entities || {};
+  const parts = await Promise.all(chunk(ids, 40).map((c) =>
+    wikiGet("www.wikidata.org", { action: "wbgetentities", ids: c.join("|"), props: "claims|labels|sitelinks", languages: "ko|en", sitefilter: "kowiki|enwiki" })
+      .then((d) => d.entities || {}).catch(() => ({}))));
+  return Object.assign({}, ...parts);
+}
+
+// 위키피디아 문서 제목들로 위키데이터 항목을 한꺼번에 찾는다 (제목 -> 항목). 50개씩 한 번에 조회.
+export async function getEntitiesByTitles(lang, titles) {
+  const site = `${lang}wiki`;
+  const out = new Map();
+  const parts = await Promise.all(chunk([...new Set(titles)], 50).map((c) =>
+    wikiGet("www.wikidata.org", { action: "wbgetentities", sites: site, titles: c.join("|"), props: "claims|labels|sitelinks", languages: "ko|en", sitefilter: "kowiki|enwiki" })
+      .then((d) => d.entities || {}).catch(() => ({}))));
+  for (const ents of parts) for (const ent of Object.values(ents)) { const t = ent.sitelinks?.[site]?.title; if (t) out.set(t, ent); }
+  return out;
+}
+
+// 위키미디어 조회수 순위 (상위 1000개 문서). path는 "2026/10/12"(하루) 또는 "2026/09/all-days"(한 달)
+export async function topViews(lang, path) {
+  const r = await fetch(`https://wikimedia.org/api/rest_v1/metrics/pageviews/top/${lang}.wikipedia/all-access/${path}`, { headers: { "User-Agent": UA, "Api-User-Agent": UA } });
+  if (!r.ok) return [];
+  const j = await r.json();
+  return j.items?.[0]?.articles || [];
 }
 
 // 제목으로 문서 본문(평문)과 다른 언어판 제목을 가져온다

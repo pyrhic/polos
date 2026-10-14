@@ -34,6 +34,12 @@
   .wk-opts { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0; }
   .wk-opts select { width:auto; margin:0; }
   .wk-done a { color:#7cff4a; }
+  .wk-tabs { display:flex; gap:6px; margin-bottom:12px; }
+  .wk-tab { width:auto; flex:1; padding:9px 6px; font-size:0.8rem; text-transform:none; letter-spacing:0; }
+  .wk-tab.active { background:#7cff4a; color:#0f0a14; }
+  .wk-recent { background:#3a2f14; color:#ffd93d; }
+  .wk-group { color:#a89bb5; font-size:0.85rem; font-weight:700; margin:16px 0 8px; }
+  .wk-views { color:#a89bb5; font-size:0.72rem; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -42,9 +48,50 @@
     <h1 style="font-size:1.4rem;margin-bottom:0.6rem;">Wikipedia</h1>
     <p class="wk-note">인물 이름을 검색하면 한국어·영어 위키피디아를 함께 찾아요. 지금은 <b>사망한 인물</b>만 다뤄요. 이야기 후보를 고르면 한 편씩 콘티가 만들어져요.</p>
 
-    <div class="wk-row">
-      <input type="text" id="q" placeholder="예: 이순신, Marie Curie" maxlength="80">
-      <button type="button" id="searchBtn">검색</button>
+    <div class="wk-tabs">
+      <button type="button" class="wk-tab active" data-tab="search">검색</button>
+      <button type="button" class="wk-tab" data-tab="popular">인기 인물</button>
+      <button type="button" class="wk-tab" data-tab="today">오늘의 기일·생일</button>
+    </div>
+
+    <div id="panelSearch" class="wk-panel">
+      <div class="wk-row">
+        <input type="text" id="q" placeholder="예: 이순신, Marie Curie" maxlength="80">
+        <button type="button" id="searchBtn">검색</button>
+      </div>
+    </div>
+    <div id="panelPopular" class="wk-panel" style="display:none;">
+      <div class="wk-note">위키피디아에서 많이 읽힌 <b>사망 인물</b> 순위예요. (위키피디아는 검색어 통계를 공개하지 않아서 "많이 읽힌 문서" 기준이에요.) 기간이 길수록 불러오는 데 시간이 걸려요(최대 10초 안팎).</div>
+      <div class="wk-opts">
+        <label style="margin:0;">기간</label>
+        <select id="popPeriod">
+          <option value="day">가장 최근 하루</option>
+          <option value="week">최근 7일</option>
+          <option value="month" selected>지난달</option>
+          <option value="3m">최근 3개월</option>
+          <option value="6m">최근 6개월</option>
+          <option value="1y">최근 1년</option>
+        </select>
+        <label style="margin:0;">언어</label>
+        <select id="popLang">
+          <option value="both">한국어+영어</option>
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+        </select>
+        <button type="button" id="popBtn" style="width:auto;padding:8px 14px;margin:0;">불러오기</button>
+      </div>
+    </div>
+    <div id="panelToday" class="wk-panel" style="display:none;">
+      <div class="wk-note">오늘(한국 날짜)이 <b>기일이거나 생일</b>인 사망 인물이에요. 한국어·영어 문서가 모두 있는 인물을 위쪽에 보여줘요.</div>
+      <div class="wk-opts">
+        <label style="margin:0;">언어</label>
+        <select id="todayLang">
+          <option value="both">한국어+영어</option>
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+        </select>
+        <button type="button" id="todayBtn" style="width:auto;padding:8px 14px;margin:0;">불러오기</button>
+      </div>
     </div>
     <div class="msg" id="msg"></div>
     <div id="results" style="margin-top:12px;"></div>
@@ -121,19 +168,53 @@
     if (!r.deceased) return { cls: "wk-live", text: "생존 인물(아직 지원 안 함)", ok: false };
     return { cls: "wk-dead", text: "사망", ok: true };
   }
-  function renderResults() {
-    if (!results.length) { $("results").innerHTML = '<div class="empty" style="margin-top:20px;">검색 결과가 없어요</div>'; return; }
-    $("results").innerHTML = results.map((r, i) => {
+  // 검색 / 인기 인물 / 오늘의 기일·생일이 같은 카드 모양을 쓴다. groups = [{title, items}]
+  function renderResults(groups) {
+    groups = groups || [{ title: "", items: results }];
+    results = groups.flatMap((g) => g.items);
+    if (!results.length) { $("results").innerHTML = '<div class="empty" style="margin-top:20px;">결과가 없어요</div>'; return; }
+    let idx = 0;
+    $("results").innerHTML = groups.map((g) => (g.items.length ? (g.title ? `<div class="wk-group">${esc(g.title)}</div>` : "") + g.items.map((r) => {
+      const i = idx++;
       const st = status(r);
       const years = r.human && (r.born || r.died) ? ` (${r.born ?? "?"}–${r.died ?? ""})` : "";
+      const views = r.views ? `<div class="wk-views">조회수 ${Object.entries(r.views).map(([l, v]) => `${LANG_NAME[l]} ${Number(v).toLocaleString()}`).join(" · ")}</div>` : "";
       return `<div class="card-box wk-item${st.ok ? "" : " off"}" data-i="${i}">
         ${r.thumb ? `<img class="wk-thumb" src="${esc(r.thumb)}" alt="">` : '<div class="wk-thumb"></div>'}
         <div style="min-width:0;">
-          <div class="wk-name">${esc(r.name)}${esc(years)}<span class="wk-badge ${st.cls}">${st.text}</span>${Object.keys(r.langs).map((l) => `<span class="wk-badge wk-lang">${LANG_NAME[l]}</span>`).join("")}</div>
-          <div class="wk-snip">${esc(r.snippet)}</div>
+          <div class="wk-name">${esc(r.name)}${esc(years)}<span class="wk-badge ${st.cls}">${st.text}</span>${r.recent ? '<span class="wk-badge wk-recent">최근 사망</span>' : ""}${Object.keys(r.langs).map((l) => `<span class="wk-badge wk-lang">${LANG_NAME[l]}</span>`).join("")}</div>
+          <div class="wk-snip">${esc(r.snippet || r.description || "")}</div>${views}
         </div></div>`;
-    }).join("");
+    }).join("") : "")).join("");
   }
+
+  // ───── 탭: 검색 / 인기 인물 / 오늘의 기일·생일 ─────
+  document.querySelectorAll(".wk-tab").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(".wk-tab").forEach((x) => x.classList.toggle("active", x === b));
+    document.querySelectorAll(".wk-panel").forEach((p) => { p.style.display = "none"; });
+    $("panel" + b.dataset.tab[0].toUpperCase() + b.dataset.tab.slice(1)).style.display = "block";
+    $("results").innerHTML = ""; $("ideaBox").style.display = "none"; $("done").innerHTML = ""; person = null; results = [];
+    $("msg").style.display = "none";
+  }));
+  async function loadList(btn, url, label, build) {
+    btn.disabled = true; const keep = btn.textContent; btn.textContent = "불러오는 중…";
+    $("msg").style.display = "none"; $("ideaBox").style.display = "none"; $("done").innerHTML = ""; person = null;
+    $("results").innerHTML = '<div class="empty" style="margin-top:20px;">불러오는 중… (길게는 10초 정도 걸려요)</div>';
+    try {
+      const res = await fetch(url);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "실패");
+      renderResults(build(d));
+    } catch (e) { $("results").innerHTML = ""; msg($("msg"), label + " 실패: " + e.message, false); }
+    finally { btn.disabled = false; btn.textContent = keep; }
+  }
+  $("popBtn").addEventListener("click", () => loadList($("popBtn"), `/api/wiki-popular?period=${$("popPeriod").value}&lang=${$("popLang").value}`, "인기 인물",
+    (d) => [{ title: `${d.label} · 많이 읽힌 사망 인물 ${d.people.length}명`, items: d.people.map((p) => ({ ...p, human: true, deceased: true })) }]));
+  $("todayBtn").addEventListener("click", () => loadList($("todayBtn"), `/api/wiki-today?lang=${$("todayLang").value}`, "오늘의 인물",
+    (d) => [
+      { title: `${d.date}이 기일인 인물`, items: d.deaths.map((p) => ({ ...p, human: true, deceased: true, snippet: `${p.year}년 사망 · ${p.description || ""}` })) },
+      { title: `${d.date}이 생일인 인물`, items: d.births.map((p) => ({ ...p, human: true, deceased: true, snippet: `${p.year}년 출생 · ${p.description || ""}` })) },
+    ]));
   $("results").addEventListener("click", (e) => {
     const el = e.target.closest(".wk-item");
     if (!el || el.classList.contains("off")) return;
