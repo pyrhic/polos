@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scenes — Wicked Wiki</title>
+<title>Scenes — wizard-yt</title>
 <link rel="stylesheet" href="/youtube/style.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@300;400;500;700&display=swap">
 <link rel="manifest" href="/manifest.json">
@@ -19,8 +19,6 @@
   .seg-group { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:22px 2px 8px; padding-bottom:5px; border-bottom:1px solid var(--line); font-weight:800; color:var(--text); font-size:0.95rem; }
   .seg-group:first-child { margin-top:4px; }
   .seg-group .cnt { color:var(--muted); font-weight:600; font-size:0.78rem; white-space:nowrap; }
-  .seg-part { width:auto; margin:0; padding:3px 6px; font-size:0.72rem; border-radius:10px; flex-shrink:0; }
-  .seg-opinion-badge { background:var(--text); color:var(--on-accent); font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; flex-shrink:0; }
   .seg-item .seg-no { background:var(--inset); color:var(--accent); font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .seg-duration { display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--muted); }
   .seg-duration-display { font-weight:700; color:#ffffff; }
@@ -310,7 +308,7 @@
 </head>
 <body>
   <div class="wrap">
-    <a class="back" href="/youtube/index.html">← Wicked Wiki</a>
+    <a class="back" href="/youtube/index.html">← wizard-yt</a>
     <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">Scenes</h1>
     <div id="listView">
       <div id="contiList"><div class="empty">불러오는 중...</div></div>
@@ -2444,15 +2442,9 @@
   // 장면 구분(대본 구조). section 칸에 구분 이름을 저장하고, 옛 콘티의 "트렌드 요약 (설명)" 같은 값은 앞부분으로 묶어 본다.
   const PARTS = ["트렌드 요약", "이슈 설명", "관점 정리", "내 의견", "도입", "전개", "의미", "마무리", "구독/좋아요"];
   const SUBSCRIBE_PART = "구독/좋아요";
-  const SUBSCRIBE_TEXT = "내 알고리즘 밖의 이야기가 궁금하다면 구독 좋아요 해주시면 나도 좋아요";
   function partOf(section) {
     const t = (section || "").trim();
     return PARTS.find((k) => t.includes(k)) || t;
-  }
-  function partOptionsHtml(section) {
-    const cur = partOf(section);
-    const list = PARTS.includes(cur) || !cur ? PARTS : [...PARTS, cur];
-    return `<option value="">구분 없음</option>` + list.map((k) => `<option value="${escapeAttr(k)}"${k === cur ? " selected" : ""}>${escapeHtml(k)}</option>`).join("");
   }
 
   // 이어지는 같은 구분의 카드들을 묶어서 "트렌드 요약 · 카드 2개 · 약 14초" 머리글을 카드 사이에 넣는다
@@ -2471,7 +2463,6 @@
     };
     list.querySelectorAll(".seg-item").forEach((el) => {
       const part = partOf(el.querySelector(".seg-section").value);
-      el.querySelector(".seg-opinion-badge").style.display = part === "내 의견" ? "inline-block" : "none";
       if (part !== prev) { flush(); prev = part; }
       run.push(el);
     });
@@ -2499,8 +2490,6 @@
       <div class="card-box seg-item" data-id="${seg.id}" tabindex="0">
         <div class="seg-head">
           <div class="seg-no">${seg.order_no}</div>
-          <select class="seg-part">${partOptionsHtml(seg.section)}</select>
-          <span class="seg-opinion-badge" style="display:${partOf(seg.section) === "내 의견" ? "inline-block" : "none"};">내 의견</span>
           <div class="seg-duration">
             <span class="seg-duration-display"></span>
             <input type="number" class="seg-duration-input" step="0.1" min="0" style="display:none;">
@@ -2599,18 +2588,6 @@
         autoGrow(directionEl); markDirty(); pvTextChanged();
       });
       autoGrow(directionEl);
-      el.querySelector(".seg-part").addEventListener("change", (e) => {
-        el.querySelector(".seg-section").value = e.target.value;
-        // 구독/좋아요 카드를 고르면 안내 대사와 검색어를 기본값으로 채운다 (비어 있을 때만)
-        if (e.target.value === SUBSCRIBE_PART) {
-          const sc = el.querySelector(".seg-script");
-          if (!sc.value.trim()) { sc.value = SUBSCRIBE_TEXT; capBlurSplit(el, ""); autoGrow(sc); updateRuntimeSummary(); }
-          const kw = el.querySelector(".seg-keyword");
-          if (!kw.value.trim()) kw.value = "sexy witch";
-        }
-        markDirty();
-        refreshGroupHeaders();
-      });
       const keywordEl = el.querySelector(".seg-keyword");
       keywordEl.addEventListener("input", markDirty);
 
@@ -2913,7 +2890,6 @@
     directionEl.value = oneLine(seg.direction);
     el._trimsDraft = null;
     el.querySelector(".seg-section").value = seg.section || "";
-    el.querySelector(".seg-part").innerHTML = partOptionsHtml(seg.section);
     el.querySelector(".seg-keyword").value = seg.keyword || "";
     autoGrow(scriptEl);
     autoGrow(directionEl);
