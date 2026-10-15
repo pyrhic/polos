@@ -93,7 +93,7 @@
   .settings-card button { background:#0f0a14; color:#7cff4a; }
   .settings-card button:hover { background:#ffffff; color:#0f0a14; }
   .settings-card button:disabled { background:#4fb82a; color:#1d4a0c; }
-  .settings-card #settingsSaveBtn.dirty { background:#ffd93d; color:#0f0a14; }
+  .settings-card #settingsSaveBtn.dirty, .settings-card #soundSaveBtn.dirty { background:#ffd93d; color:#0f0a14; }
   .settings-card #bgmRemove { background:#f6d4d4; color:#8a1c1c; }
   .settings-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .settings-title { font-weight:800; margin-bottom:6px; }
@@ -337,7 +337,7 @@
 
     <div class="card-box settings-card" id="settingsCard" style="display:none;margin-top:14px;">
       <div class="settings-head">
-        <div class="settings-title">전체 설정<span>값을 눌러 바로 바꿉니다</span></div>
+        <div class="settings-title">전체 설정</div>
         <span class="settings-dirty-badge" id="settingsDirtyBadge"></span>
       </div>
       <div class="sr-list" id="settingsSummary">
@@ -346,25 +346,11 @@
         <div class="sr sr-framed"><span class="k">제목 1줄</span><span class="v"><input class="sr-input" id="srT1" maxlength="20" placeholder="노란색, 10자 안팎"></span></div>
         <div class="sr sr-framed"><span class="k">제목 2줄</span><span class="v"><input class="sr-input" id="srT2" maxlength="20" placeholder="흰색"></span></div>
         <div class="sr sr-framed"><span class="k">출처 문구</span><span class="v"><input class="sr-input" id="srSrc" maxlength="60" placeholder="영상 아래 작은 글씨"></span></div>
-        <div class="sr"><span class="k">목소리</span><span class="v">
-          <button type="button" class="tok" data-wheel="voice" id="tokVoice"></button> ·
-          <button type="button" class="tok" data-wheel="rate" id="tokRate"></button> ·
-          <button type="button" class="tok" data-wheel="pitch" id="tokPitch"></button>
-          <button type="button" class="tok tok-btn" id="tokSample">▶ 샘플</button></span></div>
-        <div class="sr"><span class="k">배경음악</span><span class="v">
-          <button type="button" class="tok" id="tokBgm"></button>
-          <span id="bgmExtra">
-            · <button type="button" class="tok" data-wheel="bgmVol" id="tokBgmVol"></button>
-            · <button type="button" class="tok" id="tokBgmUp">교체</button>
-            · <button type="button" class="tok tok-del" id="tokBgmDel">삭제</button>
-          </span></span></div>
         <div class="sr"><span class="k">분위기</span><span class="v"><button type="button" class="tok" data-wheel="mood" id="tokMood"></button></span></div>
         <div class="sr"><span class="k"></span><span class="v"><input class="sr-input" id="srMoodNote" placeholder="분위기 메모 (예: 긴장감 있게)"></span></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
         <button type="button" class="tok tok-btn" id="settingsSaveBtn" style="display:none;margin-left:0;">전체 설정 저장</button>
-        <button type="button" class="tok tok-btn" id="defaultSaveBtn" style="margin-left:0;">이 설정을 기본값으로 저장</button>
-        <button type="button" class="tok tok-btn" id="defaultApplyBtn" style="margin-left:0;">기본값 불러오기</button>
       </div>
 
       <!-- 아래 입력들은 화면에 보이지 않는 실제 값 저장소. 위 요약 줄들이 이 값을 읽고 바꾼다 -->
@@ -384,6 +370,31 @@
         <input type="range" id="bgmVol" min="0" max="100" step="1"><b id="bgmVolVal"></b>
         <select id="moodSel"></select>
         <textarea id="moodNote"></textarea>
+      </div>
+    </div>
+
+    <!-- 음향: 성우(목소리·속도·높낮이·샘플)와 BGM(올리기·볼륨). 값은 전체 설정과 같은 저장 경로(currentSettings → 저장)로 간다 -->
+    <div class="card-box settings-card" id="soundCard" style="display:none;margin-top:14px;">
+      <div class="settings-head">
+        <div class="settings-title">음향</div>
+        <span class="settings-dirty-badge" id="soundDirtyBadge"></span>
+      </div>
+      <div class="sr-list">
+        <div class="sr"><span class="k">성우</span><span class="v">
+          <button type="button" class="tok" data-wheel="voice" id="tokVoice"></button> ·
+          <button type="button" class="tok" data-wheel="rate" id="tokRate"></button> ·
+          <button type="button" class="tok" data-wheel="pitch" id="tokPitch"></button>
+          <button type="button" class="tok tok-btn" id="tokSample">▶ 샘플</button></span></div>
+        <div class="sr"><span class="k">BGM</span><span class="v">
+          <button type="button" class="tok" id="tokBgm"></button>
+          <span id="bgmExtra">
+            · <button type="button" class="tok" data-wheel="bgmVol" id="tokBgmVol"></button>
+            · <button type="button" class="tok" id="tokBgmUp">교체</button>
+            · <button type="button" class="tok tok-del" id="tokBgmDel">삭제</button>
+          </span></span></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
+        <button type="button" class="tok tok-btn" id="soundSaveBtn" style="display:none;margin-left:0;">저장</button>
       </div>
     </div>
 
@@ -1805,9 +1816,20 @@
     $("tokMood").textContent = label("mood");
     const dirty = $("settingsSaveBtn").classList.contains("dirty");
     $("settingsSaveBtn").style.display = dirty || $("settingsSaveBtn").disabled ? "inline" : "none";
-    const badge = $("settingsDirtyBadge");
-    badge.textContent = dirty ? "저장 안 됨" : (settingsJustSaved ? "저장됨 ✓" : "");
-    badge.style.display = badge.textContent ? "inline-block" : "none";
+    // 음향 카드의 저장 버튼은 전체 설정 저장 버튼과 같은 상태를 보여 준다(저장 경로는 하나)
+    const sb = $("soundSaveBtn");
+    sb.classList.toggle("dirty", dirty);
+    sb.disabled = $("settingsSaveBtn").disabled;
+    sb.textContent = sb.disabled ? "저장 중..." : "저장";
+    sb.style.display = $("settingsSaveBtn").style.display;
+    // 저장할 게 없으면 버튼 줄 자체를 숨겨 카드 아래 빈 공간이 생기지 않게 한다
+    [$("settingsSaveBtn"), sb].forEach((x) => { x.parentElement.style.display = x.style.display === "none" ? "none" : "flex"; });
+    const badgeText = dirty ? "저장 안 됨" : (settingsJustSaved ? "저장됨 ✓" : "");
+    ["settingsDirtyBadge", "soundDirtyBadge"].forEach((id) => {
+      const badge = $(id);
+      badge.textContent = badgeText;
+      badge.style.display = badgeText ? "inline-block" : "none";
+    });
   }
 
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeWheel(); });
@@ -1859,7 +1881,7 @@
   function loadSettingsCard(scriptId) {
     const card = $("settingsCard");
     const row = scripts.find((r) => String(r.id) === String(scriptId));
-    if (!row) { card.style.display = "none"; return; }
+    if (!row) { card.style.display = "none"; $("soundCard").style.display = "none"; return; }
     currentSettings = { ...DEFAULT_SETTINGS, ...(row.video_settings || {}) };
     savedBgmPath = currentSettings.bgm_path || null;
     // 이름을 따로 안 정했으면 대본 후킹 앞부분을 기본 이름으로 제안
@@ -1886,6 +1908,7 @@
     b.classList.remove("dirty");
     b.textContent = "전체 설정 저장";
     card.style.display = "block";
+    $("soundCard").style.display = "block";
     closeWheel();
     stopBgmPlayer();
     renderBgm();
@@ -1913,7 +1936,7 @@
       currentSettings.bgm_path = path;
       renderBgm();
       markSettingsDirty();
-      showMsg("음악을 올렸습니다. '전체 설정 저장'을 눌러야 적용됩니다.", true);
+      showMsg("음악을 올렸습니다. '저장'을 눌러야 적용됩니다.", true);
     } catch (err) {
       showMsg("음악 업로드 실패: " + err.message, false);
     }
@@ -1924,6 +1947,7 @@
     const scriptId = $("scriptSelect").value;
     btn.disabled = true;
     btn.textContent = "저장 중...";
+    updateSettingsSummary();
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${scriptId}`, {
         method: "PATCH", headers: jsonHeaders,
@@ -1936,6 +1960,7 @@
         await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${savedBgmPath}`, { method: "DELETE", headers });
       }
       savedBgmPath = currentSettings.bgm_path || null;
+      scheduleDefaultsSave();   // 마지막으로 저장한 설정이 곧 기본값
       btn.classList.remove("dirty");
       btn.textContent = "전체 설정 저장";
       settingsJustSaved = true;
@@ -1949,10 +1974,11 @@
       updateSettingsSummary();
     } finally {
       btn.disabled = false;
+      updateSettingsSummary();
     }
   }
 
-  // ───── 기본값: 전체 설정을 한 번 정해두면 새 콘티가 그 값으로 시작한다 ─────
+  // ───── 기본값: 항상 마지막으로 저장한 설정이 기본값이고, 새 콘티가 그 값으로 시작한다 ─────
   // 서버(youtube_default_settings, 기기를 바꿔도 유지)에 저장하고, 이 기기에도 복사본을 둔다. 서버 표가 아직 없거나 연결이 안 되면
   // 이 기기 복사본으로 동작한다. 콘티마다 다른 값(이름, 제목 1·2줄, 출처 문구, 직접 올린 배경음악)은 기본값에서 뺀다.
   const DEFAULTS_LS_KEY = "polos_youtube_default_settings";
@@ -1991,31 +2017,21 @@
     }
   }
 
-  $("defaultSaveBtn").addEventListener("click", async () => {
-    const btn = $("defaultSaveBtn");
-    btn.disabled = true;
-    const savedOnServer = await saveUserDefaults(pickDefaults(currentSettings));
-    btn.disabled = false;
-    if (savedOnServer) {
-      // 성공은 설명 문구 대신 버튼 글자가 잠깐 바뀌는 것으로만 알림
-      btn.textContent = "저장됨";
-      setTimeout(() => { btn.textContent = "이 설정을 기본값으로 저장"; }, 1200);
-    } else {
-      showMsg("서버에 저장하지 못해 이 기기에만 저장했어요.", false);
-    }
-  });
-
-  $("defaultApplyBtn").addEventListener("click", () => {
-    if (!userDefaults) { showMsg("저장된 기본값이 없어요.", false); return; }
-    const scriptId = $("scriptSelect").value;
-    const row = scripts.find((r) => String(r.id) === String(scriptId));
-    if (!row) return;
-    const originalBgm = savedBgmPath; // 직접 올린 음악이 바뀌면 저장할 때 예전 파일을 지우기 위해 원래 경로를 기억
-    row.video_settings = { ...(row.video_settings || {}), ...userDefaults };
-    loadSettingsCard(scriptId);
-    savedBgmPath = originalBgm;
-    markSettingsDirty();
-  });
+  // 콘티 설정이 저장될 때마다 부른다. 자막 조작처럼 저장이 잦을 수 있어 잠시 모아서 한 번만 쓰고,
+  // 지난번에 쓴 기본값과 같으면 서버에 다시 쓰지 않는다.
+  const DEFAULTS_SAVE_DELAY = 1500;
+  let defaultsSaveTimer = 0;
+  function scheduleDefaultsSave() {
+    const snapshot = pickDefaults(currentSettings);   // 저장된 그 순간의 값(다른 콘티로 넘어가도 섞이지 않게)
+    clearTimeout(defaultsSaveTimer);
+    defaultsSaveTimer = setTimeout(async () => {
+      defaultsSaveTimer = 0;
+      await userDefaultsReady;
+      if (userDefaults && JSON.stringify(userDefaults) === JSON.stringify(snapshot)) return;
+      const savedOnServer = await saveUserDefaults(snapshot);
+      if (!savedOnServer) console.warn("기본값을 서버에 저장하지 못해 이 기기에만 저장했어요.");
+    }, DEFAULTS_SAVE_DELAY);
+  }
 
   // 어떤 설정을 바꿔도(다른 핸들러가 값을 갱신한 뒤) 요약을 새로 그린다
   $("settingsBody").addEventListener("input", () => setTimeout(updateSettingsSummary, 0));
@@ -2083,6 +2099,7 @@
   $("moodNote").addEventListener("input", () => { currentSettings.mood_note = $("moodNote").value; markSettingsDirty(); });
   $("bgmFile").addEventListener("change", (e) => { if (e.target.files[0]) uploadBgm(e.target.files[0]); e.target.value = ""; });
   $("settingsSaveBtn").addEventListener("click", saveSettings);
+  $("soundSaveBtn").addEventListener("click", () => { if (!$("settingsSaveBtn").disabled) saveSettings(); });
 
   async function loadScripts() {
     const sel = document.getElementById("scriptSelect");
