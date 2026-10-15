@@ -1,11 +1,36 @@
+/* 색 규칙 — 완전한 검정 바탕 + 스킴밐스 하늘색(동작·강조) + 짙은 하늘색(눌림) + 흰색(본문) + 주황(포인트, 아껴 쓰기)
+   ※ 색은 아래 변수로만 바꾼다. 페이지 안에 직접 색을 적지 말 것. */
+:root {
+  --bg: #000000;            /* 페이지 바탕 */
+  --inset: #0a0a0a;         /* 카드 안쪽에 파인 칸(번호 원, 트랙 바탕 등) */
+  --card: #141414;          /* 카드·팝업 */
+  --card-2: #181818;        /* 카드 위 한 단계 밝은 면 */
+  --input: #1c1c1c;         /* 입력칸 */
+  --btn: #1c1c1c;           /* 보조 버튼 바탕 (글자는 하늘색) */
+  --line: #2a2a2a;          /* 테두리·구분선 */
+  --line-strong: #333333;
+  --text: #ffffff;          /* 본문 글자 */
+  --text-2: #d0d0d0;        /* 조금 흐린 본문 */
+  --muted: #9a9a9a;         /* 보조 글자 */
+  --muted-2: #6a6a6a;       /* 더 흐린 보조 글자 */
+  --accent: #4fc3f7;        /* 스킴밐스 하늘색: 버튼·선택·진행·링크·켬 */
+  --accent-strong: #1e9ad6; /* 짙은 하늘색: 눌림·강조 버튼·자막 트랙 */
+  --accent-dim: #16324a;    /* 하늘색 기운의 어두운 바탕(스킴밐스 값): 진행 중 칩 등 */
+  --on-accent: #000000;     /* 하늘색·주황 바탕 위 글자 */
+  --point: #ff7a1a;         /* 스킴밐스 주황: 경고·저장 안 됨 등 꼭 필요한 곳만 */
+  --point-dim: #3a1f0a;
+  --danger: #ff6b6b;        /* 삭제·오류 */
+  --danger-bg: #2a1212;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   font-family: -apple-system, "Malgun Gothic", sans-serif;
-  background: #0d1b2a;
-  color: #ffffff;
+  background: var(--bg);
+  color: var(--text);
   margin: 0;
   padding: 20px;
 }
@@ -19,7 +44,7 @@ h1 {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-transform: uppercase;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .card h1 {
@@ -29,7 +54,7 @@ h1 {
 }
 
 p.role {
-  color: #8fa3b8;
+  color: var(--muted);
   margin-top: 0;
   margin-bottom: 2rem;
   line-height: 1.5;
@@ -46,10 +71,11 @@ a.link-btn, button, input[type="submit"] {
   display: block;
   width: 100%;
   padding: 14px 20px;
-  background: #16324a;
+  background: var(--btn);
   border: none;
+  box-shadow: inset 0 0 0 1px var(--line);
   border-radius: 3px;
-  color: #ffffff;
+  color: var(--accent);
   text-decoration: none;
   font-size: 1rem;
   font-weight: 700;
@@ -61,30 +87,35 @@ a.link-btn, button, input[type="submit"] {
 }
 
 a.link-btn:hover, button:hover {
-  background: #ffd93d;
-  color: #0f3d33;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+a.link-btn:active, button:active {
+  background: var(--accent-strong);
+  color: var(--on-accent);
 }
 
 .accent {
-  color: #d99a00;
+  color: var(--accent);
 }
 
 label {
   display: block;
   margin-top: 14px;
   margin-bottom: 6px;
-  color: #8fa3b8;
+  color: var(--muted);
   font-size: 0.9rem;
   font-weight: 600;
 }
 
-input, textarea {
+input, textarea, select {
   width: 100%;
   box-sizing: border-box;
-  background: #ffffff;
-  border: none;
+  background: var(--input);
+  border: 1px solid var(--line);
   border-radius: 3px;
-  color: #0f3d33;
+  color: var(--text);
   padding: 10px 12px;
   font-size: 1rem;
   font-family: inherit;
@@ -100,9 +131,10 @@ button[type="submit"] {
 }
 
 button:disabled {
-  background: #ccc;
-  border-color: #ccc;
-  color: #666;
+  background: var(--line-strong);
+  color: var(--muted-2);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .msg {
@@ -112,21 +144,56 @@ button:disabled {
   font-size: 0.9rem;
   display: none;
 }
-.msg.ok { background: #e6f6ea; color: #1a7a34; display: block; }
-.msg.err { background: #fdeceb; color: #b3251a; display: block; }
+.msg.ok { background: var(--accent-dim); color: var(--accent); display: block; }
+.msg.err { background: var(--danger-bg); color: var(--danger); display: block; }
 
 a.back {
   display: inline-block;
   margin-top: 10px;
   margin-bottom: 20px;
-  color: #8fa3b8;
+  color: var(--accent);
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 600;
 }
 
+.card-box {
+  background: var(--card);
+  border: none;
+  border-radius: 3px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.card-box .title {
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.card-box .meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.empty {
+  color: var(--muted);
+  text-align: center;
+  margin-top: 40px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .report {
-  background: #16324a;
+  background: var(--card);
   border: none;
   border-radius: 3px;
   padding: 16px 18px;
@@ -142,28 +209,22 @@ a.back {
   font-size: 0.9rem;
 }
 .report .day .dow {
-  color: #8fa3b8;
+  color: var(--accent);
   margin-right: 6px;
   font-weight: 700;
 }
 .report .day .leave {
-  color: #d99a00;
+  color: var(--point);
   margin-left: 6px;
   font-size: 0.8rem;
   font-weight: 700;
-}
-
-.empty {
-  color: #8fa3b8;
-  text-align: center;
-  margin-top: 40px;
 }
 
 .todo-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #16324a;
+  background: var(--card);
   border: none;
   border-radius: 3px;
   padding: 12px 14px;
@@ -173,7 +234,7 @@ a.back {
   width: 20px;
   height: 20px;
   min-width: 20px;
-  accent-color: #d99a00;
+  accent-color: var(--accent);
   cursor: pointer;
 }
 .todo-item .todo-text {
@@ -185,11 +246,11 @@ a.back {
   border-radius: 2px;
 }
 .todo-item .todo-text:focus {
-  background: #1e3a52;
+  background: var(--card-2);
 }
 .todo-item.completed .todo-text {
   text-decoration: line-through;
-  color: #6b7d8f;
+  color: var(--muted-2);
 }
 .todo-item .todo-del {
   width: auto;

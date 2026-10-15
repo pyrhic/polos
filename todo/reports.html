@@ -6,7 +6,7 @@
 <title>주간보고서 — 사교원</title>
 <link rel="stylesheet" href="/todo/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0d1b2a">
+<meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
@@ -108,7 +108,7 @@
     const days = slots
       .map(
         (day, di) => `
-      <div style="margin-top:14px;font-weight:700;">${escapeHtml(day.date)}(${escapeHtml(day.dow)})${day.inferred ? ' <span style="font-weight:400;color:#e8362a;">— AI 추정, 확인 필요</span>' : ""}</div>
+      <div style="margin-top:14px;font-weight:700;">${escapeHtml(day.date)}(${escapeHtml(day.dow)})${day.inferred ? ' <span style="font-weight:400;color:var(--point);">— AI 추정, 확인 필요</span>' : ""}</div>
       <label>업무</label>
       <textarea data-day="${di}" data-date="${escapeHtml(day.date)}" data-dow="${escapeHtml(day.dow)}" data-field="tasks" style="min-height:70px;">${escapeHtml((day.tasks || []).join("\n"))}</textarea>
       <label>근무시간</label>
