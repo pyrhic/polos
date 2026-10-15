@@ -158,7 +158,7 @@ async function genStart(row, segRows, version) {
     bgm_url: vs.bgm_path ? genAssetUrl(vs.bgm_path) : null,
     bgm_volume: vs.bgm_volume,
     mood: vs.mood,
-    transition: vs.transition,
+    transition: "cut",   // 화면 전환은 늘 컷 (예전에 fade로 저장된 콘티도 컷으로 만든다)
     tts_voice: vs.tts_voice,
     tts_rate: vs.tts_rate,
     tts_pitch: vs.tts_pitch,

@@ -193,6 +193,11 @@
   .seg-stage-row { display:flex; gap:10px; align-items:stretch; margin-bottom:10px; }
   .seg-stage-box { position:relative; flex:0 0 140px; width:140px; height:250px; border-radius:4px; overflow:hidden; background:#000; }
   .seg-stage { position:absolute; left:0; top:0; width:270px; max-width:none; height:480px; margin:0 !important; transform:scale(0.52); transform-origin:0 0; touch-action:auto; cursor:pointer; }
+  /* 미리보기 자막 직접 조정: 자막 위에서만 페이지 스크롤을 막는다. 잡기 쉽게 위아래 판정 영역만 넓힌다(글자 자리는 그대로) */
+  .seg-stage { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+  .seg-stage .cap-lines { touch-action:none; cursor:grab; padding:14px 0; margin-bottom:-14px; border-radius:6px; transition:box-shadow .15s; }
+  .seg-stage .cap-lines:has(.cap-normal:empty) { pointer-events:none; }   /* 자막이 없는 장면은 그 자리도 스크롤·탭이 그대로 */
+  .seg-stage .cap-lines.cap-adj { cursor:grabbing; box-shadow:0 0 0 3px rgba(124,255,74,0.45); }
   .seg-stage .pv-layer { position:absolute; inset:0; overflow:hidden; background:#000; }
   .seg-stage .pv-cut { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
   .seg-stage .pv-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:14px; text-align:center; color:#a89bb5; font-size:0.95rem; line-height:1.5; background:#17101f; }
@@ -341,10 +346,6 @@
         <div class="sr sr-framed"><span class="k">제목 1줄</span><span class="v"><input class="sr-input" id="srT1" maxlength="20" placeholder="노란색, 10자 안팎"></span></div>
         <div class="sr sr-framed"><span class="k">제목 2줄</span><span class="v"><input class="sr-input" id="srT2" maxlength="20" placeholder="흰색"></span></div>
         <div class="sr sr-framed"><span class="k">출처 문구</span><span class="v"><input class="sr-input" id="srSrc" maxlength="60" placeholder="영상 아래 작은 글씨"></span></div>
-        <div class="sr"><span class="k">자막</span><span class="v">
-          <button type="button" class="tok" id="tokSize"></button> ·
-          <button type="button" class="tok" id="tokWeight"></button> ·
-          <button type="button" class="tok" id="tokPos"></button></span></div>
         <div class="sr"><span class="k">목소리</span><span class="v">
           <button type="button" class="tok" data-wheel="voice" id="tokVoice"></button> ·
           <button type="button" class="tok" data-wheel="rate" id="tokRate"></button> ·
@@ -359,7 +360,6 @@
           </span></span></div>
         <div class="sr"><span class="k">분위기</span><span class="v"><button type="button" class="tok" data-wheel="mood" id="tokMood"></button></span></div>
         <div class="sr"><span class="k"></span><span class="v"><input class="sr-input" id="srMoodNote" placeholder="분위기 메모 (예: 긴장감 있게)"></span></div>
-        <div class="sr"><span class="k">화면 전환</span><span class="v"><button type="button" class="tok" data-wheel="trans" id="tokTrans"></button></span></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
         <button type="button" class="tok tok-btn" id="settingsSaveBtn" style="display:none;margin-left:0;">전체 설정 저장</button>
@@ -375,7 +375,6 @@
         <input type="range" id="capSize" min="40" max="140" step="2">
         <input type="range" id="capWeight" min="0" max="4" step="1">
         <input type="range" id="capPos" min="3" max="85" step="1">
-        <b id="capSizeVal"></b><b id="capWeightVal"></b><b id="capPosVal"></b>
         <select id="voiceSel"></select>
         <audio id="voiceSample" preload="none"></audio>
         <input type="range" id="ttsRate" min="-30" max="30" step="1"><b id="ttsRateVal"></b>
@@ -385,7 +384,6 @@
         <input type="range" id="bgmVol" min="0" max="100" step="1"><b id="bgmVolVal"></b>
         <select id="moodSel"></select>
         <textarea id="moodNote"></textarea>
-        <select id="transSel"><option value="cut">cut</option><option value="fade">fade</option></select>
       </div>
     </div>
 
@@ -399,7 +397,8 @@
         <div style="color:#e8def5;font-size:0.82rem;line-height:1.6;margin:8px 0 4px;">
           · 미리보기 화면을 누르면 재생, 다시 누르면 멈춰요.<br>
           · 소리는 <b>휴대폰 목소리</b>로 읽어 줘요. 실제 영상의 목소리와는 달라요.<br>
-          · 화면 배치·자막 줄과 자막 길이·클립 전환은 실제 영상과 같아요.
+          · 화면 배치·자막 줄과 자막 길이·클립 전환은 실제 영상과 같아요.<br>
+          · 자막을 끌면 위치, 두 손가락으로 크기, 두 번 탭하면 굵기가 바뀌고 모든 장면에 같이 적용돼요.
         </div>
         <div class="trim-actions">
           <button type="button" id="pvGuideOk" style="flex:1;background:#7cff4a;color:#0f0a14;">확인</button>
@@ -459,25 +458,6 @@
       </div>
     </div>
 
-    <!-- 자막 예시 화면 팝업: 글자를 끌어 위치, 마우스 휠/두 손가락으로 크기, 톡 누르면 굵기 -->
-    <div class="cap-modal" id="capModal">
-      <div class="cap-modal-box">
-        <div class="cap-modal-hint">글자를 끌면 위치 · 휠/두 손가락 벌리기로 크기 · 글자를 톡 누르면 굵기</div>
-        <div class="cap-preview" id="capPreview">
-          <div class="cap-media" id="capMedia"></div>
-          <div class="cap-t1" id="capT1"></div>
-          <div class="cap-t2" id="capT2"></div>
-          <div class="cap-src" id="capSrc"></div>
-          <div class="cap-lines" id="capLines">
-            <div class="cap-normal" id="capNormal">일반 자막은 이렇게 보여요</div>
-            <div class="cap-emph" id="capEmph">강조 123억</div>
-          </div>
-        </div>
-        <div class="cap-modal-hint" id="capFrameNote" style="display:none;">점선 글자는 아직 안 쓴 자리예요. 비워두면 영상에 나오지 않아요. 입력은 설정의 '제목 1줄 / 제목 2줄 / 출처 문구'에서 해요. (콘티 이름이나 유튜브 제목과는 별개예요)</div>
-        <div class="cap-modal-val" id="capModalVal"></div>
-        <button type="button" id="capModalClose">완료</button>
-      </div>
-    </div>
 
     <div class="runtime-summary" id="runtimeSummary" style="display:none;">
       <div id="runtimeText"></div>
@@ -1741,7 +1721,6 @@
     pitch: { ctl: "ttsPitch", opts: () => range(-20, 20, 1).map((n) => [String(n), `높낮이 ${n > 0 ? "+" : ""}${n}Hz`]) },
     bgmVol: { ctl: "bgmVol", opts: () => range(0, 100, 5).map((n) => [String(n), `볼륨 ${n}%`]) },
     mood: { ctl: "moodSel", opts: () => MOODS.map((m) => [m.id, m.label]) },
-    trans: { ctl: "transSel", opts: () => [["cut", "컷 (바로 전환)"], ["fade", "페이드 (어두워졌다 밝아짐)"]] },
   };
 
   function fireCtl(el) {
@@ -1755,7 +1734,7 @@
     openWheel = null;
     $("pickModal").classList.remove("open");
   }
-  const WHEEL_TITLES = { layout: "화면 구성", voice: "목소리", rate: "말하기 속도", pitch: "목소리 높낮이", bgmVol: "배경음악 볼륨", mood: "영상 분위기", trans: "화면 전환" };
+  const WHEEL_TITLES = { layout: "화면 구성", voice: "목소리", rate: "말하기 속도", pitch: "목소리 높낮이", bgmVol: "배경음악 볼륨", mood: "영상 분위기" };
   function openWheelFor(tok) {
     const key = tok.dataset.wheel;
     closeWheel();
@@ -1800,12 +1779,6 @@
     });
   }
 
-  function cycleWeight() {
-    const el = $("capWeight");
-    el.value = (Number(el.value) + 1) % WEIGHTS.length;
-    fireCtl(el);
-  }
-
   let settingsJustSaved = false;
   let bgmPlayer = null;
   function stopBgmPlayer() { if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer = null; } }
@@ -1821,9 +1794,6 @@
     const framed = $("layoutSel").value === "framed";
     document.querySelectorAll(".sr-framed").forEach((el) => el.classList.toggle("show", framed));
     $("tokLayout").textContent = label("layout");
-    $("tokSize").textContent = `크기 ${$("capSize").value}`;
-    $("tokWeight").textContent = WEIGHTS[Number($("capWeight").value)].label;
-    $("tokPos").textContent = `위치 ${$("capPos").value}%`;
     $("tokVoice").textContent = label("voice");
     const r = Number($("ttsRate").value), p = Number($("ttsPitch").value);
     $("tokRate").textContent = `속도 ${r > 0 ? "+" : ""}${r}%`;
@@ -1833,8 +1803,6 @@
     $("bgmExtra").style.display = hasBgm ? "inline" : "none";
     $("tokBgmVol").textContent = `볼륨 ${$("bgmVol").value}%`;
     $("tokMood").textContent = label("mood");
-    $("tokTrans").textContent = label("trans");
-    $("capModalVal").textContent = `크기 ${$("capSize").value} · ${WEIGHTS[Number($("capWeight").value)].label} · 위치 ${$("capPos").value}%`;
     const dirty = $("settingsSaveBtn").classList.contains("dirty");
     $("settingsSaveBtn").style.display = dirty || $("settingsSaveBtn").disabled ? "inline" : "none";
     const badge = $("settingsDirtyBadge");
@@ -1842,71 +1810,9 @@
     badge.style.display = badge.textContent ? "inline-block" : "none";
   }
 
-  // 자막 예시 팝업
-  function openCapModal() {
-    closeWheel();
-    $("capModal").classList.add("open");
-    updateSettingsPreview();
-    updateSettingsSummary();
-  }
-  function closeCapModal() { $("capModal").classList.remove("open"); }
-
-  (function initCapModal() {
-    const pv = $("capPreview");
-    const pointers = new Map();
-    let drag = null, pinch = null;
-    pv.addEventListener("pointerdown", (e) => {
-      pv.setPointerCapture(e.pointerId);
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointers.size === 2) {
-        const [a, b] = [...pointers.values()];
-        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), size: Number($("capSize").value) };
-        drag = null;
-      } else {
-        drag = { y: e.clientY, pos: Number($("capPos").value), moved: false, t: Date.now(), onText: !!e.target.closest(".cap-lines") };
-      }
-    });
-    pv.addEventListener("pointermove", (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pinch && pointers.size === 2) {
-        const [a, b] = [...pointers.values()];
-        const size = Math.round(pinch.size * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d / 2) * 2;
-        $("capSize").value = Math.max(40, Math.min(140, size));
-        fireCtl($("capSize"));
-      } else if (drag) {
-        const dy = e.clientY - drag.y;
-        if (Math.abs(dy) > 4) drag.moved = true;
-        if (drag.moved) {
-          // 미리보기 높이 480px 기준, 자막 위치는 화면 아래에서 띄운 비율
-          $("capPos").value = Math.max(3, Math.min(85, Math.round(drag.pos - dy / 480 * 100)));
-          fireCtl($("capPos"));
-        }
-      }
-    });
-    const end = (e) => {
-      if (drag && !drag.moved && drag.onText && Date.now() - drag.t < 400 && pointers.size === 1) cycleWeight();
-      pointers.delete(e.pointerId);
-      if (pointers.size < 2) pinch = null;
-      if (!pointers.size) drag = null;
-    };
-    pv.addEventListener("pointerup", end);
-    pv.addEventListener("pointercancel", end);
-    pv.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      const el = $("capSize");
-      el.value = Math.max(40, Math.min(140, Number(el.value) + (e.deltaY < 0 ? 2 : -2)));
-      fireCtl(el);
-    }, { passive: false });
-    $("capModalClose").addEventListener("click", closeCapModal);
-    $("capModal").addEventListener("click", (e) => { if (e.target === $("capModal")) closeCapModal(); });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeCapModal(); closeWheel(); } });
-  })();
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeWheel(); });
 
   document.querySelectorAll(".tok[data-wheel]").forEach((t) => t.addEventListener("click", () => openWheelFor(t)));
-  $("tokSize").addEventListener("click", openCapModal);
-  $("tokPos").addEventListener("click", openCapModal);
-  $("tokWeight").addEventListener("click", cycleWeight);
   $("tokSample").addEventListener("click", () => {
     const a = $("voiceSample");
     if (!a.paused) { a.pause(); return; }
@@ -1934,32 +1840,6 @@
   $("pickModal").addEventListener("click", (e) => { if (e.target === $("pickModal")) closeWheel(); });
 
   function updateSettingsPreview() {
-    const size = Number($("capSize").value);
-    $("capSizeVal").textContent = size;
-    // 영상 폭 1080px 기준을 미리보기 폭 270px로 줄인 비율(0.25)로 표시
-    $("capNormal").style.fontSize = (size * 0.25) + "px";
-    $("capEmph").style.fontSize = (size * 1.15 * 0.25) + "px";
-    const wt = WEIGHTS[Number($("capWeight").value)];
-    $("capNormal").style.fontFamily = `${wt.family}, sans-serif`;
-    $("capNormal").style.fontWeight = wt.weight;
-    $("capWeightVal").textContent = wt.label;
-    const pos = Number($("capPos").value);
-    $("capPosVal").textContent = pos + "%";
-    $("capLines").style.bottom = (pos / 100 * 480) + "px";
-    const firstImg = segments[0] && (segments[0].asset_paths || []).find((p) => isImage(p));
-    const bg = firstImg ? `url("${assetUrl(firstImg)}")` : "none";
-    const framed = $("layoutSel").value === "framed";
-    $("capMedia").style.display = framed ? "block" : "none";
-    $("capMedia").style.backgroundImage = bg;
-    $("capPreview").style.backgroundImage = framed ? "none" : bg;
-    // 제목/출처를 아직 안 썼어도 어디에 나오는지 알 수 있게 점선 안내 글자로 자리를 보여준다 (비워두면 영상에는 나오지 않는다)
-    [["capT1", "title1", "제목 1줄 (노란색)"], ["capT2", "title2", "제목 2줄 (흰색)"], ["capSrc", "sourceText", "출처 (영상 아래 작은 글씨)"]].forEach(([el, input, hint]) => {
-      const val = $(input).value.trim();
-      $(el).style.display = framed ? "block" : "none";
-      $(el).textContent = val || hint;
-      $(el).classList.toggle("cap-ph", framed && !val);
-    });
-    $("capFrameNote").style.display = framed ? "block" : "none";
     pvSyncAll();   // 장면 카드의 미리보기에도 화면 구성·제목·자막 모양을 반영
   }
 
@@ -1996,7 +1876,7 @@
     $("bgmVolVal").textContent = $("bgmVol").value + "%";
     $("moodSel").value = currentSettings.mood;
     $("moodNote").value = currentSettings.mood_note || "";
-    $("transSel").value = currentSettings.transition;
+    currentSettings.transition = "cut";   // 화면 전환 설정은 없앴다. 늘 컷 (예전 fade 콘티도 컷)
     $("voiceSel").value = currentSettings.tts_voice;
     $("voiceSample").src = `/youtube/voices/${currentSettings.tts_voice}.mp3`;
     $("ttsRate").value = currentSettings.tts_rate;
@@ -2076,7 +1956,7 @@
   // 서버(youtube_default_settings, 기기를 바꿔도 유지)에 저장하고, 이 기기에도 복사본을 둔다. 서버 표가 아직 없거나 연결이 안 되면
   // 이 기기 복사본으로 동작한다. 콘티마다 다른 값(이름, 제목 1·2줄, 출처 문구, 직접 올린 배경음악)은 기본값에서 뺀다.
   const DEFAULTS_LS_KEY = "polos_youtube_default_settings";
-  const DEFAULT_KEYS = ["caption_font_size", "bgm_volume", "mood", "mood_note", "transition", "tts_voice", "tts_rate", "tts_pitch", "caption_weight", "caption_position_pct", "layout"];
+  const DEFAULT_KEYS = ["caption_font_size", "bgm_volume", "mood", "mood_note", "tts_voice", "tts_rate", "tts_pitch", "caption_weight", "caption_position_pct", "layout"];
   function pickDefaults(settings) {
     const o = {};
     DEFAULT_KEYS.forEach((k) => { if (settings[k] !== undefined) o[k] = settings[k]; });
@@ -2201,7 +2081,6 @@
   });
   $("moodSel").addEventListener("change", () => { currentSettings.mood = $("moodSel").value; markSettingsDirty(); });
   $("moodNote").addEventListener("input", () => { currentSettings.mood_note = $("moodNote").value; markSettingsDirty(); });
-  $("transSel").addEventListener("change", () => { currentSettings.transition = $("transSel").value; markSettingsDirty(); });
   $("bgmFile").addEventListener("change", (e) => { if (e.target.files[0]) uploadBgm(e.target.files[0]); e.target.value = ""; });
   $("settingsSaveBtn").addEventListener("click", saveSettings);
 
@@ -2661,7 +2540,11 @@
         box.style.display = open ? "block" : "none";
         if (open) box.innerHTML = blankButtonsHtml(segOfEl(el) || {});
       });
-      el.querySelector(".seg-stage").addEventListener("click", () => pvToggle(el));
+      el.querySelector(".seg-stage").addEventListener("click", (e) => {
+        if (e.target.closest(".cap-lines") || Date.now() < (el._capNoClick || 0)) return;   // 자막 위 탭은 아래 제스처가 처리
+        pvToggle(el);
+      });
+      bindStageCapGestures(el);
       el.querySelector(".seg-media").addEventListener("contextmenu", (e) => { if (e.target.closest(".seg-stage-box, .seg-tl-area")) e.preventDefault(); });
       bindTimelineGestures(el);
       bindCapGestures(el);
@@ -3310,6 +3193,7 @@
   }
   // 자막 한 줄을 한 번에 보여준다. **강조** 부분만 노란색(강조 글꼴)
   function pvCapShow(cap, g, size, wt) {
+    cap._g = g || null;
     cap.innerHTML = g ? capLineHtml(g.raw) : "";
     cap.style.fontFamily = `${wt.family}, sans-serif`;
     cap.style.fontWeight = wt.weight;
@@ -3462,6 +3346,7 @@
     });
     ctx.P.play.textContent = "▶";
     ctx.P.play.classList.remove("on");
+    if (!ctx.P.cap._g && ctx.groups[0]) pvCapShow(ctx.P.cap, ctx.groups[0], ctx.size, ctx.wt);   // 멈췄는데 자막이 비었으면 첫 줄
   }
   function pvVideoAt(v, sec, play) {
     const go = () => {
@@ -3515,7 +3400,8 @@
     }
     if (gi !== ctx.shown) {
       ctx.shown = gi;
-      pvCapShow(ctx.P.cap, ctx.groups[gi], ctx.size, ctx.wt);
+      // 멈춘 화면에서 자막이 비면(끝난 뒤 등) 첫 줄을 보여 둔다 — 잡아서 위치·크기·굵기를 바꿀 수 있게
+      pvCapShow(ctx.P.cap, ctx.groups[gi] || (ctx.playing ? null : ctx.groups[0]), ctx.size, ctx.wt);
       if (ctx.playing && gi >= 0) pvSpeak(ctx, gi);
     }
     ctx.t = Math.min(Math.max(0, t), ctx.secs);
@@ -3559,7 +3445,7 @@
         pvShow(ctx, ctx.secs, false);
         pvStop(ctx);
         ctx.t = ctx.secs;
-        pvCapShow(ctx.P.cap, null, ctx.size, ctx.wt);
+        pvCapShow(ctx.P.cap, ctx.groups[0] || null, ctx.size, ctx.wt);   // 끝난 화면에도 첫 줄(잡을 수 있게)
         ctx.shown = -1;
         pvPlayhead(ctx);
       }
@@ -3628,13 +3514,131 @@
         if (framed !== pvActive.framed && !pvActive.playing) { pvRefreshCard(el.dataset.id); return; }
         const d = pvDecor(el);
         pvActive.size = d.size; pvActive.wt = d.wt;
-        pvActive.shown = -2;
-        pvShow(pvActive, pvActive.t, false);
+        pvCapShow(pvActive.P.cap, pvActive.P.cap._g, d.size, d.wt);   // 지금 줄 그대로 모양만 바꾼다 (목소리를 다시 읽지 않게)
       } else {
         pvIdle(el, seg);
       }
     });
   }
+  // ───── 미리보기에서 자막 직접 조정 ─────
+  // 자막을 위아래로 끌면 위치(caption_position_pct), 두 손가락 벌리기/오므리기(PC는 자막 위 마우스 휠)로 크기(caption_font_size),
+  // 자막을 두 번 탭하면 굵기(caption_weight, WEIGHTS 순서로 순환). 전체 설정 값이라 모든 장면 미리보기에 같이 적용되고,
+  // 조작이 멈추면 잠시 뒤 전체 설정 저장(saveSettings)으로 저장된다. 숫자는 보여주지 않는다.
+  // 화면 숨은 값 칸(capSize/capWeight/capPos)에 넣고 원래 이벤트를 쏘므로 currentSettings·미리보기 갱신·저장 표시는 기존 경로 그대로다.
+  // 자막 위: 한 번 탭 = (두 번 탭이 아니면) 재생/멈춤, 두 번 탭 = 굵기, 끌기 = 위치. 자막 밖 탭 = 재생/멈춤. 두 손가락 = 어디서든 크기.
+  const CAP_DBL_MS = 280;
+  let capFireRaf = 0, capSaveTimer = 0;
+  const capFirePending = new Set();
+  function capSet(id, v) {
+    const ctl = $(id);
+    const before = ctl.value;
+    ctl.value = v;   // range 칸이 min/max/step에 맞춰 준다
+    if (ctl.value === before) return;
+    capFirePending.add(ctl);
+    if (!capFireRaf) capFireRaf = requestAnimationFrame(() => {   // 연속 조작 중엔 한 화면에 한 번만 갱신
+      capFireRaf = 0;
+      const list = [...capFirePending]; capFirePending.clear();
+      list.forEach(fireCtl);
+    });
+    capScheduleSave();
+  }
+  function capScheduleSave() {
+    clearTimeout(capSaveTimer);
+    capSaveTimer = setTimeout(() => {
+      if (!$("scriptSelect").value || !$("settingsSaveBtn").classList.contains("dirty")) return;
+      if ($("settingsSaveBtn").disabled) { capScheduleSave(); return; }   // 저장 중이면 끝난 뒤 다시
+      saveSettings();
+    }, 900);
+  }
+  function capCycleWeight() {
+    capSet("capWeight", (Number($("capWeight").value) + 1) % WEIGHTS.length);
+  }
+  function bindStageCapGestures(el) {
+    const stage = el.querySelector(".seg-stage");
+    const lines = stage.querySelector(".cap-lines");
+    const pointers = new Map();
+    let drag = null, pinch = null, adjTimer = 0;
+    const adj = (on) => {
+      clearTimeout(adjTimer);
+      if (on) lines.classList.add("cap-adj");
+      else adjTimer = setTimeout(() => lines.classList.remove("cap-adj"), 450);
+    };
+    const pinchStart = (d, touch) => { if (d > 0) { pinch = { d, size: Number($("capSize").value), touch }; drag = null; adj(true); } };
+    const pinchMove = (d) => {
+      if (!pinch || !(d > 0)) return;
+      capSet("capSize", Math.round(pinch.size * d / pinch.d / 2) * 2);
+    };
+    const pinchEnd = () => { if (pinch) { pinch = null; el._capNoClick = Date.now() + 450; adj(false); } };
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    stage.addEventListener("pointerdown", (e) => {
+      const onCap = !!e.target.closest(".cap-lines");
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType || "" });
+      if (pointers.size >= 2) {
+        drag = null;
+        // 터치 두 손가락은 아래 touch 이벤트가 맡는다(자막 밖에서도 스크롤/확대보다 먼저 잡으려고). 그 밖(펜·합성 이벤트)은 여기서
+        const ps = [...pointers.values()];
+        if (!ps.some((q) => q.type === "touch")) pinchStart(dist(ps[0], ps[1]), false);
+        return;
+      }
+      if (!onCap || e.button > 0) return;
+      e.preventDefault();   // 글자 선택 막기
+      try { lines.setPointerCapture(e.pointerId); } catch {}
+      drag = { id: e.pointerId, y: e.clientY, pos: Number($("capPos").value), moved: false, t: Date.now(),
+        h: stage.getBoundingClientRect().height || 250 };
+      adj(true);
+    });
+    stage.addEventListener("pointermove", (e) => {
+      const q = pointers.get(e.pointerId);
+      if (!q) return;
+      q.x = e.clientX; q.y = e.clientY;
+      if (pinch && !pinch.touch && pointers.size >= 2) {
+        const ps = [...pointers.values()];
+        pinchMove(dist(ps[0], ps[1]));
+      } else if (drag && drag.id === e.pointerId) {
+        const dy = e.clientY - drag.y;
+        if (!drag.moved && Math.abs(dy) > 4) drag.moved = true;
+        // 화면 높이 기준, 자막 위치는 화면 아래에서 띄운 비율 (예전 자막 팝업과 같은 계산·범위 3~85)
+        if (drag.moved) capSet("capPos", Math.round(drag.pos - dy / drag.h * 100));
+      }
+    });
+    const end = (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      const d = drag;
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2 && pinch && !pinch.touch) pinchEnd();
+      if (d && d.id === e.pointerId) {
+        drag = null;
+        adj(false);
+        if (e.type === "pointerup" && !d.moved && Date.now() - d.t < 400) {
+          // 자막 위 탭: 두 번째 탭이면 굵기, 아니면 잠깐 기다렸다가 재생/멈춤
+          if (el._capTapTimer) { clearTimeout(el._capTapTimer); el._capTapTimer = 0; capCycleWeight(); adj(true); adj(false); }
+          else el._capTapTimer = setTimeout(() => { el._capTapTimer = 0; pvToggle(el); }, CAP_DBL_MS);
+        }
+      }
+    };
+    stage.addEventListener("pointerup", end);
+    stage.addEventListener("pointercancel", end);
+    // 실제 손가락 두 개: 미리보기 어디서든 크기. 두 손가락일 때만 브라우저 스크롤/확대를 막는다 (한 손가락 스크롤은 그대로)
+    const tdist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    stage.addEventListener("touchstart", (e) => {
+      if (e.targetTouches.length === 2) pinchStart(tdist(e.targetTouches), true);
+    }, { passive: true });
+    stage.addEventListener("touchmove", (e) => {
+      if (!pinch || !pinch.touch || e.targetTouches.length < 2) return;
+      if (e.cancelable) e.preventDefault();
+      pinchMove(tdist(e.targetTouches));
+    }, { passive: false });
+    const tend = (e) => { if (pinch && pinch.touch && e.targetTouches.length < 2) pinchEnd(); };
+    stage.addEventListener("touchend", tend);
+    stage.addEventListener("touchcancel", tend);
+    // PC: 자막 위 마우스 휠로 크기
+    lines.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      capSet("capSize", Number($("capSize").value) + (e.deltaY < 0 ? 2 : -2));
+      adj(true); adj(false);
+    }, { passive: false });
+  }
+
   function pvStopAll() {
     if (pvActive) { pvStop(pvActive); pvActive = null; }
   }
