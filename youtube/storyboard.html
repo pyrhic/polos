@@ -74,8 +74,6 @@
   .gen-main-btn:hover { background:#ffffff; }
   .gen-main-btn:disabled { background:#16324a; color:#4fc3f7; }
   .runtime-summary .note { color:#a89bb5; font-weight:400; font-size:0.75rem; display:block; margin-top:2px; }
-  .seg-pexels-preview { display:none; margin:-4px 0 10px; background:#0f0a14; border-radius:3px; padding:8px; }
-  .seg-pexels-preview.open { display:block; }
   .seg-pexels-loading { color:#a89bb5; font-size:0.75rem; padding:4px; }
   .seg-pexels-grid { display:flex; gap:8px; overflow-x:auto; }
   .seg-pexels-item { flex-shrink:0; width:80px; }
@@ -186,10 +184,10 @@
   .seg-media { position:relative; margin:0 0 8px; }
   .seg-media, .seg-media * { -webkit-touch-callout:none; }
   .seg-media img { -webkit-user-drag:none; user-select:none; -webkit-user-select:none; }
-  /* 인라인 미리보기: 영상 1080x1920을 0.25배(270x480)로 그린 무대를 다시 0.6배로 줄여 카드에 넣는다 (좌표·글자 크기는 팝업 때와 같은 값) */
+  /* 인라인 미리보기: 영상 1080x1920을 0.25배(270x480)로 그린 무대를 다시 0.52배로 줄여 카드에 넣는다 (좌표·글자 크기는 팝업 때와 같은 값) */
   .seg-stage-row { display:flex; gap:10px; align-items:stretch; margin-bottom:10px; }
-  .seg-stage-box { position:relative; flex:0 0 162px; width:162px; height:288px; border-radius:4px; overflow:hidden; background:#000; }
-  .seg-stage { position:absolute; left:0; top:0; width:270px; max-width:none; height:480px; margin:0 !important; transform:scale(0.6); transform-origin:0 0; touch-action:auto; cursor:pointer; }
+  .seg-stage-box { position:relative; flex:0 0 140px; width:140px; height:250px; border-radius:4px; overflow:hidden; background:#000; }
+  .seg-stage { position:absolute; left:0; top:0; width:270px; max-width:none; height:480px; margin:0 !important; transform:scale(0.52); transform-origin:0 0; touch-action:auto; cursor:pointer; }
   .seg-stage .pv-layer { position:absolute; inset:0; overflow:hidden; background:#000; }
   .seg-stage .pv-cut { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
   .seg-stage .pv-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:14px; text-align:center; color:#a89bb5; font-size:0.95rem; line-height:1.5; background:#17101f; }
@@ -263,7 +261,10 @@
   .seg-add-menu .blank-pick-row button { font-size:0.68rem; padding:6px 0; }
   .seg-add-note { color:#7d7189; font-size:0.64rem; line-height:1.35; padding:2px 2px 0; }
   .seg-file-input { display:none; }
-  .seg-media .seg-pexels-preview { margin:8px 0 0; }
+  .seg-kw-row { display:flex; gap:4px; }
+  .seg-kw-row .seg-keyword { flex:1; min-width:0; margin:0; padding:6px 8px; font-size:0.8rem; }
+  .seg-kw-search { flex:0 0 32px; width:32px; margin:0; padding:0; font-size:0.85rem; background:#2d2240; border:1px solid #4a3a63; }
+  .pexels-pick-body .seg-pexels-grid { flex-wrap:wrap; overflow:visible; justify-content:flex-start; max-height:60vh; overflow-y:auto; }
   .seg-pexels-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#a89bb5; font-size:0.72rem; margin-bottom:6px; }
   .seg-pexels-close { width:auto; margin:0; padding:2px 8px; font-size:0.8rem; background:transparent; color:#a89bb5; }
   .seg-tl-area.ro-on > :not(.seg-ro-wrap) { display:none; }
@@ -383,6 +384,9 @@
     </div>
 
     <!-- 구간 지정 팝업: 영상/GIF에서 쓸 부분(시작~끝 초)을 고른다 -->
+    <div class="cap-modal" id="pexelsPickModal">
+      <div class="cap-modal-box" style="max-width:360px;"><div id="pexelsPickBody" class="pexels-pick-body"></div></div>
+    </div>
     <div class="cap-modal" id="pvGuideModal">
       <div class="cap-modal-box" style="max-width:320px;">
         <div class="cap-modal-hint" style="font-size:0.9rem;font-weight:700;color:#fff;">장면 미리보기 안내</div>
@@ -2285,6 +2289,11 @@
               <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
               <div class="seg-side-lab">ACTION</div>
               <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
+              <div class="seg-side-lab">SEARCHING KEY WORD</div>
+              <div class="seg-kw-row">
+                <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="영어로 (예: city night)">
+                <button type="button" class="seg-kw-search" title="Pexels에서 후보 찾기">🔎</button>
+              </div>
             </div>
           </div>
           <div class="seg-tl-area"></div>
@@ -2297,13 +2306,9 @@
             <div class="seg-add-note">맨 뒤에 추가돼요 · PC에선 카드를 누르고 Ctrl+V로 이미지 붙여넣기</div>
           </div>
           <input type="file" class="seg-file-input" accept="image/*,video/*" multiple>
-          <div class="seg-pexels-preview"></div>
         </div>
         <div class="seg-media-hint" style="display:none;color:#ffd93d;font-size:0.78rem;margin:2px 0 8px;"></div>
         <input type="hidden" class="seg-section" value="${escapeAttr(seg.section)}">
-        <label>자료사진/영상 검색 키워드</label>
-        <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="Pexels 검색 키워드 (영어)">
-        <div class="settings-note" style="margin:-4px 0 0;">이 키워드로 자동 배치돼요. 직접 고르려면 타임라인 끝 + → "Pexels에서 찾기" (여기서 Enter도 돼요)</div>
       </div>
     `;
     }).join("");
@@ -2348,14 +2353,14 @@
         refreshGroupHeaders();
       });
       const keywordEl = el.querySelector(".seg-keyword");
-      const previewBox = el.querySelector(".seg-pexels-preview");
       keywordEl.addEventListener("input", markDirty);
 
       const triggerPexelsSearch = () => {
         const q = keywordEl.value.trim();
         if (!q) { showMsg("검색어를 먼저 입력하세요.", false); return; }
-        searchPexelsPreview(previewBox, q, id);
+        searchPexelsPreview($("pexelsPickBody"), q, id);
       };
+      el.querySelector(".seg-kw-search").addEventListener("click", triggerPexelsSearch);
       keywordEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter") { e.preventDefault(); triggerPexelsSearch(); }
       });
@@ -2367,7 +2372,7 @@
       el.querySelector(".seg-add-pexels").addEventListener("click", () => {
         closeAddMenus();
         if (!keywordEl.value.trim()) {
-          showMsg("아래 '검색 키워드' 칸에 영어 검색어를 먼저 쓰세요.", false);
+          showMsg("미리보기 옆 'SEARCHING KEY WORD' 칸에 영어 검색어를 먼저 쓰세요.", false);
           keywordEl.scrollIntoView({ behavior: "smooth", block: "center" });
           keywordEl.focus();
           return;
@@ -2463,13 +2468,19 @@
     }
   }
 
+  // 검색 후보는 팝업으로 띄운다 (box = 팝업 안 내용 칸). 선택하면 그 장면 맨 뒤에 추가되고 팝업은 열린 채로 남아 여러 개 고를 수 있다
+  function closePexelsPick() {
+    $("pexelsPickModal").classList.remove("open");
+    $("pexelsPickBody").innerHTML = "";
+  }
+  $("pexelsPickModal").addEventListener("click", (e) => { if (e.target.id === "pexelsPickModal") closePexelsPick(); });   // 바깥을 누르면 닫힘
   async function searchPexelsPreview(box, query, id) {
-    box.classList.add("open");
+    $("pexelsPickModal").classList.add("open");
     // 머리줄(검색어 + 닫기)은 결과가 바뀌어도 그대로 둔다
     const head = `<div class="seg-pexels-head"><span>Pexels · '${escapeHtml(query)}'</span><button type="button" class="seg-pexels-close" title="닫기">✕</button></div>`;
     const setBody = (html) => {
       box.innerHTML = head + html;
-      box.querySelector(".seg-pexels-close").addEventListener("click", () => { box.classList.remove("open"); box.innerHTML = ""; });
+      box.querySelector(".seg-pexels-close").addEventListener("click", closePexelsPick);
     };
     setBody('<div class="seg-pexels-loading">Pexels에서 검색 중...</div>');
     try {
