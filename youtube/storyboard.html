@@ -36,7 +36,8 @@
   .seg-stage-side .seg-pv-time, .seg-stage-side .seg-pv-info { display:none; }
   .seg-stage-side .seg-script, .seg-stage-side .seg-direction { margin:0; padding:6px 8px; font-size:0.8rem; line-height:1.5; min-height:0; }
   .seg-stage-side .seg-script { flex:1 1 auto; overflow-y:auto; }
-  .seg-stage-side .seg-direction { flex:0 0 52px; overflow-y:auto; }
+  /* ACTION은 검색어 칸과 같은 한 줄 높이 (줄바꿈 없음, 넘치면 칸 안에서 가로로 밀린다) */
+  .seg-stage-side .seg-direction { flex:0 0 auto; height:auto; line-height:normal; white-space:pre; overflow:hidden; border:none; border-radius:3px; }
   .seg-item .seg-script::placeholder { color:#4f7a3c; }
   .seg-thumb-empty { width:100%; height:50px; border-radius:3px; background:#0f0a14; margin-bottom:8px; display:flex; align-items:center; justify-content:center; color:#a89bb5; font-size:0.8rem; text-align:center; padding:8px; }
   .seg-icon-btn { width:26px; height:26px; padding:0; margin:0; border-radius:50%; background:#0f0a14; color:#a89bb5; font-size:0.95rem; line-height:1; flex-shrink:0; text-transform:none; }
@@ -507,6 +508,10 @@
 
   function escapeAttr(s) {
     return String(s ?? "").replace(/"/g, "&quot;");
+  }
+  // 줄바꿈을 공백으로 (한 줄 칸용)
+  function oneLine(s) {
+    return String(s || "").replace(/\s*[\r\n]+\s*/g, " ");
   }
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -1193,7 +1198,7 @@
   // 장면 길이 = 자막 줄 길이 합 (자막이 없는 장면만 노출 시간 target_seconds, 그것도 없으면 1초)
   function effectiveSeconds(el, seg) {
     const text = el.querySelector(".seg-script").value;
-    const st = capState(text, seg, el._capLive);
+    const st = capState(text, seg, capLiveOf(el));
     if (st.lines.length) return st.total;
     if (seg && seg.target_seconds > 0) return Number(seg.target_seconds);
     return estimateSeconds(text);
@@ -1229,7 +1234,13 @@
     return { lines, secs, est, custom, starts, total: acc };
   }
   function capStateOf(el, seg) {
-    return capState(el.querySelector(".seg-script").value, seg, el._capLive);
+    return capState(el.querySelector(".seg-script").value, seg, capLiveOf(el));
+  }
+  // 줄별 길이 원본: 끄는 중인 값 > 아직 저장 전인 초안(자동 끊기 직후) > 저장된 값(null을 돌려주면 capState가 저장된 값을 쓴다)
+  function capLiveOf(el) {
+    if (el._capLive) return el._capLive;
+    if (el._trimsDraft) return el._trimsDraft.__cap_secs || [];
+    return null;
   }
   function capPlainText(line) {
     return String(line || "").replace(/\*\*/g, "");
@@ -1296,7 +1307,7 @@
     try { handle.setPointerCapture(e.pointerId); } catch {}
     handle.classList.add("drag");
     host.dataset.dragging = "1";
-    const stored = ((seg.asset_trims || {}).__cap_secs || []);
+    const stored = ((el._trimsDraft || seg.asset_trims || {}).__cap_secs || []);
     el._capLive = st.lines.map((_, k) => (stored[k] != null && Number(stored[k]) > 0 ? Number(stored[k]) : null));
     const pps = (track.clientWidth || 1) / (st.total || 1);   // 끄는 동안 손가락 1px = 시작할 때 축 기준 초
     const x0 = e.clientX, len0 = st.secs[i], est = st.est[i];
@@ -1327,7 +1338,8 @@
     const seg = segments.find((s) => String(s.id) === String(id));
     const el = document.querySelector(`.seg-item[data-id="${id}"]`);
     if (!seg) return;
-    const next = { ...(seg.asset_trims || {}) };
+    const next = { ...((el && el._trimsDraft) || seg.asset_trims || {}) };
+    if (el && el._trimsDraft) el._trimsDraft = next;   // 저장 전 초안이 있으면 초안도 같이 고친다 (카드 저장 때 덮어쓰지 않게)
     const vals = (arr || []).map((v) => (v != null && Number(v) > 0 ? Number(Number(v).toFixed(2)) : null));
     if (vals.some((v) => v != null)) next.__cap_secs = vals; else delete next.__cap_secs;
     try {
@@ -1370,6 +1382,248 @@
       if (line.trim() && ++n === i) { ta.focus({ preventScroll: true }); ta.setSelectionRange(pos, pos + line.length); break; }
       pos += line.length + 1;
     }
+  }
+
+  // ───── 긴 자막 줄 자동 끊기 ─────
+  // 줄바꿈이 없는 옛 대사(한 장면이 긴 한 줄)는 화면에 통째로 나와 버린다. 화면 폭(전체 설정의 자막 글자 크기)을 넘는 줄만
+  // 예전 자동 끊기 규칙(영상 쪽 02_tts.py의 group_words / _split_run_by_width / CaptionFit)으로 나눠 실제 줄바꿈으로 써 넣는다.
+  // 사용자는 그 줄을 보고 줄바꿈을 지우거나 넣어서 고친다. 직접 합친 긴 줄은 다시 끊지 않는다(asset_trims.__cap_manual).
+  function capMeasurer() {
+    const size = Number($("capSize").value) || Number(currentSettings.caption_font_size) || 80;
+    const wt = WEIGHTS[Number($("capWeight").value)] || WEIGHTS[0];
+    capMeasurer.ctx = capMeasurer.ctx || document.createElement("canvas").getContext("2d");
+    const ctx = capMeasurer.ctx;
+    const font = `${wt.weight} ${size}px ${wt.family}, sans-serif`;
+    ctx.font = font;
+    return { size, font, avail: (1080 - 40 - 2 * 3) * 0.98, width: (t) => ctx.measureText(t).width };
+  }
+  // 한 줄에 들어가는지 (조금 넘치면 자간 7%·장평 85%까지 줄여 한 줄로 넣는 영상 쪽 규칙과 같다)
+  function capFits(m, text) {
+    const w = m.width(text);
+    if (w <= m.avail) return true;
+    const n = Math.max(1, text.length);
+    if ((w - m.avail) / n * 1.05 <= 0.07 * m.size) return true;
+    const w2 = w - 0.07 * m.size * n;
+    return w2 > 0 && m.avail / w2 >= 0.85;
+  }
+  // 글꼴 폭을 못 잴 때: 6단어/18자 기준으로 비슷한 길이로 (02_tts.py의 _split_run)
+  function capSplitRun(run, maxWords, maxChars) {
+    const n = run.length;
+    if (n <= 1) return n ? [run] : [];
+    const total = run.reduce((a, x) => a + x.p.length + 1, 0);
+    const k = Math.min(n, Math.max(Math.ceil(n / maxWords), Math.ceil(total / maxChars)));
+    if (k <= 1) return [run];
+    const out = [];
+    let start = 0;
+    for (let part = 1; part < k; part++) {
+      const left = k - part + 1;
+      const rest = run.slice(start).reduce((a, x) => a + x.p.length + 1, 0);
+      const target = rest / left;
+      let best = null, acc = 0;
+      for (let j = start; j < n - (left - 1); j++) {
+        acc += run[j].p.length + 1;
+        const cost = Math.abs(acc - target) - (/[,，]$/.test(run[j].p) ? 3 : 0);
+        if (!best || cost < best.cost) best = { cost, j };
+        if (acc > target * 1.6) break;
+      }
+      out.push(run.slice(start, best.j + 1));
+      start = best.j + 1;
+    }
+    out.push(run.slice(start));
+    return out;
+  }
+  // 화면 폭 기준: 덩어리마다 한 줄에 들어가도록 폭이 고르게 나눈다 (02_tts.py의 _split_run_by_width)
+  function capSplitRunWidth(run, m) {
+    const n = run.length;
+    if (n <= 1) return n ? [run] : [];
+    const textOf = (ws) => ws.map((x) => x.p).join(" ");
+    const total = m.width(textOf(run));
+    for (let k = Math.max(1, Math.ceil(total / (m.avail * 1.06))); k <= n; k++) {
+      const out = [];
+      let start = 0;
+      for (let part = 1; part < k; part++) {
+        const left = k - part + 1;
+        const target = m.width(textOf(run.slice(start))) / left;
+        let best = null;
+        for (let j = start; j < n - (left - 1); j++) {
+          const w = m.width(textOf(run.slice(start, j + 1)));
+          const cost = Math.abs(w - target) - (/[,，]$/.test(run[j].p) ? 0.6 * m.size : 0);
+          if (!best || cost < best.cost) best = { cost, j };
+          if (w > target * 1.6) break;
+        }
+        out.push(run.slice(start, best.j + 1));
+        start = best.j + 1;
+      }
+      out.push(run.slice(start));
+      if (out.every((g) => capFits(m, textOf(g)))) return out;
+    }
+    return run.map((x) => [x]);
+  }
+  // 지금 콘티의 "붙여 둘 말"(keep_together_terms, 쉼표 구분)
+  function capKeepTerms() {
+    const row = scripts.find((r) => String(r.id) === String($("scriptSelect").value));
+    return String((row && row.keep_together_terms) || "").split(",").map((t) => t.replace(/\s+/g, "")).filter(Boolean);
+  }
+  // 한 줄을 단어로. **강조**는 (여러 단어여도, 뒤에 붙은 조사·문장부호까지) 한 단어로 묶고 단독 자막으로 둔다.
+  // 붙여 둘 말은 이어붙인 글자가 그 말로 시작하면 한 단어로 묶는다 (02_tts.py의 merge_matching_phrases)
+  function capTokens(line, terms) {
+    const raw = [];
+    let acc = null;
+    String(line).split(/\s+/).filter(Boolean).forEach((w) => {
+      acc = acc == null ? w : acc + " " + w;
+      if (((acc.match(/\*\*/g) || []).length % 2) === 0) { raw.push(acc); acc = null; }
+    });
+    if (acc != null) raw.push(acc);
+    const toks = raw.map((w) => ({ w, p: w.replace(/\*\*/g, ""), solo: /\*\*/.test(w) }));
+    if (!terms.length) return toks;
+    const out = [];
+    for (let i = 0; i < toks.length; ) {
+      let len = 0;
+      if (!toks[i].solo) {
+        for (const term of terms) {
+          let concat = "";
+          for (let j = i; j < toks.length && !toks[j].solo; j++) {
+            concat += toks[j].p;
+            if (concat.startsWith(term)) { len = j - i + 1; break; }
+            if (!term.startsWith(concat)) break;
+          }
+          if (len) break;
+        }
+      }
+      if (len > 1) {
+        const g = toks.slice(i, i + len);
+        out.push({ w: g.map((x) => x.w).join(" "), p: g.map((x) => x.p).join(" "), solo: false });
+        i += len;
+      } else { out.push(toks[i]); i += 1; }
+    }
+    return out;
+  }
+  function capLineFits(m, line) {
+    return m ? capFits(m, capPlainText(line).trim()) : capPlainText(line).replace(/\s+/g, "").length <= 18;
+  }
+  // 긴 한 줄 → 여러 줄. 문장 끝(. ? ! 등)에서 먼저 끊고, 그래도 넘치면 단어 경계에서 고르게 나눈다
+  function capSplitLine(line, m, terms) {
+    if (capLineFits(m, line)) return [line.trim()];
+    const lines = [];
+    let run = [];
+    const flush = () => {
+      if (!run.length) return;
+      const parts = m ? capSplitRunWidth(run, m) : capSplitRun(run, 6, 18);
+      parts.forEach((g) => lines.push(g.map((x) => x.w).join(" ")));
+      run = [];
+    };
+    capTokens(line, terms).forEach((t) => {
+      if (t.solo) { flush(); lines.push(t.w); return; }
+      run.push(t);
+      if (/[.?!。…？！]["'”’)\]]*$/.test(t.p)) flush();
+    });
+    flush();
+    return lines.length ? lines : [line.trim()];
+  }
+  function capMeasurerSafe() {
+    try { return capMeasurer(); } catch { return null; }
+  }
+  // 대사 전체에서 화면 폭을 넘는 줄만 나눈다. 나눈 줄의 __cap_secs는 null(자동)로, 뒤 줄의 값은 인덱스를 밀어 그대로 둔다
+  function capAutoSplit(text, capSecs, m) {
+    const terms = capKeepTerms();
+    const src = Array.isArray(capSecs) ? capSecs : null;
+    const outRows = [], secs = [];
+    let idx = 0, changed = false;
+    normalizeScript(text).split("\n").forEach((row) => {
+      if (!row.trim()) { outRows.push(row); return; }
+      const parts = capSplitLine(row, m, terms);
+      if (parts.length > 1) {
+        changed = true;
+        parts.forEach((p) => { outRows.push(p); secs.push(null); });
+      } else {
+        outRows.push(row);
+        secs.push(src && src[idx] != null ? src[idx] : null);
+      }
+      idx++;
+    });
+    if (!changed) return { changed: false, text, capSecs };
+    return { changed: true, text: outRows.join("\n"), capSecs: src && secs.some((v) => v != null) ? secs : null };
+  }
+  function capHasLong(text, m) {
+    return genCaptionLines(text).some((l) => !capLineFits(m, l));
+  }
+  // 긴 줄이 이전 값의 이웃한 두 줄을 이어붙인 것이면 = 사용자가 줄바꿈을 지워서 직접 합친 줄
+  function capIsMerged(text, beforeText) {
+    const prev = genCaptionLines(beforeText).map((l) => l.replace(/\s+/g, ""));
+    if (prev.length < 2) return false;
+    const m = capMeasurerSafe();
+    return genCaptionLines(text).filter((l) => !capLineFits(m, l)).some((l) => {
+      const c = l.replace(/\s+/g, "");
+      for (let i = 0; i + 1 < prev.length; i++) if (prev[i] && prev[i + 1] && c.includes(prev[i] + prev[i + 1])) return true;
+      return false;
+    });
+  }
+  // 칸에서 나갈 때. 바뀐 게 있으면 true (저장 전 초안 el._trimsDraft에 __cap_secs / __cap_manual을 담는다)
+  function capBlurSplit(el, beforeText) {
+    const seg = segOfEl(el);
+    const ta = el.querySelector(".seg-script");
+    if (!seg || !ta) return false;
+    const now = ta.value;
+    if (beforeText != null && now === beforeText) return false;   // 고친 게 없으면 그대로
+    const trims = el._trimsDraft || seg.asset_trims || {};
+    const m = capMeasurerSafe();
+    if (!capHasLong(now, m)) {
+      // 긴 줄이 없어졌으면 "직접 정함" 표시도 푼다 (다음에 긴 글을 붙여 넣으면 다시 자동으로 끊긴다)
+      if (!trims.__cap_manual) return false;
+      const next = { ...trims };
+      delete next.__cap_manual;
+      el._trimsDraft = next;
+      return true;
+    }
+    if (trims.__cap_manual || capIsMerged(now, beforeText || "")) {
+      if (trims.__cap_manual) return false;
+      el._trimsDraft = { ...trims, __cap_manual: true };
+      return true;
+    }
+    const r = capAutoSplit(now, trims.__cap_secs, m);
+    if (!r.changed) return false;
+    const next = { ...trims };
+    if (r.capSecs) next.__cap_secs = r.capSecs; else delete next.__cap_secs;
+    ta.value = r.text;
+    el._trimsDraft = next;
+    return true;
+  }
+  // 콘티를 열 때: 화면 폭을 넘는 줄이 있는 장면만 그 줄을 나눠 바로 저장한다 (짧은 줄·직접 정한 장면은 건드리지 않는다)
+  async function capAutoSplitOnOpen(scriptId) {
+    let m = capMeasurerSafe();
+    if (m && document.fonts && document.fonts.load) {
+      // 글꼴이 아직 안 내려왔으면 폭이 틀리게 재진다. 기다린 뒤 다시 잰다 (최대 3초)
+      try { await Promise.race([document.fonts.load(m.font, "가나다"), new Promise((r) => setTimeout(r, 3000))]); } catch {}
+      m = capMeasurerSafe();
+    }
+    let done = 0;
+    for (const seg of segments.slice()) {
+      if (String($("scriptSelect").value) !== String(scriptId)) return;   // 그 사이 다른 콘티로 넘어갔다
+      const trims = seg.asset_trims || {};
+      if (trims.__cap_manual) continue;
+      const el = document.querySelector(`.seg-item[data-id="${seg.id}"]`);
+      if (!el || el.dataset.dirty || el._trimsDraft || el.contains(document.activeElement)) continue;   // 고치는 중인 카드는 건드리지 않는다
+      const ta = el.querySelector(".seg-script");
+      const r = capAutoSplit(ta.value, trims.__cap_secs, m);
+      if (!r.changed) continue;
+      const fields = { script_text: r.text };
+      if (r.capSecs || trims.__cap_secs) {
+        const next = { ...trims };
+        if (r.capSecs) next.__cap_secs = r.capSecs; else delete next.__cap_secs;
+        fields.asset_trims = next;
+      }
+      ta.value = r.text;
+      try {
+        await saveFields(seg.id, fields);
+        done++;
+      } catch (err) {
+        el.dataset.dirty = "1";   // 저장 실패: 카드에서 나갈 때 다시 저장한다
+        if (fields.asset_trims) el._trimsDraft = fields.asset_trims;
+        showMsg("자막 줄 자동 나누기 저장 실패: " + err.message, false);
+      }
+      if (pvActive && pvActive.el === el) pvRefreshCard(String(seg.id)); else pvIdle(el, seg);
+    }
+    if (done) updateRuntimeSummary();
   }
 
   // 장면이 길어서 사진 하나가 오래 머물면 지루하다. 콘티를 열 때 모자란 컷을 키워드로 Pexels 영상으로 자동 배치하지만
@@ -2201,6 +2455,7 @@
     document.getElementById("regenBtn").textContent = segments.length ? "콘티 다시 생성" : "콘티 생성";
     render();
     updateSettingsPreview();
+    capAutoSplitOnOpen(scriptId);   // 화면 폭을 넘는 긴 자막 줄은 자동으로 나눠 저장 (사용자가 SCRIPT 칸에서 고친다)
     startAutofill(scriptId);   // 비었거나 모자란 장면을 키워드로 Pexels 영상 자동 배치 (한 장면씩 순서대로)
   }
 
@@ -2293,7 +2548,7 @@
               <div class="seg-side-lab">SCRIPT</div>
               <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
               <div class="seg-side-lab">ACTION</div>
-              <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
+              <textarea class="seg-direction" rows="1" wrap="off" placeholder="예: 천천히 줌인">${escapeHtml(oneLine(seg.direction))}</textarea>
               <div class="seg-side-lab">SEARCHING KEY WORD</div>
               <div class="seg-kw-row">
                 <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="영어로 (예: city night)">
@@ -2342,15 +2597,31 @@
       };
       scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); pvTextChanged(); });
       autoGrow(scriptEl);
+      // 입력 중에는 끊지 않고, 칸에서 나갈 때 화면 폭을 넘는 줄만 자동으로 나눈다 (직접 합친 줄은 그대로)
+      scriptEl.addEventListener("focus", () => { el._capFocusText = scriptEl.value; });
+      scriptEl.addEventListener("blur", () => {
+        const before = el._capFocusText;
+        el._capFocusText = null;
+        if (capBlurSplit(el, before)) { markDirty(); updateRuntimeSummary(); pvTextChanged(); }
+      });
       const directionEl = el.querySelector(".seg-direction");
-      directionEl.addEventListener("input", () => { autoGrow(directionEl); markDirty(); pvTextChanged(); });
+      // ACTION은 한 줄 칸: Enter는 막고, 붙여넣은 줄바꿈은 공백으로
+      directionEl.addEventListener("keydown", (e) => { if (e.key === "Enter") e.preventDefault(); });
+      directionEl.addEventListener("input", () => {
+        if (/[\r\n]/.test(directionEl.value)) {
+          const pos = directionEl.selectionStart;
+          directionEl.value = oneLine(directionEl.value);
+          try { directionEl.setSelectionRange(pos, pos); } catch {}
+        }
+        autoGrow(directionEl); markDirty(); pvTextChanged();
+      });
       autoGrow(directionEl);
       el.querySelector(".seg-part").addEventListener("change", (e) => {
         el.querySelector(".seg-section").value = e.target.value;
         // 구독/좋아요 카드를 고르면 안내 대사와 검색어를 기본값으로 채운다 (비어 있을 때만)
         if (e.target.value === SUBSCRIBE_PART) {
           const sc = el.querySelector(".seg-script");
-          if (!sc.value.trim()) { sc.value = SUBSCRIBE_TEXT; autoGrow(sc); updateRuntimeSummary(); }
+          if (!sc.value.trim()) { sc.value = SUBSCRIBE_TEXT; capBlurSplit(el, ""); autoGrow(sc); updateRuntimeSummary(); }
           const kw = el.querySelector(".seg-keyword");
           if (!kw.value.trim()) kw.value = "sexy witch";
         }
@@ -2568,10 +2839,14 @@
     // 자막 줄이 줄었으면 줄별 길이(__cap_secs)도 줄 수만큼만 남긴다 (인덱스 기준 유지, 넘치는 건 버림)
     const seg0 = segments.find((s) => String(s.id) === id);
     const fields = { script_text: scriptText, direction, section, keyword };
-    const capSecs = ((seg0 && seg0.asset_trims) || {}).__cap_secs;
+    // 자동 끊기로 줄이 늘었으면(또는 직접 합친 줄 표시) asset_trims 초안이 있다. 대사와 같이 저장한다
+    const draft = el._trimsDraft || null;
+    const baseTrims = draft || (seg0 && seg0.asset_trims) || {};
+    if (draft) fields.asset_trims = { ...draft };
+    const capSecs = baseTrims.__cap_secs;
     const lineCount = genCaptionLines(scriptText).length;
     if (Array.isArray(capSecs) && capSecs.length > lineCount) {
-      const nextTrims = { ...seg0.asset_trims };
+      const nextTrims = { ...baseTrims };
       const kept = capSecs.slice(0, lineCount);
       if (kept.some((v) => v != null)) nextTrims.__cap_secs = kept; else delete nextTrims.__cap_secs;
       fields.asset_trims = nextTrims;
@@ -2588,6 +2863,7 @@
       const keywordChanged = seg && (seg.keyword || "").trim() !== keyword.trim();
       if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
       if (seg && fields.asset_trims) seg.asset_trims = fields.asset_trims;
+      if (draft && el._trimsDraft === draft) el._trimsDraft = null;
       if (keywordChanged) enqueueAutofill(id);   // 키워드를 바꿨으면 (모자란 장면이고 직접 지운 적 없으면) 새 키워드로 자동 배치
       // 저장하는 동안 또 고쳤다면 다시 수정됨 상태로 둔다
       if (el.dataset.dirty) { stateEl.textContent = "수정됨"; return; }
@@ -2649,7 +2925,8 @@
     const scriptEl = el.querySelector(".seg-script");
     const directionEl = el.querySelector(".seg-direction");
     scriptEl.value = normalizeScript(seg.script_text);
-    directionEl.value = seg.direction || "";
+    directionEl.value = oneLine(seg.direction);
+    el._trimsDraft = null;
     el.querySelector(".seg-section").value = seg.section || "";
     el.querySelector(".seg-part").innerHTML = partOptionsHtml(seg.section);
     el.querySelector(".seg-keyword").value = seg.keyword || "";
