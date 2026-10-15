@@ -56,15 +56,15 @@ function ytDefaultSlot(row) {
 
 function ytReauthHelpHtml() {
   const buttons = ytChannels().filter((c) => ytReauthCmd(c.slot)).map((c) =>
-    `<button type="button" class="yt-reauth-copy" data-slot="${escapeHtml(c.slot)}" style="margin-top:6px;background:#221a2e;">재로그인 명령 복사 (${escapeHtml(c.label)}${c.slot === "1" ? "" : " · 채널 선택 화면에서 그 채널을 고르세요"})</button>`
+    `<button type="button" class="yt-reauth-copy" data-slot="${escapeHtml(c.slot)}" style="margin-top:6px;background:var(--btn);">재로그인 명령 복사 (${escapeHtml(c.label)}${c.slot === "1" ? "" : " · 채널 선택 화면에서 그 채널을 고르세요"})</button>`
   ).join("");
   if (!buttons) {
-    return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:#17141c;border-radius:3px;font-size:0.78rem;color:#a89bb5;">
+    return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:var(--inset);border-radius:3px;font-size:0.78rem;color:var(--muted);">
     유튜브 인증이 만료되면(7일마다) 업로드가 실패합니다. 이 채널의 유튜브 로그인을 다시 연결해 주세요.
   </div>`;
   }
-  return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:#17141c;border-radius:3px;font-size:0.78rem;color:#a89bb5;">
-    <div style="color:#ffd93d;font-weight:700;margin-bottom:4px;">⚠ 프로그래밍 폴더가 있는 PC에서 실행해주세요</div>
+  return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:var(--inset);border-radius:3px;font-size:0.78rem;color:var(--muted);">
+    <div style="color:var(--point);font-weight:700;margin-bottom:4px;">⚠ 프로그래밍 폴더가 있는 PC에서 실행해주세요</div>
     유튜브 인증이 만료되면(7일마다) 업로드가 실패합니다. 아래 버튼으로 명령을 복사해 PC 터미널에 붙여넣고 Enter를 누른 뒤, 브라우저에서 "허용"만 누르면 됩니다. (폰에서는 실행할 수 없습니다)
     ${buttons}
   </div>`;
@@ -83,13 +83,13 @@ function uploadBlockHtml(o, row) {
     </div>`;
   }
   if (o.youtube_status === "uploading") {
-    return `<div class="yt-block" style="margin-top:8px;font-size:0.85rem;color:#4fc3f7;">유튜브 업로드 중... (몇 분 걸릴 수 있어요)</div>`;
+    return `<div class="yt-block" style="margin-top:8px;font-size:0.85rem;color:var(--accent);">유튜브 업로드 중... (몇 분 걸릴 수 있어요)</div>`;
   }
   const errorNote = o.youtube_status === "error"
     ? `<div class="msg err" style="display:block;font-size:0.8rem;">업로드 실패: ${escapeHtml(o.youtube_error || "알 수 없는 오류")}</div>${ytReauthHelpHtml()}` : "";
   return `<div class="yt-block" data-output-id="${o.id}" data-video-url="${escapeHtml(o.video_url)}" style="margin-top:8px;">
     ${errorNote}
-    <button type="button" class="yt-open-btn" style="background:#221a2e;">${o.youtube_status === "error" ? "다시 업로드" : "유튜브에 업로드"}</button>
+    <button type="button" class="yt-open-btn" style="background:var(--btn);">${o.youtube_status === "error" ? "다시 업로드" : "유튜브에 업로드"}</button>
     <div class="yt-form" style="display:none;margin-top:8px;">
       <label>올릴 채널</label>
       <select class="yt-channel">${ytChannels().map((c) => `<option value="${escapeHtml(c.slot)}"${c.slot === ytDefaultSlot(row) ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")}</select>
@@ -99,11 +99,11 @@ function uploadBlockHtml(o, row) {
       <textarea class="yt-desc" style="min-height:140px;">${escapeHtml(ytDefaultDescription(row))}</textarea>
       <label>태그 (콤마로 구분, 선택)</label>
       <input type="text" class="yt-tags" placeholder="예: 미스터리, 이슈">
-      <div style="color:#a89bb5;font-size:0.75rem;margin:6px 0;">비공개로 올라갑니다. 공개 전환은 유튜브 스튜디오에서 직접 하세요.</div>
-      ${o.youtube_status === "error" ? "" : `<details style="margin:6px 0;"><summary style="color:#a89bb5;font-size:0.78rem;cursor:pointer;">업로드가 실패하거나 유튜브 인증이 만료됐나요?</summary>${ytReauthHelpHtml()}</details>`}
+      <div style="color:var(--muted);font-size:0.75rem;margin:6px 0;">비공개로 올라갑니다. 공개 전환은 유튜브 스튜디오에서 직접 하세요.</div>
+      ${o.youtube_status === "error" ? "" : `<details style="margin:6px 0;"><summary style="color:var(--muted);font-size:0.78rem;cursor:pointer;">업로드가 실패하거나 유튜브 인증이 만료됐나요?</summary>${ytReauthHelpHtml()}</details>`}
       <div style="display:flex;gap:8px;">
         <button type="button" class="yt-start-btn" style="flex:2;">업로드 시작</button>
-        <button type="button" class="yt-cancel-btn" style="flex:1;background:#221a2e;">취소</button>
+        <button type="button" class="yt-cancel-btn" style="flex:1;background:var(--btn);">취소</button>
       </div>
     </div>
   </div>`;

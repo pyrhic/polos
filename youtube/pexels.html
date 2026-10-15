@@ -6,7 +6,7 @@
 <title>Pexels — Wicked Wiki</title>
 <link rel="stylesheet" href="/youtube/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f0a14">
+<meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
@@ -15,16 +15,19 @@
   .px-row button { width:auto; padding:0 18px; margin:0; }
   .px-opts { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0; }
   .px-opts select { width:auto; margin:0; }
-  .px-note { color:#a89bb5; font-size:0.78rem; line-height:1.5; margin:6px 0 12px; }
+  .px-note { color:var(--muted); font-size:0.78rem; line-height:1.5; margin:6px 0 12px; }
   .px-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-top:10px; }
-  .px-ph { position:relative; aspect-ratio:3/4; background:#221a2e center/cover no-repeat; border-radius:3px; cursor:pointer; border:2px solid transparent; overflow:hidden; }
-  .px-ph.sel { border-color:#7cff4a; }
+  .px-ph { position:relative; aspect-ratio:3/4; background:var(--card) center/cover no-repeat; border-radius:3px; cursor:pointer; border:2px solid transparent; overflow:hidden; }
+  .px-ph.sel { border-color:var(--accent); }
   .px-ph .chk { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; font-size:0.8rem; font-weight:800; display:flex; align-items:center; justify-content:center; }
-  .px-ph.sel .chk { background:#7cff4a; color:#0f0a14; }
+  .px-ph.sel .chk { background:var(--accent); color:var(--on-accent); }
   .px-ph .by { position:absolute; left:0; right:0; bottom:0; padding:12px 4px 3px; font-size:0.6rem; color:#ddd; background:linear-gradient(transparent, rgba(0,0,0,.7)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .px-bar { position:sticky; bottom:0; background:#0f0a14; padding:10px 0 14px; margin-top:14px; border-top:1px solid #221a2e; }
+  .px-bar { position:sticky; bottom:0; background:var(--bg); padding:10px 0 14px; margin-top:14px; border-top:1px solid var(--line); }
   .px-bar button { margin:0; }
-  .px-more { background:#221a2e; margin-top:10px; }
+  .px-more { background:var(--card); margin-top:10px; }
+  #makeBtn { background:var(--accent); color:var(--on-accent); box-shadow:none; }
+  #makeBtn:hover { background:var(--accent-strong); }
+  #makeBtn:disabled { background:var(--line-strong); color:var(--muted-2); }
 </style>
 </head>
 <body>
@@ -50,7 +53,7 @@
     <button type="button" class="px-more" id="moreBtn" style="display:none;">더 보기</button>
 
     <div class="px-bar">
-      <button type="button" id="makeBtn" style="background:#7cff4a;color:#0f0a14;" disabled>사진을 골라주세요</button>
+      <button type="button" id="makeBtn" disabled>사진을 골라주세요</button>
       <div class="px-note" style="margin:6px 0 0;">사진 출처(촬영자)는 영상 설명에 자동으로 적혀요.</div>
     </div>
   </div>

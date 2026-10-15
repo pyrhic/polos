@@ -6,32 +6,32 @@
 <title>Trend — Wicked Wiki</title>
 <link rel="stylesheet" href="/youtube/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f0a14">
+<meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
   .t-item { display:block; }
   .t-top { display:flex; align-items:center; gap:10px; }
-  .t-rank { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.85rem; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .t-rank { background:var(--inset); color:var(--accent); font-weight:800; font-size:0.85rem; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .t-title { font-weight:800; font-size:1.05rem; flex:1; color:#fff; text-decoration:none; word-break:keep-all; }
-  .t-meta { color:#a89bb5; font-size:0.78rem; margin:6px 0 0 38px; }
-  .t-meta b { color:#ffd93d; }
+  .t-meta { color:var(--muted); font-size:0.78rem; margin:6px 0 0 38px; }
+  .t-meta b { color:var(--text); }
   .t-news { margin:8px 0 0 38px; padding:0; list-style:none; }
   .t-news li { font-size:0.8rem; margin-bottom:4px; line-height:1.35; }
-  .t-news a { color:#cfc6d8; text-decoration:none; }
-  .t-news a:hover { color:#7cff4a; }
-  .t-news .src { color:#a89bb5; }
-  .t-make { margin:10px 0 0 38px; width:auto; padding:7px 14px; font-size:0.8rem; background:#221a2e; border:1px solid #3a2f14; }
-  .t-first { border:2px solid #7cff4a; }
-  .t-first .t-title { font-size:1.25rem; color:#7cff4a; }
+  .t-news a { color:var(--text-2); text-decoration:none; }
+  .t-news a:hover { color:var(--accent); }
+  .t-news .src { color:var(--muted); }
+  .t-make { margin:10px 0 0 38px; width:auto; padding:7px 14px; font-size:0.8rem; background:var(--btn); }
+  .t-first { border:2px solid var(--accent); }
+  .t-first .t-title { font-size:1.25rem; color:var(--accent); }
   .t-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px; }
   .t-head button { width:auto; padding:6px 14px; font-size:0.8rem; }
   .t-tabs { display:flex; gap:8px; align-items:center; margin-bottom:14px; }
   .t-tab { width:auto; padding:8px 20px; font-size:0.9rem; }
-  .t-tab.active { background:#7cff4a; color:#0f0a14; }
+  .t-tab.active { background:var(--accent); color:var(--on-accent); }
   .t-tabs select { width:auto; padding:8px 12px; font-size:0.9rem; }
-  .t-tr { color:#a89bb5; font-size:0.72rem; margin-left:8px; text-decoration:none; font-weight:400; white-space:nowrap; }
-  .t-tr:hover { color:#7cff4a; }
+  .t-tr { color:var(--muted); font-size:0.72rem; margin-left:8px; text-decoration:none; font-weight:400; white-space:nowrap; }
+  .t-tr:hover { color:var(--accent); }
 </style>
 </head>
 <body>
@@ -59,7 +59,7 @@
       </select>
     </div>
     <div class="msg" id="msg"></div>
-    <div id="meta" style="color:#a89bb5;font-size:0.78rem;margin-bottom:10px;"></div>
+    <div id="meta" style="color:var(--muted);font-size:0.78rem;margin-bottom:10px;"></div>
     <div id="list"><div class="empty">불러오는 중...</div></div>
   </div>
 

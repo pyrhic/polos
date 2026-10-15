@@ -6,7 +6,7 @@
 <title>Wikipedia — Wicked Wiki</title>
 <link rel="stylesheet" href="/youtube/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f0a14">
+<meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
@@ -14,33 +14,36 @@
   .wk-row input { flex:1; margin:0; }
   .wk-row button { width:auto; padding:0 18px; margin:0; }
   .wk-item { display:flex; gap:12px; align-items:flex-start; cursor:pointer; border:2px solid transparent; }
-  .wk-item:hover, .wk-item.sel { border-color:#7cff4a; }
+  .wk-item:hover, .wk-item.sel { border-color:var(--accent); }
   .wk-item.off { opacity:.5; cursor:not-allowed; }
   .wk-item.off:hover { border-color:transparent; }
-  .wk-thumb { width:64px; height:64px; border-radius:3px; object-fit:cover; background:#0f0a14; flex-shrink:0; }
+  .wk-thumb { width:64px; height:64px; border-radius:3px; object-fit:cover; background:var(--inset); flex-shrink:0; }
   .wk-name { font-weight:800; font-size:1rem; }
-  .wk-snip { color:#a89bb5; font-size:0.78rem; line-height:1.4; margin-top:4px; }
+  .wk-snip { color:var(--muted); font-size:0.78rem; line-height:1.4; margin-top:4px; }
   .wk-badge { display:inline-block; font-size:0.68rem; padding:1px 7px; border-radius:9px; margin-left:6px; vertical-align:middle; font-weight:700; }
-  .wk-dead { background:#17331a; color:#7cff4a; }
-  .wk-live { background:#3a1414; color:#ff8a80; }
-  .wk-other { background:#2a2a2a; color:#bbb; }
-  .wk-lang { background:#16324a; color:#4fc3f7; }
+  .wk-dead { background:var(--accent-dim); color:var(--accent); }
+  .wk-live { background:var(--danger-bg); color:var(--danger); }
+  .wk-other { background:var(--line); color:var(--muted); }
+  .wk-lang { background:var(--accent-dim); color:var(--accent); }
   .wk-idea { display:flex; gap:10px; align-items:flex-start; cursor:pointer; }
   .wk-idea input { width:auto; margin:4px 0 0; flex-shrink:0; }
   .wk-idea .t { font-weight:800; }
-  .wk-idea .h { color:#ffd93d; font-size:0.82rem; margin-top:3px; }
-  .wk-idea .f { color:#a89bb5; font-size:0.75rem; margin-top:4px; line-height:1.4; }
-  .wk-note { color:#a89bb5; font-size:0.78rem; line-height:1.5; margin:6px 0 12px; }
+  .wk-idea .h { color:var(--text); font-size:0.82rem; margin-top:3px; }
+  .wk-idea .f { color:var(--muted); font-size:0.75rem; margin-top:4px; line-height:1.4; }
+  .wk-note { color:var(--muted); font-size:0.78rem; line-height:1.5; margin:6px 0 12px; }
   .wk-opts { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0; }
   .wk-opts select { width:auto; margin:0; }
-  .wk-done a { color:#7cff4a; }
+  .wk-done a { color:var(--accent); }
   .wk-tabs { display:flex; gap:6px; margin-bottom:12px; }
   .wk-tab { width:auto; flex:1; padding:9px 6px; font-size:0.8rem; text-transform:none; letter-spacing:0; }
-  .wk-tab.active { background:#7cff4a; color:#0f0a14; }
-  .wk-recent { background:#3a2f14; color:#ffd93d; }
-  .wk-kind { background:#2d2146; color:#c9a7ff; }
-  .wk-group { color:#a89bb5; font-size:0.85rem; font-weight:700; margin:16px 0 8px; }
-  .wk-views { color:#a89bb5; font-size:0.72rem; margin-top:4px; }
+  .wk-tab.active { background:var(--accent); color:var(--on-accent); }
+  .wk-recent { background:var(--line-strong); color:var(--text); }
+  .wk-kind { background:var(--line); color:var(--text-2); }
+  .wk-group { color:var(--muted); font-size:0.85rem; font-weight:700; margin:16px 0 8px; }
+  .wk-views { color:var(--muted); font-size:0.72rem; margin-top:4px; }
+  #makeBtn { background:var(--accent); color:var(--on-accent); box-shadow:none; }
+  #makeBtn:hover { background:var(--accent-strong); }
+  #makeBtn:disabled { background:var(--line-strong); color:var(--muted-2); }
 </style>
 </head>
 <body>
@@ -137,7 +140,7 @@
             <option value="180">약 3분</option>
           </select>
         </div>
-        <button type="button" id="makeBtn" style="background:#7cff4a;color:#0f0a14;">선택한 이야기로 콘티 만들기</button>
+        <button type="button" id="makeBtn">선택한 이야기로 콘티 만들기</button>
         <div class="wk-note">이야기 하나마다 제미나이를 1번 써요(무료 한도: 하루 약 20회). 사진은 위키피디아 문서에 실린 자유 라이선스 사진만 가져오고, 출처와 라이선스는 영상 설명에 자동으로 적혀요.</div>
       </div>
     </div>

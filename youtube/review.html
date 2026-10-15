@@ -6,18 +6,18 @@
 <title>Studio — Wicked Wiki</title>
 <link rel="stylesheet" href="/youtube/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f0a14">
+<meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
   video { width: 100%; border-radius: 3px; margin-top: 10px; background:#000; }
   .status-tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:800; text-transform:uppercase; }
-  .status-idle { background:#3a2f14; color:#ffd93d; }
-  .status-running { background:#16324a; color:#4fc3f7; }
-  .status-done { background:#17331a; color:#7cff4a; }
-  .status-error { background:#3a1414; color:#ff8a80; }
+  .status-idle { background:var(--line); color:var(--text-2); }
+  .status-running { background:var(--accent-dim); color:var(--accent); }
+  .status-done { background:var(--accent-dim); color:var(--accent); }
+  .status-error { background:var(--danger-bg); color:var(--danger); }
   .studio-item { cursor:pointer; border:2px solid transparent; }
-  .studio-item:hover, .studio-item:focus-visible { border-color:#7cff4a; outline:none; }
+  .studio-item:hover, .studio-item:focus-visible { border-color:var(--accent); outline:none; }
 </style>
 </head>
 <body>
@@ -119,7 +119,7 @@
             <div class="title" style="margin-bottom:4px;">${escapeHtml(videoName(r) || "(이름 없음)")}</div>
             <div class="meta">${meta}${running ? ' · <span class="status-tag status-running">생성 중</span>' : ""}</div>
           </div>
-          ${outs.length ? `<button type="button" class="list-del-btn" data-id="${r.id}" style="width:auto;padding:4px 10px;font-size:0.72rem;background:#3a1414;color:#ff8a80;flex-shrink:0;">전체 삭제</button>` : ""}
+          ${outs.length ? `<button type="button" class="list-del-btn" data-id="${r.id}" style="width:auto;padding:4px 10px;font-size:0.72rem;background:var(--danger-bg);color:var(--danger);flex-shrink:0;">전체 삭제</button>` : ""}
         </div>
       </div>`;
     }).join("");
@@ -136,19 +136,19 @@
 
   function renderDetail(list, r, outputs) {
     list.innerHTML = `
-      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;background:#221a2e;margin-bottom:12px;">← 영상 목록</button>
+      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;background:var(--btn);margin-bottom:12px;">← 영상 목록</button>
       <div class="card-box" data-id="${r.id}">
         <div class="title" style="font-weight:800;margin-bottom:6px;">${escapeHtml(videoName(r) || "(이름 없음)")}</div>
         <div class="s-meta" style="margin-bottom:6px;"><span class="status-tag status-${r.generation_status || "idle"}">${r.generation_status || "idle"}</span></div>
-        ${r.generation_status === "running" ? `<div class="s-meta" style="color:#4fc3f7;">영상 생성 중... (몇 분 걸려요. 끝나면 알림이 뜹니다)</div>` : ""}
-        ${r.generation_status === "error" ? `<div class="s-meta" style="color:#ff8a80;">${escapeHtml(genErrorText((r.video_settings || {}).last_error, videoName(r)))}${((r.video_settings || {}).last_error || {}).url ? ` · <a class="accent" href="${escapeHtml(r.video_settings.last_error.url)}" target="_blank" rel="noopener">실행 기록 보기</a>` : ""}<br>Scenes에서 영상 생성 버튼을 다시 누르면 재시도합니다.</div>` : ""}
+        ${r.generation_status === "running" ? `<div class="s-meta" style="color:var(--accent);">영상 생성 중... (몇 분 걸려요. 끝나면 알림이 뜹니다)</div>` : ""}
+        ${r.generation_status === "error" ? `<div class="s-meta" style="color:var(--danger);">${escapeHtml(genErrorText((r.video_settings || {}).last_error, videoName(r)))}${((r.video_settings || {}).last_error || {}).url ? ` · <a class="accent" href="${escapeHtml(r.video_settings.last_error.url)}" target="_blank" rel="noopener">실행 기록 보기</a>` : ""}<br>Scenes에서 영상 생성 버튼을 다시 누르면 재시도합니다.</div>` : ""}
         ${!outputs.length && r.generation_status !== "running" ? '<div class="s-meta">남은 영상이 없습니다.</div>' : ""}
         <div class="video-wrap" id="video-${r.id}">
           ${outputs.map((o) => `
             <div style="margin-top:12px;">
               <div class="s-meta" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
                 <span>${(((r.video_settings || {}).titles || {})[o.version]) ? `v${o.version} · ${escapeHtml(r.video_settings.titles[o.version])}` : `${escapeHtml(videoName(r))} v${o.version}`}</span>
-                <button type="button" class="out-del-btn" data-id="${o.id}" data-path="${escapeHtml(o.storage_path)}" data-version="${o.version}" style="width:auto;padding:3px 10px;font-size:0.7rem;background:#3a1414;color:#ff8a80;">삭제</button>
+                <button type="button" class="out-del-btn" data-id="${o.id}" data-path="${escapeHtml(o.storage_path)}" data-version="${o.version}" style="width:auto;padding:3px 10px;font-size:0.7rem;background:var(--danger-bg);color:var(--danger);">삭제</button>
               </div>
               <video controls preload="none" src="${o.video_url}"></video>
               <a class="link-btn" style="margin-top:8px;" href="${downloadUrl(o.video_url, videoName(r), o.version)}" download>다운로드</a>

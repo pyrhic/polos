@@ -6,48 +6,48 @@
 <title>Curation — Wicked Wiki</title>
 <link rel="stylesheet" href="/youtube/style.css">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f0a14">
+<meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
-  .cu-item { background:#221a2e; border-radius:3px; padding:12px; margin-bottom:10px; }
+  .cu-item { background:var(--card); border-radius:3px; padding:12px; margin-bottom:10px; }
   .cu-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-  .cu-no { background:#0f0a14; color:#7cff4a; font-weight:800; font-size:0.8rem; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .cu-no { background:var(--inset); color:var(--accent); font-weight:800; font-size:0.8rem; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .cu-body { display:flex; gap:10px; }
-  .cu-photo { width:96px; height:128px; border-radius:3px; background:#0f0a14 center/cover no-repeat; flex-shrink:0; cursor:pointer; position:relative; border:2px solid transparent; }
-  .cu-photo:hover { border-color:#7cff4a; }
+  .cu-photo { width:96px; height:128px; border-radius:3px; background:var(--inset) center/cover no-repeat; flex-shrink:0; cursor:pointer; position:relative; border:2px solid transparent; }
+  .cu-photo:hover { border-color:var(--accent); }
   .cu-photo span { position:absolute; left:0; right:0; bottom:0; background:rgba(0,0,0,0.65); color:#fff; font-size:0.62rem; text-align:center; padding:2px 0; }
   .cu-fields { flex:1; min-width:0; }
   .cu-fields input { margin-bottom:6px; font-size:0.88rem; padding:7px 9px; }
-  .cu-fields .k { font-size:0.7rem; color:#a89bb5; margin:0 0 2px; }
-  .cu-mini { width:auto; padding:3px 9px; margin:0; font-size:0.72rem; background:#0f0a14; color:#a89bb5; text-transform:none; letter-spacing:0; }
-  .cu-mini.del { color:#ff8a80; margin-left:auto; }
-  .cu-card { background:#221a2e; border-radius:3px; padding:14px; margin-bottom:12px; }
+  .cu-fields .k { font-size:0.7rem; color:var(--muted); margin:0 0 2px; }
+  .cu-mini { width:auto; padding:3px 9px; margin:0; font-size:0.72rem; background:var(--inset); color:var(--accent); text-transform:none; letter-spacing:0; }
+  .cu-mini.del { color:var(--danger); margin-left:auto; }
+  .cu-card { background:var(--card); border-radius:3px; padding:14px; margin-bottom:12px; }
   .cu-card h2 { font-size:0.95rem; margin:0 0 8px; }
   .cu-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .cu-row input[type="number"] { width:80px; }
-  .cu-list-item { display:block; background:#221a2e; border:2px solid transparent; border-radius:3px; padding:14px 16px; margin-bottom:10px; cursor:pointer; }
-  .cu-list-item:hover { border-color:#7cff4a; }
+  .cu-list-item { display:block; background:var(--card); border:2px solid transparent; border-radius:3px; padding:14px 16px; margin-bottom:10px; cursor:pointer; }
+  .cu-list-item:hover { border-color:var(--accent); }
   .cu-list-item .t { font-weight:800; margin-bottom:4px; }
-  .cu-list-item .m { color:#a89bb5; font-size:0.8rem; }
+  .cu-list-item .m { color:var(--muted); font-size:0.8rem; }
   .cu-list-item { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-  .cu-list-item.pressing { border-color:#ff8a80; background:#2a1a24; }
-  .list-hint { color:#a89bb5; font-size:0.72rem; text-align:center; margin:8px 0 0; }
-  .cu-sum { background:#17141c; border-radius:3px; padding:10px 14px; color:#7cff4a; font-weight:700; font-size:0.9rem; margin:10px 0; }
-  .cu-main { background:#7cff4a; color:#0f0a14; padding:12px; font-size:0.95rem; }
-  .cu-main:hover { background:#fff; }
-  .cu-main:disabled { background:#16324a; color:#4fc3f7; }
-  .cu-save { font-size:0.75rem; color:#a89bb5; text-align:right; min-height:1em; }
+  .cu-list-item.pressing { border-color:var(--danger); background:var(--danger-bg); }
+  .list-hint { color:var(--muted); font-size:0.72rem; text-align:center; margin:8px 0 0; }
+  .cu-sum { background:var(--inset); border-radius:3px; padding:10px 14px; color:var(--accent); font-weight:700; font-size:0.9rem; margin:10px 0; }
+  .cu-main { background:var(--accent); color:var(--on-accent); padding:12px; font-size:0.95rem; }
+  .cu-main:hover { background:var(--accent-strong); }
+  .cu-main:disabled { background:var(--accent-dim); color:var(--accent); }
+  .cu-save { font-size:0.75rem; color:var(--muted); text-align:right; min-height:1em; }
   .cu-modal { display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.8); overflow-y:auto; padding:12px; }
   .cu-modal.open { display:block; }
-  .cu-modal-box { background:#221a2e; border-radius:6px; padding:14px; max-width:480px; margin:0 auto; }
+  .cu-modal-box { background:var(--card); border-radius:6px; padding:14px; max-width:480px; margin:0 auto; }
   .cu-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:10px; }
-  .cu-grid div { aspect-ratio:3/4; background:#0f0a14 center/cover no-repeat; border-radius:3px; cursor:pointer; border:2px solid transparent; position:relative; }
-  .cu-grid div:hover { border-color:#7cff4a; }
-  .cu-grid div.sel { border-color:#7cff4a; }
+  .cu-grid div { aspect-ratio:3/4; background:var(--inset) center/cover no-repeat; border-radius:3px; cursor:pointer; border:2px solid transparent; position:relative; }
+  .cu-grid div:hover { border-color:var(--accent); }
+  .cu-grid div.sel { border-color:var(--accent); }
   .cu-grid small { position:absolute; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); font-size:0.55rem; padding:1px 3px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-  .cu-note { color:#a89bb5; font-size:0.78rem; margin:6px 0; }
-  .cu-err { color:#ff8a80; }
+  .cu-note { color:var(--muted); font-size:0.78rem; margin:6px 0; }
+  .cu-err { color:var(--danger); }
 </style>
 </head>
 <body>
@@ -63,7 +63,7 @@
     </div>
 
     <div id="editView" style="display:none;">
-      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;background:#221a2e;margin-bottom:12px;">← 큐레이션 목록</button>
+      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;background:var(--btn);margin-bottom:12px;">← 큐레이션 목록</button>
 
       <div class="cu-card">
         <label for="curTitle" style="margin-top:0;">제목 (영상 첫 화면에 들어갑니다)</label>
@@ -73,16 +73,16 @@
           <input type="number" id="curCount" min="3" max="30" value="10">
           <input type="text" id="curNote" maxlength="300" placeholder="AI에게 요청 (선택) 예: 아시아 위주로" style="flex:1;min-width:140px;">
         </div>
-        <button type="button" id="planBtn" style="margin-top:10px;background:#2f2440;">AI로 구성안 만들기</button>
+        <button type="button" id="planBtn" style="margin-top:10px;background:var(--btn);">AI로 구성안 만들기</button>
         <div class="cu-note" id="planMsg"></div>
       </div>
 
       <div class="cu-card" id="capCard" style="display:none;">
-        <button type="button" id="capBtn" style="background:#2f2440;">AI로 이름·설명 쓰기</button>
+        <button type="button" id="capBtn" style="background:var(--btn);">AI로 이름·설명 쓰기</button>
         <div class="cu-note" id="capMsg">사진 설명을 바탕으로 이름과 한 줄 설명을 써요. 비어 있는 칸만 채우고, 직접 쓴 건 그대로 둬요.</div>
       </div>
       <div id="items"></div>
-      <button type="button" id="addItemBtn" style="background:#221a2e;margin-bottom:12px;">+ 항목 추가</button>
+      <button type="button" id="addItemBtn" style="background:var(--btn);margin-bottom:12px;">+ 항목 추가</button>
 
       <div class="cu-card">
         <h2>영상 설정</h2>
@@ -107,10 +107,10 @@
             <option value="serif">명조체 (감성)</option>
           </select>
         </div>
-        <div class="settings-note" style="margin:4px 0 0;color:#a89bb5;font-size:0.75rem;">항목의 이름(장소, 나라)과 설명이 사진 아래에 작고 은은하게 나와요. 설명까지 읽으려면 사진 한 장당 4초 이상이 좋아요.</div>
+        <div class="settings-note" style="margin:4px 0 0;color:var(--muted);font-size:0.75rem;">항목의 이름(장소, 나라)과 설명이 사진 아래에 작고 은은하게 나와요. 설명까지 읽으려면 사진 한 장당 4초 이상이 좋아요.</div>
         <label style="margin-top:12px;">배경음악 (사용이 허락된 음원만 올려주세요)</label>
         <div id="bgmArea"></div>
-        <label class="cu-file" style="display:block;background:#2f2440;color:#fff;text-align:center;padding:9px;border-radius:3px;font-size:0.85rem;cursor:pointer;margin-top:6px;">
+        <label class="cu-file" style="display:block;background:var(--btn);color:var(--accent);box-shadow:inset 0 0 0 1px var(--line);text-align:center;padding:9px;border-radius:3px;font-size:0.85rem;cursor:pointer;margin-top:6px;">
           + 음악 파일 올리기<input type="file" id="bgmFile" accept="audio/*" style="display:none;">
         </label>
         <div class="cu-row" style="margin-top:8px;">
@@ -519,7 +519,7 @@
     if (info.status === "running") { btn.disabled = true; btn.textContent = "영상 생성 중... (몇 분 걸려요)"; watchGeneration(cur.id); }
     else { btn.disabled = false; btn.textContent = `영상 생성 (v${await genNextVersion(cur.id)})`; }
     if (info.status === "error") {
-      note.innerHTML = `${esc(genErrorText(info.lastError, (curRow && curRow.video_settings && curRow.video_settings.name) || info.name))}${info.lastError && info.lastError.url ? ` · <a href="${esc(info.lastError.url)}" target="_blank" rel="noopener" style="color:#ffd93d;">실행 기록 보기</a>` : ""}<br>버튼을 다시 누르면 재시도합니다.`;
+      note.innerHTML = `${esc(genErrorText(info.lastError, (curRow && curRow.video_settings && curRow.video_settings.name) || info.name))}${info.lastError && info.lastError.url ? ` · <a href="${esc(info.lastError.url)}" target="_blank" rel="noopener" style="color:var(--accent);">실행 기록 보기</a>` : ""}<br>버튼을 다시 누르면 재시도합니다.`;
       note.style.display = "block";
     } else note.style.display = "none";
   }

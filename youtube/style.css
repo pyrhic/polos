@@ -1,11 +1,36 @@
+/* 유튜브 섹션 색 규칙 — 모노톤 바탕 + 스킴밐스 하늘색(동작) + 주황(포인트, 아껴 쓰기)
+   ※ 콘티 미리보기 무대(.seg-stage, .cap-preview)의 노랑·흰색·검정은 실제 영상 색이라 변수로 바꾸지 않는다. */
+:root {
+  --bg: #000000;            /* 페이지 바탕 */
+  --inset: #0a0a0a;         /* 카드 안쪽에 파인 칸(번호 원, 트랙 바탕 등) */
+  --card: #141414;          /* 카드·팝업 */
+  --card-2: #181818;        /* 카드 위 한 단계 밝은 면 */
+  --input: #1c1c1c;         /* 입력칸 */
+  --btn: #1c1c1c;           /* 보조 버튼 바탕 (글자는 하늘색) */
+  --line: #2a2a2a;          /* 테두리·구분선 */
+  --line-strong: #333333;
+  --text: #ffffff;          /* 본문 글자 */
+  --text-2: #d0d0d0;        /* 조금 흐린 본문 */
+  --muted: #9a9a9a;         /* 보조 글자 */
+  --muted-2: #6a6a6a;       /* 더 흐린 보조 글자 */
+  --accent: #4fc3f7;        /* 스킴밐스 하늘색: 버튼·선택·진행·링크·켬 */
+  --accent-strong: #1e9ad6; /* 짙은 하늘색: 눌림·강조 버튼·자막 트랙 */
+  --accent-dim: #16324a;    /* 하늘색 기운의 어두운 바탕(스킴밐스 값): 진행 중 칩 등 */
+  --on-accent: #000000;     /* 하늘색·주황 바탕 위 글자 */
+  --point: #ff7a1a;         /* 스킴밐스 주황: 경고·저장 안 됨 등 꼭 필요한 곳만 */
+  --point-dim: #3a1f0a;
+  --danger: #ff6b6b;        /* 삭제·오류 */
+  --danger-bg: #2a1212;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   font-family: -apple-system, "Malgun Gothic", sans-serif;
-  background: #0f0a14;
-  color: #ffffff;
+  background: var(--bg);
+  color: var(--text);
   margin: 0;
   padding: 20px;
 }
@@ -19,7 +44,7 @@ h1 {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-transform: uppercase;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .card h1 {
@@ -29,7 +54,7 @@ h1 {
 }
 
 p.role {
-  color: #a89bb5;
+  color: var(--muted);
   margin-top: 0;
   margin-bottom: 2rem;
   line-height: 1.5;
@@ -46,10 +71,11 @@ a.link-btn, button, input[type="submit"] {
   display: block;
   width: 100%;
   padding: 14px 20px;
-  background: #221a2e;
+  background: var(--btn);
   border: none;
+  box-shadow: inset 0 0 0 1px var(--line);
   border-radius: 3px;
-  color: #ffffff;
+  color: var(--accent);
   text-decoration: none;
   font-size: 1rem;
   font-weight: 700;
@@ -61,19 +87,24 @@ a.link-btn, button, input[type="submit"] {
 }
 
 a.link-btn:hover, button:hover {
-  background: #7cff4a;
-  color: #0f0a14;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+a.link-btn:active, button:active {
+  background: var(--accent-strong);
+  color: var(--on-accent);
 }
 
 .accent {
-  color: #7cff4a;
+  color: var(--accent);
 }
 
 label {
   display: block;
   margin-top: 14px;
   margin-bottom: 6px;
-  color: #a89bb5;
+  color: var(--muted);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -81,10 +112,10 @@ label {
 input, textarea, select {
   width: 100%;
   box-sizing: border-box;
-  background: #ffffff;
-  border: none;
+  background: var(--input);
+  border: 1px solid var(--line);
   border-radius: 3px;
-  color: #0f0a14;
+  color: var(--text);
   padding: 10px 12px;
   font-size: 1rem;
   font-family: inherit;
@@ -100,8 +131,9 @@ button[type="submit"] {
 }
 
 button:disabled {
-  background: #4a4453;
-  color: #a89bb5;
+  background: var(--line-strong);
+  color: var(--muted-2);
+  box-shadow: none;
   cursor: not-allowed;
 }
 
@@ -112,21 +144,21 @@ button:disabled {
   font-size: 0.9rem;
   display: none;
 }
-.msg.ok { background: #17331a; color: #7cff4a; display: block; }
-.msg.err { background: #3a1414; color: #ff8a80; display: block; }
+.msg.ok { background: var(--accent-dim); color: var(--accent); display: block; }
+.msg.err { background: var(--danger-bg); color: var(--danger); display: block; }
 
 a.back {
   display: inline-block;
   margin-top: 10px;
   margin-bottom: 20px;
-  color: #a89bb5;
+  color: var(--accent);
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 600;
 }
 
 .card-box {
-  background: #221a2e;
+  background: var(--card);
   border: none;
   border-radius: 3px;
   padding: 16px 18px;
@@ -137,12 +169,12 @@ a.back {
   margin-bottom: 6px;
 }
 .card-box .meta {
-  color: #a89bb5;
+  color: var(--muted);
   font-size: 0.8rem;
 }
 
 .empty {
-  color: #a89bb5;
+  color: var(--muted);
   text-align: center;
   margin-top: 40px;
 }
@@ -151,8 +183,8 @@ a.back {
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2px solid #a89bb5;
-  border-top-color: #7cff4a;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   vertical-align: middle;
