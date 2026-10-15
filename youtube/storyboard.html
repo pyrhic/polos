@@ -833,10 +833,7 @@
       const tlW = host.clientWidth || 280;
       const tiles = Math.min(14, Math.ceil(tlW / 26) + 1);
       host.innerHTML = `
-        <div class="seg-tl-head">
-          <span>${paths.length > 1 ? "탭: 고르기 · 길게: 순서 · 경계: 비중" : "탭: 고르기 · 클립 1개가 장면 전체에 나와요"}</span>
-          ${custom ? '<button type="button" class="seg-tl-reset">균등하게</button>' : ""}
-        </div>
+        ${custom ? '<div class="seg-tl-head" style="justify-content:flex-end;"><button type="button" class="seg-tl-reset">균등하게</button></div>' : ""}
         <div class="seg-tl-row">
           <div class="seg-tl-col">
             <div class="seg-tl-ruler" title="눌러서 그 시점 보기"></div>
