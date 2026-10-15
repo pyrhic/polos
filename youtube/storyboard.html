@@ -469,7 +469,8 @@
         <div class="cap-modal-hint" style="font-size:0.9rem;font-weight:700;color:#fff;">장면 미리보기 안내</div>
         <div style="color:var(--text-2);font-size:0.82rem;line-height:1.6;margin:8px 0 4px;">
           · 미리보기 화면을 누르면 재생, 다시 누르면 멈춰요.<br>
-          · 소리는 <b>휴대폰 목소리</b>로 읽어 줘요. 실제 영상의 목소리와는 달라요.<br>
+          · 소리는 <b>실제 영상과 같은 성우 목소리</b>로 들려줘요(처음엔 준비에 몇 초). 자막과 장면 전환도 그 목소리에 맞춰요.<br>
+          · 성우 목소리를 못 불러오면 <b>휴대폰 목소리</b>로 대신 읽어요. 이때는 실제 영상과 목소리·길이가 조금 달라요.<br>
           · 화면 배치·자막 줄과 자막 길이·클립 전환은 실제 영상과 같아요.<br>
           · 자막을 끌면 위치, 두 손가락으로 크기, 두 번 탭하면 굵기가 바뀌고 모든 장면에 같이 적용돼요.
         </div>
@@ -3408,7 +3409,7 @@
   // 평소엔 첫 클립의 정지 화면(가벼운 썸네일). ▶ 또는 화면을 누르면 재생, 타임라인을 누르거나 끌면 그 시점 화면.
   // 한 번에 한 카드만 살아 있다(pvActive). 다른 카드를 재생/선택하면 이전 카드는 멈추고 정지 화면으로 돌아간다.
   let pvActive = null;   // { el, id, P, secs, cuts, cutEnds, groups, size, wt, framed, t, playing, ... }
-  const pvVoiceOn = true;   // 미리보기는 늘 휴대폰 목소리로 읽는다 (처음 한 번 안내 팝업으로 알려준다)
+  const pvVoiceOn = true;   // 미리보기는 실제 성우 목소리(/api/tts)로, 못 불러오면 휴대폰 목소리로 읽는다 (처음 한 번 안내 팝업으로 알려준다)
 
   function pvParts(el) {
     const st = el.querySelector(".seg-stage");
@@ -3550,7 +3551,8 @@
 
   // 미리보기를 살린다: 장면의 클립을 전부 순서대로, 비중(__weights)만큼 나눠 보여줄 준비 (영상 생성과 같은 규칙)
   // stage/secsOver: 전체 미리보기용 (다른 무대에 그리고, 장면 길이는 영상과 같은 effectiveSeconds)
-  function pvBuild(el, seg, stage, secsOver) {
+  // groupsOver: 실제 성우 목소리로 정한 자막 줄 구간(장면 안 초). 없으면 콘티 예상 길이(est)
+  function pvBuild(el, seg, stage, secsOver, groupsOver) {
     const { P, framed, size, wt } = pvDecor(el, stage);
     const direction = el.querySelector(".seg-direction").value;
     const secs = secsOver != null ? secsOver : pvSecsOf(el, seg);
@@ -3569,7 +3571,7 @@
     });
     if (!paths.length && !stage) P.media.appendChild(pvEmptyNode(el, seg));   // 전체 미리보기는 검은 화면 + 자막만
     P.ref.style.display = "none";   // pvShow가 지금 클립에 맞춰 켠다
-    const groups = capGroups(el, seg);
+    const groups = groupsOver || capGroups(el, seg);
     P.info.innerHTML = pvInfoHtml(seg, plan, secs);
     return { el, id: String(seg.id), P, secs, cuts, cutEnds, groups, size, wt, framed,
       t: 0, playing: false, cutIdx: -1, shown: -2, raf: 0, t0: 0 };
@@ -3599,7 +3601,8 @@
     if (!ctx) return;
     cancelAnimationFrame(ctx.raf);
     ctx.playing = false;
-    if (!ctx.full) spStop();
+    if (ctx.voiceLoading) { ctx.voiceLoading = null; vaNoteDone(); }   // 목소리 준비 중에 멈추면 준비가 끝나도 재생하지 않는다
+    if (!ctx.full) { spStop(); vpStop(); }
     ctx.cuts.forEach((c) => {
       if (c.video) c.node.pause();
       else if (c.node.getAnimations) c.node.getAnimations().forEach((a) => a.pause());
@@ -3665,11 +3668,320 @@
       // 멈춘 화면에서 자막이 비면(끝난 뒤 등) 첫 줄을 보여 둔다 — 잡아서 위치·크기·굵기를 바꿀 수 있게
       pvCapShow(ctx.P.cap, ctx.groups[gi] || (ctx.playing ? null : pvFirstVisible(ctx.groups)), ctx.size, ctx.wt, !ctx.playing);
     }
-    if (ctx.playing && !ctx.full) spTick(Math.min(Math.max(0, t), ctx.secs));
+    if (ctx.playing && !ctx.full && !ctx.voice) spTick(Math.min(Math.max(0, t), ctx.secs));
     ctx.t = Math.min(Math.max(0, t), ctx.secs);
     pvPlayhead(ctx);
   }
-  // ───── 음성: 휴대폰 목소리 (실제 영상의 목소리와 다르다) ─────
+  // ───── 음성 1: 실제 성우 목소리 (영상과 같은 TTS, /api/tts) ─────
+  // 영상 생성 파이프라인(youtube-automation core/02_tts.py run_line_mode / synthesize_voice_stream, 계약서 8~11절)을 그대로 흉내낸다.
+  //   1. 읽을 줄 전체를 이어 TTS 한 번(3,000바이트를 넘으면 문장 끝에서 나눔) → 소리 + 단어 시각(WordBoundary)
+  //   2. 묶음 앞뒤 무음 자르기(소리 시작 0.05초 전 ~ 소리 끝 0.15초 뒤)
+  //   3. 줄 경계·쉼 자리는 단어 시각(글자 누적 정렬)으로 찾는다
+  //   4. 무음은 ' - ' 쉼(개수 × 0.3초)과 { } 전용 줄(정한 길이, 없으면 est)에만 넣는다. 자막 없는 장면은 그 장면 길이만큼 무음
+  //   5. 잘라 이어 붙인 소리 하나(AudioBuffer)를 재생하고, 줄·장면의 실제 시각으로 자막·장면 전환·진행 막대를 그린다
+  // 화면은 TTS 제공자(Edge 등)와 서버 캐시를 모른다. /api/tts에 글자를 주고 {audio, words}만 받는다.
+  // 실패하면 아래 휴대폰 목소리(sp*)로 돌아간다.
+  const VA = { TRIM_LEAD: 0.05, TRIM_TAIL: 0.15, CUT_LEAD: 0.05, PEAK: 184 / 32768, CHUNK_GAP: 0.3, MAX_BYTES: 3000 };
+  const VA_STRIP = /["'“”‘’()*]/g;                 // 파이프라인 TTS_STRIP_CHARS: 소리 내어 읽지 않는 기호
+  const VA_SENT_END = /[.!?…。！？~]["'”’)\]]*$/;   // 파이프라인 SENTENCE_END_RE
+  const vaCountW = (t) => (String(t || "").match(/[\p{L}\p{N}_]/gu) || []).length;   // 파이썬 \w 글자 수
+  let vaCtx = null;
+  // 소리 장치 (누른 순간에 만들어/깨워 둬야 나중에 소리가 난다)
+  function vaAudio() {
+    if (!vaCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { vaCtx = new AC({ sampleRate: 24000 }); } catch { try { vaCtx = new AC(); } catch { return null; } }
+    }
+    if (vaCtx.state === "suspended") vaCtx.resume().catch(() => {});
+    return vaCtx;
+  }
+  function vaSettings() {
+    return { voice: currentSettings.tts_voice || "ko-KR-InJoonNeural", rate: Number(currentSettings.tts_rate) || 0, pitch: Number(currentSettings.tts_pitch) || 0 };
+  }
+  // 글자 한 묶음 → { buf: AudioBuffer, words }. 같은 글자·설정은 브라우저 메모리에 둔다(서버 쪽 캐시는 /api/tts가 따로 한다)
+  const vaMem = new Map();
+  function vaFetch(text, s) {
+    const key = JSON.stringify([text, s.voice, s.rate, s.pitch]);
+    if (vaMem.has(key)) return vaMem.get(key);
+    const p = (async () => {
+      const r = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voice: s.voice, rate: s.rate, pitch: s.pitch }) });
+      let j = null;
+      try { j = await r.json(); } catch {}
+      if (!r.ok || !j || j.error || !j.audio) throw new Error((j && j.error) || `HTTP ${r.status}`);
+      const bin = atob(j.audio);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const ctx = vaAudio();
+      if (!ctx) throw new Error("이 브라우저는 소리 재생(Web Audio)을 못 해요");
+      const buf = await new Promise((res, rej) => { const q = ctx.decodeAudioData(u8.buffer, res, rej); if (q && q.catch) q.catch(rej); });
+      return { buf, words: Array.isArray(j.words) ? j.words : [] };
+    })();
+    vaMem.set(key, p);
+    p.catch(() => vaMem.delete(key));
+    while (vaMem.size > 40) vaMem.delete(vaMem.keys().next().value);
+    return p;
+  }
+  // 자막 한 줄 → 읽을 글자(speak)·쉼 자리·글자 수 (파이프라인 split_hidden + strip_pauses + tts_text_of)
+  function vaLine(raw) {
+    const spoken = String(raw || "").replace(GEN_CAP_HIDE_RE, (_, a) => ` ${a} `).replace(GEN_CAP_MUTE_RE, " ").replace(/\s{2,}/g, " ").trim();
+    const out = [], pauses = [];
+    let chars = 0;
+    spoken.split(/\s+/).filter(Boolean).forEach((tok) => {
+      if (/^-+$/.test(tok)) {
+        const last = pauses[pauses.length - 1];
+        if (last && last[0] === chars) last[1] += tok.length; else pauses.push([chars, tok.length]);
+        return;
+      }
+      out.push(tok);
+      chars += vaCountW(tok);
+    });
+    const speak = out.join(" ").replace(/\*\*/g, "").replace(/(^|\s)\/(?=\s|$)/g, "$1 ").replace(/[{}\\]/g, "")
+      .replace(VA_STRIP, "").replace(/\s{2,}/g, " ").trim();
+    const nchars = vaCountW(speak);
+    return { speak, pauses, nchars, hasVoice: nchars > 0 };
+  }
+  // 장면 입력: { lines, secs(줄별 콘티 길이 — { } 전용 줄의 무음 길이로 쓴다), empty(자막 없는 장면 길이) }
+  function vaSceneInput(el, seg, emptySecs) {
+    const st = capStateOf(el, seg);
+    return { lines: st.lines, secs: st.secs, empty: st.lines.length ? null : emptySecs };
+  }
+  function vaSceneKey(input) {
+    const s = vaSettings();
+    return JSON.stringify([s.voice, s.rate, s.pitch, input.lines, input.lines.map((l, i) => (genCaptionIsMuteOnly(l) ? input.secs[i] : 0))]);
+  }
+  function vaHasVoice(input) {
+    return input.lines.some((l) => vaLine(l).hasVoice);
+  }
+  // 읽을 줄 묶음 나누기 (파이프라인 _plan_tts_chunks): 3,000바이트를 넘을 때만, 문장부호로 끝나는 줄 뒤에서
+  function vaChunks(items) {
+    const enc = new TextEncoder();
+    const nb = (it) => enc.encode(it.speak).length + 1;
+    const chunks = [];
+    let cur = [], bytes = 0;
+    items.forEach((it) => {
+      const b = nb(it);
+      while (cur.length && bytes + b > VA.MAX_BYTES) {
+        let k = -1;
+        cur.forEach((x, i) => { if (VA_SENT_END.test(x.speak)) k = i; });
+        if (k < 0) k = cur.length - 1;
+        chunks.push(cur.slice(0, k + 1));
+        cur = cur.slice(k + 1);
+        bytes = cur.reduce((a, x) => a + nb(x), 0);
+      }
+      cur.push(it);
+      bytes += b;
+    });
+    if (cur.length) chunks.push(cur);
+    return chunks;
+  }
+  // 앞뒤 무음 자르기 (파이프라인 trim_bounds): 10ms 창의 최대 진폭이 -45dB를 넘는 첫/마지막 창 기준
+  function vaTrim(d, sr, words) {
+    const n = d.length, win = Math.max(1, Math.round(sr / 100));
+    let on = -1, off = -1;
+    for (let i = 0; i < n; i += win) {
+      const e = Math.min(n, i + win);
+      let m = 0;
+      for (let k = i; k < e; k++) { const v = d[k] < 0 ? -d[k] : d[k]; if (v > m) m = v; }
+      if (m > VA.PEAK) { if (on < 0) on = i; off = e; }
+    }
+    if (on < 0) {
+      if (!words.length) return [0, n];
+      on = Math.round(words[0].start * sr); off = Math.round(words[words.length - 1].end * sr);
+    }
+    const s = Math.max(0, on - Math.round(VA.TRIM_LEAD * sr)), e = Math.min(n, off + Math.round(VA.TRIM_TAIL * sr));
+    return e > s ? [s, e] : [0, n];
+  }
+  // 글자 누적 위치 → 소리 시각 (파이프라인 make_time_at)
+  function vaTimeAt(words, totalChars, audioEnd) {
+    const spans = [];
+    let cum = 0;
+    words.forEach((w) => {
+      const n = vaCountW(w.text);
+      if (n <= 0) return;
+      spans.push([cum, n, w.start, w.end]);
+      cum += n;
+    });
+    const totalW = cum;
+    return (pos) => {
+      if (pos <= 0) return 0;
+      if (pos >= totalChars) return audioEnd;
+      if (totalW <= 0 || totalChars <= 0) return audioEnd * pos / Math.max(1, totalChars);
+      const sw = pos * totalW / totalChars;
+      let prevEnd = 0;
+      for (const [c0, n, st, en] of spans) {
+        if (sw < c0 + n - 1e-9) {
+          if (sw <= c0 + 1e-9) return Math.min(st, Math.max(prevEnd, st - VA.CUT_LEAD));
+          return st + (en - st) * (sw - c0) / n;
+        }
+        prevEnd = en;
+      }
+      return audioEnd;
+    };
+  }
+  // 장면들 → { buffer, total, scenes: [{ s0, secs, groups: [{raw, text, s0, s1}] }] } (groups 시각은 장면 안 초)
+  async function vaBuild(scenes) {
+    const s = vaSettings();
+    const items = [];
+    const plans = scenes.map((sc) => {
+      if (!sc.lines.length) return { empty: Math.max(0, Number(sc.empty) || 0) };
+      const its = sc.lines.map((raw, li) => {
+        const L = vaLine(raw);
+        let mute = Number(sc.secs[li]) || 0;
+        // 쉼 표시만 있는 줄(보이는 글자도 없음)은 쉼 길이만 (파이프라인과 같다)
+        if (!L.hasVoice && !capPlainText(genCaptionShown(raw)).trim() && L.pauses.length) mute = L.pauses.reduce((a, p) => a + p[1], 0) * GEN_CAP_PAUSE_SEC;
+        return { raw, ...L, mute };
+      });
+      its.forEach((it) => { if (it.hasVoice) items.push(it); });
+      return { lines: its };
+    });
+    if (!items.length) throw new Error("읽을 글자가 없어요");
+    const chunks = vaChunks(items);
+    const res = await Promise.all(chunks.map((ch) => vaFetch(ch.map((it) => it.speak).join(" "), s)));
+    const sr = res[0].buf.sampleRate;
+
+    // 1) 목소리 흐름: 묶음마다 앞뒤 무음을 자르고 이어 붙인다. 줄마다 흐름 안의 범위 a~b와 쉼 자리
+    const parts = [];
+    let streamLen = 0;
+    chunks.forEach((chunk, ci) => {
+      const data = res[ci].buf.getChannelData(0);
+      const [t0, t1] = vaTrim(data, sr, res[ci].words);
+      const pcm = data.subarray(t0, t1);
+      const words = res[ci].words.map((w) => ({ text: w.text, start: w.start - t0 / sr, end: w.end - t0 / sr }));
+      const n = pcm.length;
+      const timeAt = vaTimeAt(words, chunk.reduce((a, it) => a + it.nchars, 0), n / sr);
+      if (ci > 0) {
+        const gap = Math.round(Math.max(0, VA.CHUNK_GAP - VA.TRIM_TAIL - VA.TRIM_LEAD) * sr);
+        parts.push({ n: gap, data: null });
+        const last = chunks[ci - 1][chunks[ci - 1].length - 1];
+        const oldB = last.b;
+        last.b = streamLen + gap;
+        last.pts = last.pts.map(([p, d]) => [p === oldB ? last.b : p, d]);
+        streamLen += gap;
+      }
+      const base = streamLen;
+      const starts = [];
+      let pos = 0;
+      chunk.forEach((it) => { starts.push(pos); pos += it.nchars; });
+      const cuts = [0, ...starts.slice(1).map((p) => Math.round(timeAt(p) * sr)), n];
+      for (let k = 1; k < cuts.length; k++) cuts[k] = Math.min(Math.max(cuts[k], cuts[k - 1]), n);
+      chunk.forEach((it, j) => {
+        const a = cuts[j], b = cuts[j + 1];
+        it.pts = it.pauses.map(([p, cnt]) => {
+          const at = p <= 0 ? a : p >= it.nchars ? b : Math.min(Math.max(Math.round(timeAt(starts[j] + p) * sr), a), b);
+          return [base + at, cnt * GEN_CAP_PAUSE_SEC];
+        });
+        it.a = base + a; it.b = base + b;
+      });
+      parts.push({ n, data: pcm });
+      streamLen += n;
+    });
+    const stream = new Float32Array(streamLen);
+    let o = 0;
+    parts.forEach((p) => { if (p.data) stream.set(p.data, o); o += p.n; });
+
+    // 2) 장면 순서대로 이어 붙이고, 정해진 자리에만 무음
+    const pieces = [];
+    let outLen = 0;
+    const take = (a, b) => { if (b > a) { pieces.push([a, b]); outLen += b - a; } };
+    const sil = (sec) => { const n = Math.max(0, Math.round(sec * sr)); if (n) { pieces.push([-1, n]); outLen += n; } };
+    const cur = () => outLen / sr;
+    const outScenes = plans.map((plan) => {
+      const s0 = cur();
+      const groups = [];
+      if (plan.empty != null) sil(plan.empty);
+      else plan.lines.forEach((it) => {
+        const ls = cur();
+        if (!it.hasVoice) sil(it.mute);
+        else {
+          let prev = it.a;
+          it.pts.forEach(([p, d]) => { take(prev, p); sil(d); prev = p; });
+          take(prev, it.b);
+        }
+        groups.push({ raw: it.raw, text: capPlainText(genCaptionSpoken(it.raw)), s0: ls - s0, s1: cur() - s0 });
+      });
+      return { s0, secs: cur() - s0, groups };
+    });
+    const ctx = vaAudio();
+    const buffer = ctx.createBuffer(1, Math.max(1, outLen), sr);
+    const ch = buffer.getChannelData(0);
+    o = 0;
+    pieces.forEach(([a, b]) => {
+      if (a < 0) { o += b; return; }
+      ch.set(stream.subarray(a, b), o);
+      o += b - a;
+    });
+    return { buffer, total: outLen / sr, scenes: outScenes, calls: chunks.length };
+  }
+  // 장면별 결과 (카드 미리보기가 전체 미리보기 결과를 다시 쓴다): key → { buffer, off, secs, groups }
+  const vaSceneMem = new Map();
+  function vaRemember(key, v) {
+    vaSceneMem.delete(key);
+    vaSceneMem.set(key, v);
+    while (vaSceneMem.size > 60) vaSceneMem.delete(vaSceneMem.keys().next().value);
+  }
+  const vaFailed = new Map();   // key → 실패 시각 (1분 동안은 다시 부르지 않고 휴대폰 목소리로)
+  function vaFailedRecently(key) {
+    const t = vaFailed.get(key);
+    return t != null && performance.now() - t < 60000;
+  }
+  // 재생기: 한 번에 하나 (카드 또는 전체 미리보기)
+  const vp = { src: null, at: 0, t: 0 };
+  function vpStart(buffer, off, t, end) {
+    vpStop();
+    const ctx = vaAudio();
+    if (!ctx || !buffer) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    const dur = Math.max(0, end - t);
+    if (dur <= 0.001) return;
+    try { src.start(0, Math.max(0, off + t), dur); } catch { return; }
+    vp.src = src; vp.at = ctx.currentTime; vp.t = t;
+  }
+  function vpStop() {
+    if (vp.src) {
+      try { vp.src.stop(); } catch {}
+      try { vp.src.disconnect(); } catch {}
+      vp.src = null;
+    }
+  }
+  // 지금 재생 위치(초) — 소리 장치 시계를 기준으로 (없거나 멈춰 있으면 null → 화면 시계)
+  function vpNow() {
+    if (!vp.src || !vaCtx || vaCtx.state !== "running") return null;
+    return vp.t + (vaCtx.currentTime - vp.at);
+  }
+  // 짧은 안내 (준비 중 / 대체 안내)
+  let vaNoteTimer = 0;
+  function vaNote(text, keep) {
+    let n = $("vaNote");
+    if (!n) {
+      n = document.createElement("div");
+      n.id = "vaNote";
+      n.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:70;max-width:min(92vw,420px);padding:9px 14px;border-radius:6px;background:rgba(20,20,20,0.92);border:1px solid #444;color:#fff;font-size:0.85rem;font-weight:700;text-align:center;pointer-events:none;";
+      document.body.appendChild(n);
+    }
+    clearTimeout(vaNoteTimer);
+    n.textContent = text;
+    n.style.display = "block";
+    if (!keep) vaNoteTimer = setTimeout(vaNoteHide, 3500);
+  }
+  // "준비 중" 안내를 기다리는 곳이 더 없으면 닫는다
+  function vaNoteDone() {
+    const n = $("vaNote");
+    if (!n || n.textContent !== VA_LOADING) return;
+    if ((pvActive && pvActive.voiceLoading) || (fpv.open && fpv.voiceState === "loading" && fpv.wantPlay)) return;
+    vaNoteHide();
+  }
+  function vaNoteHide() {
+    clearTimeout(vaNoteTimer);
+    const n = $("vaNote");
+    if (n) n.style.display = "none";
+  }
+  const VA_LOADING = "실제 성우 목소리 준비 중…";
+  const VA_FALLBACK = "실제 목소리를 못 불러와 휴대폰 목소리로 들려줘요";
+
+  // ───── 음성 2 (대체): 휴대폰 목소리 (실제 영상의 목소리와 다르다) ─────
   // 영상처럼 줄을 끊지 않고 이어 읽는다(계약서 11절). 읽는 글자 = 줄의 spoken([ ] 안 포함, { }·쉼 표시 제외).
   // 쉼(-)이나 { } 전용 줄에서만 말(utterance)을 나누고, 그 쉼 길이만큼 기다렸다가 다음 말을 읽는다.
   // 너무 긴 말은 브라우저 한계 때문에 문장 끝에서 나눠 차례로 읽는다. 자막은 지금처럼 시각 기준이라 조금 어긋날 수 있다.
@@ -3769,20 +4081,70 @@
       speechSynthesis.speak(u);
     } catch { sp.on = false; }
   }
+  // 카드 재생: 그 장면 문장만 실제 성우 목소리로 (전체 미리보기에서 받은 결과가 있으면 그것을 다시 쓴다)
+  // 준비되는 동안은 "준비 중" 안내, 실패하면 휴대폰 목소리로
   function pvPlay(el) {
-    const ctx = pvActivate(el);
+    let ctx = pvActivate(el);
     if (!ctx) return;
+    const seg = segOfEl(el);
+    const input = seg ? vaSceneInput(el, seg, ctx.secs) : null;
+    if (input && vaHasVoice(input)) {
+      const key = vaSceneKey(input);
+      const v = vaSceneMem.get(key);
+      if (v) {
+        if (ctx.voiceKey !== key) ctx = pvVoiceCard(ctx, seg, key, v);
+      } else if (!vaFailedRecently(key)) {
+        if (ctx.voiceLoading === key) return;   // 이미 받는 중
+        ctx.voiceLoading = key;
+        ctx.P.play.textContent = "…";
+        vaNote(VA_LOADING, true);
+        vaBuild([input]).then((res) => {
+          const sc = res.scenes[0];
+          vaRemember(key, { buffer: res.buffer, off: 0, secs: sc.secs, groups: sc.groups });
+          if (pvActive !== ctx || ctx.voiceLoading !== key) { vaNoteDone(); return; }   // 그 사이 다른 카드로 옮겼거나 멈췄다
+          ctx.voiceLoading = null;
+          vaNoteHide();
+          pvPlay(el);
+        }).catch((err) => {
+          console.warn("실제 성우 목소리 실패:", err);
+          vaFailed.set(key, performance.now());
+          if (pvActive !== ctx || ctx.voiceLoading !== key) { vaNoteDone(); return; }
+          ctx.voiceLoading = null;
+          vaNote(VA_FALLBACK);
+          pvPlay(el);
+        });
+        return;
+      } else if (ctx.voice) {
+        ctx = pvVoiceCard(ctx, seg, null, null);   // 실패한 설정으로 돌아왔다: 예상 길이로 다시
+      }
+    }
+    pvPlayGo(ctx);
+  }
+  // 카드 무대를 실제 목소리 길이(v)로 다시 만든다 (같은 비율 자리에서). v가 null이면 콘티 예상 길이로
+  function pvVoiceCard(ctx, seg, key, v) {
+    const frac = ctx.secs > 0 ? ctx.t / ctx.secs : 0;
+    pvStop(ctx);
+    const nc = v ? pvBuild(ctx.el, seg, null, v.secs, v.groups) : pvBuild(ctx.el, seg);
+    nc.voice = v; nc.voiceKey = key;
+    nc.t = Math.min(nc.secs, frac * nc.secs);
+    pvActive = nc;
+    pvShow(nc, nc.t, true);
+    return nc;
+  }
+  function pvPlayGo(ctx) {
     if (ctx.t >= ctx.secs - 0.05) ctx.t = 0;
     ctx.playing = true;
     ctx.shown = -2;
-    spStart(ctx.groups, ctx.t);   // 재생을 시작한 그 줄부터 장면 끝까지 이어 읽는다
+    if (ctx.voice) vpStart(ctx.voice.buffer, ctx.voice.off, ctx.t, ctx.secs);   // 실제 목소리: 그 시점부터
+    else spStart(ctx.groups, ctx.t);   // 휴대폰 목소리: 재생을 시작한 그 줄부터 장면 끝까지 이어 읽는다
     ctx.P.play.textContent = "❚❚";
     ctx.P.play.classList.add("on");
     ctx.t0 = performance.now() - ctx.t * 1000;
     pvShow(ctx, ctx.t, true);
     const tick = (now) => {
       if (pvActive !== ctx || !ctx.playing) return;
-      const t = (now - ctx.t0) / 1000;
+      const vt = ctx.voice ? vpNow() : null;
+      const t = vt != null ? vt : (now - ctx.t0) / 1000;
       if (t < ctx.secs) {   // 장면 길이(자막 줄 길이 합)에서 끝난다 — 영상과 같다
         pvShow(ctx, t, false);
         ctx.raf = requestAnimationFrame(tick);
@@ -3798,6 +4160,8 @@
     ctx.raf = requestAnimationFrame(tick);
   }
   function pvToggle(el) {
+    vaAudio();   // 누른 순간에 소리 장치를 깨워 둔다 (나중에 목소리가 준비돼도 소리가 나게)
+    if (pvActive && pvActive.el === el && pvActive.voiceLoading) { pvActive.voiceLoading = null; vaNoteHide(); pvStop(pvActive); return; }   // 준비 중에 다시 누르면 취소
     if (pvActive && pvActive.el === el && pvActive.playing) pvStop(pvActive);
     else if (pvGuideNeeded()) pvShowGuide(() => pvPlay(el));
     else pvPlay(el);
@@ -3828,7 +4192,8 @@
     if (ctx.playing) {
       ctx.t0 = performance.now() - t * 1000;
       ctx.shown = -2;
-      spStart(ctx.groups, t);   // 옮긴 자리의 줄부터 다시 읽는다
+      if (ctx.voice) vpStart(ctx.voice.buffer, ctx.voice.off, t, ctx.secs);
+      else spStart(ctx.groups, t);   // 옮긴 자리의 줄부터 다시 읽는다
     }
     pvShow(ctx, t, true);
   }
@@ -3996,7 +4361,10 @@
   // ───── 전체 미리보기: 모든 장면을 순서대로 한 무대에서 이어 재생 ─────
   // 장면 길이 = effectiveSeconds(영상 생성의 weight_seconds와 같은 값). 지금 장면만 카드 엔진(pvBuild/pvShow)으로 무대에 만든다.
   // 시계는 전체 시각 하나(fpv.t0)이고, 장면이 바뀌는 순간 그 장면을 새로 만들어 이어 붙인다.
-  const fpv = { open: false, scenes: [], items: [], total: 0, si: -1, ctx: null, playing: false, t: 0, t0: 0, raf: 0 };
+  // 실제 성우 목소리(voice)가 준비되면 장면 길이·자막 줄 구간을 그 목소리의 실제 시각으로 바꾼다(fpvApplyVoice).
+  // voiceState: "loading" | "ready" | "failed"(휴대폰 목소리로). wantPlay: 준비 중에 재생을 눌러 둔 상태
+  const fpv = { open: false, scenes: [], items: [], total: 0, si: -1, ctx: null, playing: false, t: 0, t0: 0, raf: 0,
+    voice: null, voiceState: "", vgen: 0, wantPlay: false };
   function fpvParts() {
     const st = $("fpvStage");
     return {
@@ -4025,7 +4393,7 @@
     if (fpv.ctx) pvStop(fpv.ctx);
     const sc = fpv.scenes[si];
     fpv.si = si;
-    const ctx = pvBuild(sc.el, sc.seg, fpvParts(), sc.secs);
+    const ctx = pvBuild(sc.el, sc.seg, fpvParts(), sc.secs, sc.groups);
     ctx.full = true;
     ctx.playing = fpv.playing;
     ctx.shown = -2;
@@ -4054,12 +4422,17 @@
       if (fpv.playing) fpv.ctx.shown = -2;
       pvShow(fpv.ctx, local, true);
     }
-    if (fpv.playing) spStart(fpv.items, T);   // 옮긴 자리의 줄부터 다시 이어 읽는다
+    if (fpv.playing) fpvVoiceAt(T);   // 옮긴 자리부터 다시 (휴대폰 목소리는 그 줄부터 이어 읽는다)
     fpvUi();
+  }
+  function fpvVoiceAt(T) {
+    if (fpv.voice) vpStart(fpv.voice.buffer, 0, T, fpv.total);
+    else spStart(fpv.items, T);
   }
   function fpvTick(now) {
     if (!fpv.open || !fpv.playing) return;
-    const T = (now - fpv.t0) / 1000;
+    const vt = fpv.voice ? vpNow() : null;   // 실제 목소리면 소리 장치 시계를 따른다
+    const T = vt != null ? vt : (now - fpv.t0) / 1000;
     if (T >= fpv.total) {   // 끝: 마지막 장면 끝 화면에서 멈춘다
       const last = fpv.scenes.length - 1;
       if (fpv.si !== last) fpvEnter(last, fpv.scenes[last].secs);
@@ -4072,12 +4445,19 @@
     const si = fpvSceneAt(T);
     if (si !== fpv.si) fpvEnter(si, T - fpv.scenes[si].s0);
     else pvShow(fpv.ctx, T - fpv.scenes[si].s0, false);
-    spTick(T);   // 목소리는 장면 경계에서도 끊지 않고 전체 시간축으로 이어 읽는다
+    if (!fpv.voice) spTick(T);   // 휴대폰 목소리는 장면 경계에서도 끊지 않고 전체 시간축으로 이어 읽는다
     fpvUi();
     fpv.raf = requestAnimationFrame(fpvTick);
   }
   function fpvPlay() {
     if (!fpv.open || !fpv.scenes.length) return;
+    if (fpv.voiceState === "loading") {   // 성우 목소리가 오면 그때 재생한다 (fpvVoicePrepare)
+      fpv.wantPlay = true;
+      $("fpvPlay").textContent = "…";
+      vaNote(VA_LOADING, true);
+      return;
+    }
+    fpv.wantPlay = false;
     if (fpv.t >= fpv.total - 0.05) fpv.t = 0;
     fpv.playing = true;
     fpv.t0 = performance.now() - fpv.t * 1000;
@@ -4085,24 +4465,81 @@
     const local = fpv.t - fpv.scenes[si].s0;
     if (si !== fpv.si || !fpv.ctx) fpvEnter(si, local);
     else { fpv.ctx.playing = true; fpv.ctx.shown = -2; pvShow(fpv.ctx, local, true); }
-    spStart(fpv.items, fpv.t);
+    fpvVoiceAt(fpv.t);
     fpvUi();
     cancelAnimationFrame(fpv.raf);
     fpv.raf = requestAnimationFrame(fpvTick);
   }
   function fpvPause() {
     fpv.playing = false;
+    if (fpv.wantPlay) { fpv.wantPlay = false; vaNoteDone(); }
     cancelAnimationFrame(fpv.raf);
     if (fpv.ctx) pvStop(fpv.ctx);
     spStop();
+    vpStop();
     fpvUi();
   }
   function fpvToggle() {
-    if (fpv.playing) fpvPause();
+    vaAudio();   // 누른 순간에 소리 장치를 깨워 둔다
+    if (fpv.playing || fpv.wantPlay) fpvPause();
     else if (pvGuideNeeded()) pvShowGuide(fpvPlay);
     else fpvPlay();
   }
+  // 영상 전체의 읽을 문장을 /api/tts로 받아 실제 목소리 흐름을 만든다 (파이프라인과 같은 규칙, vaBuild)
+  function fpvVoicePrepare() {
+    const gen = ++fpv.vgen;
+    fpv.voice = null;
+    const input = fpv.scenes.map((sc) => vaSceneInput(sc.el, sc.seg, sc.secs));
+    if (!input.some(vaHasVoice)) { fpv.voiceState = "failed"; return; }   // 읽을 글자가 없으면 목소리 없이 (예상 길이)
+    fpv.voiceState = "loading";
+    vaBuild(input).then((res) => {
+      if (gen !== fpv.vgen || !fpv.open) return;
+      // 장면별 결과를 카드 미리보기가 다시 쓸 수 있게 남긴다
+      input.forEach((inp, i) => {
+        if (vaHasVoice(inp)) vaRemember(vaSceneKey(inp), { buffer: res.buffer, off: res.scenes[i].s0, secs: res.scenes[i].secs, groups: res.scenes[i].groups });
+      });
+      fpv.voiceState = "ready";
+      fpvApplyVoice(res);
+    }).catch((err) => {
+      if (gen !== fpv.vgen || !fpv.open) return;
+      console.warn("실제 성우 목소리 실패:", err);
+      fpv.voiceState = "failed";
+      const waiting = fpv.wantPlay;
+      vaNote(VA_FALLBACK);
+      if (waiting) fpvPlay();
+    });
+  }
+  // 실제 목소리의 장면 길이·자막 줄 구간으로 시간축을 바꾼다 (지금 자리는 같은 장면 안 같은 비율 자리로)
+  function fpvApplyVoice(res) {
+    const T = fpv.t;
+    const si = fpv.scenes.length ? fpvSceneAt(Math.min(T, fpv.total - 0.001)) : 0;
+    const old = fpv.scenes[si];
+    const frac = old && old.secs > 0 ? Math.max(0, Math.min(1, (T - old.s0) / old.secs)) : 0;
+    fpv.scenes.forEach((sc, i) => { sc.s0 = res.scenes[i].s0; sc.secs = res.scenes[i].secs; sc.groups = res.scenes[i].groups; });
+    fpv.total = res.total;
+    fpv.voice = res;
+    fpvTicks();
+    if (fpv.ctx) pvStop(fpv.ctx);
+    fpv.ctx = null; fpv.si = -1;
+    const nt = old ? fpv.scenes[si].s0 + frac * fpv.scenes[si].secs : 0;
+    const waiting = fpv.wantPlay;
+    fpv.wantPlay = false;
+    fpvSeek(nt);
+    if (waiting) { vaNoteHide(); fpvPlay(); }
+  }
+  // 진행 막대의 장면 경계 눈금
+  function fpvTicks() {
+    const bar = $("fpvBar");
+    bar.querySelectorAll(".fpv-tick").forEach((n) => n.remove());
+    fpv.scenes.slice(1).forEach((s) => {
+      const k = document.createElement("div");
+      k.className = "fpv-tick";
+      k.style.left = s.s0 / fpv.total * 100 + "%";
+      bar.appendChild(k);
+    });
+  }
   function fpvOpen() {
+    vaAudio();   // 누른 순간에 소리 장치를 깨워 둔다
     pvDeactivate();   // 카드 미리보기는 멈추고 정지 화면으로
     const cards = Array.from(document.querySelectorAll(".seg-item"));
     let acc = 0;
@@ -4127,15 +4564,10 @@
     m.classList.add("open");
     m.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
-    const bar = $("fpvBar");
-    bar.querySelectorAll(".fpv-tick").forEach((n) => n.remove());
-    fpv.scenes.slice(1).forEach((s) => {
-      const k = document.createElement("div");
-      k.className = "fpv-tick";
-      k.style.left = s.s0 / fpv.total * 100 + "%";
-      bar.appendChild(k);
-    });
+    fpvTicks();
     fpvLayout();
+    fpv.wantPlay = false;
+    fpvVoicePrepare();
     fpvSeek(0);
     if (pvGuideNeeded()) pvShowGuide(fpvPlay); else fpvPlay();
   }
@@ -4144,7 +4576,10 @@
     fpvPause();
     fpv.open = false;
     fpv.ctx = null; fpv.si = -1;
+    fpv.vgen++; fpv.voice = null; fpv.voiceState = ""; fpv.wantPlay = false;
+    vaNoteHide();
     spStop();
+    vpStop();
     $("fpvStage").querySelector(".pv-layer").innerHTML = "";   // 영상 요소를 치워 내려받기를 멈춘다
     const m = $("fpv");
     m.classList.remove("open");
