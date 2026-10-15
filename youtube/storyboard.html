@@ -120,12 +120,15 @@
   .settings-card .sr-input { background:transparent; border:none; border-radius:0; padding:0; margin:0; font-size:0.8rem; font-weight:800; color:#0f0a14; width:100%; }
   .settings-card .sr-input::placeholder { color:#3f7a28; font-weight:400; }
   .settings-card .sr-input:focus { outline:none; background:rgba(255,255,255,0.55); }
-  /* 카드 머리의 콘티 이름 (누르면 그 자리에서 고침) */
-  .conti-name { flex:1; min-width:0; font-weight:800; font-size:1.15rem; line-height:1.3; margin-bottom:6px; cursor:text; overflow-wrap:anywhere; }
-  .conti-name:focus-visible { outline:2px solid #0f0a14; outline-offset:2px; }
-  .settings-card .conti-name-input { flex:1; min-width:0; background:rgba(255,255,255,0.55); border:none; border-radius:3px; padding:2px 4px; margin:0 0 6px; font:inherit; font-weight:800; font-size:1.15rem; line-height:1.3; color:#0f0a14; }
-  .settings-card .conti-name-input:focus { outline:none; }
-  #soundHead:not(.show) { display:none; }
+  /* 카드 위 페이지 제목 = 콘티 이름 (누르면 그 자리에서 고침) */
+  .conti-name-wrap { margin:18px 0 0; min-width:0; }
+  .conti-name-wrap + #settingsCard { margin-top:8px !important; }
+  .conti-name { font-weight:900; font-size:1.5rem; line-height:1.25; color:#ffffff; cursor:text; overflow-wrap:anywhere; }
+  .conti-name:focus-visible { outline:2px solid #7cff4a; outline-offset:2px; }
+  .conti-name-input { display:block; width:100%; box-sizing:border-box; background:rgba(255,255,255,0.08); border:1px solid #7cff4a; border-radius:4px; padding:2px 6px; margin:0; font:inherit; font-weight:900; font-size:1.5rem; line-height:1.25; color:#ffffff; }
+  .conti-name-input::placeholder { color:#8c8299; font-weight:400; font-size:1rem; }
+  .conti-name-input:focus { outline:none; }
+  #soundHead:not(.show), #settingsHead:not(.show) { display:none; }
   /* 굴러가는 선택 휠 */
   .wheel-wrap { position:relative; margin:0; }
   .wheel { height:132px; overflow-y:auto; scroll-snap-type:y mandatory; background:#0f0a14; border-radius:6px; padding:44px 0; scrollbar-width:none; -webkit-mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); }
@@ -339,11 +342,13 @@
     </div>
     <div class="msg" id="msg"></div>
 
+    <!-- 카드 위 페이지 제목 = 콘티 이름. 누르면 그 자리에서 고치고 Enter/바깥 누르기로 바로 저장, Esc로 취소. 카드와 같이 보이고 같이 숨는다 -->
+    <div class="conti-name-wrap" id="contiNameWrap" style="display:none;">
+      <div class="conti-name" id="contiName" role="button" tabindex="0" title="눌러서 이름 바꾸기"></div>
+      <input class="conti-name-input" id="contiNameInput" maxlength="40" placeholder="콘티 이름 (영상 제목에 v1, v2…로 붙음)" style="display:none;">
+    </div>
     <div class="card-box settings-card" id="settingsCard" style="display:none;margin-top:14px;">
-      <!-- 카드 머리 = 콘티 이름. 누르면 그 자리에서 고치고 Enter/바깥 누르기로 바로 저장, Esc로 취소 -->
-      <div class="settings-head">
-        <div class="conti-name" id="contiName" role="button" tabindex="0" title="눌러서 이름 바꾸기"></div>
-        <input class="conti-name-input" id="contiNameInput" maxlength="40" placeholder="콘티 이름 (영상 제목에 v1, v2…로 붙음)" style="display:none;">
+      <div class="settings-head" id="settingsHead" style="justify-content:flex-end;">
         <span class="settings-dirty-badge" id="settingsDirtyBadge"></span>
       </div>
       <div class="sr-list" id="settingsSummary">
@@ -1848,6 +1853,7 @@
       badge.style.display = badgeText ? "inline-block" : "none";
     });
     $("soundHead").classList.toggle("show", $("soundDirtyBadge").style.display !== "none");
+    $("settingsHead").classList.toggle("show", $("settingsDirtyBadge").style.display !== "none");
   }
 
   // 카드 머리에 보이는 이름: 정한 이름, 없으면 대본 후킹 앞부분
@@ -1905,7 +1911,7 @@
   function loadSettingsCard(scriptId) {
     const card = $("settingsCard");
     const row = scripts.find((r) => String(r.id) === String(scriptId));
-    if (!row) { card.style.display = "none"; $("soundCard").style.display = "none"; return; }
+    if (!row) { card.style.display = "none"; $("contiNameWrap").style.display = "none"; $("soundCard").style.display = "none"; return; }
     currentSettings = { ...DEFAULT_SETTINGS, ...(row.video_settings || {}) };
     savedBgmPath = currentSettings.bgm_path || null;
     // 이름을 따로 안 정했으면 카드 머리에는 대본 후킹 앞부분을 보여 준다(contiDisplayName). 저장값은 그대로 둔다
@@ -1933,6 +1939,7 @@
     $("ttsPitch").value = currentSettings.tts_pitch;
     updateVoiceLabels();
     card.style.display = "block";
+    $("contiNameWrap").style.display = "block";
     $("soundCard").style.display = "block";
     closeWheel();
     stopBgmPlayer();
