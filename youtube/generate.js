@@ -10,18 +10,42 @@ function genAssetUrl(path) {
   return `${GEN_SUPABASE_URL}/storage/v1/object/public/youtube-assets/${path}`;
 }
 
-// 콘티 페이지와 같은 기준(초당 4.3자) — 노출 시간을 직접 안 정했으면 대사 길이로 추정.
+// 콘티 페이지와 같은 기준(초당 4.3자) — 노출 시간을 직접 안 정했으면 대사 길이로 추정. (자막 줄이 없는 장면용)
 function genEstimateSeconds(text) {
   const len = (text || "").replace(/\*\*/g, "").replace(/(^|\s)\/(?=\s|$)/g, "").replace(/\s+/g, "").length;   // 자막 끊김 표시(/)는 읽지 않는다
   return Math.max(1, len / 4.3);
+}
+
+// ───── 자막 줄 = 화면 단위 (youtube-automation docs/storyboard-contract.md 6절) ─────
+// 콘티 화면(storyboard.html)도 이 함수들을 그대로 써서, 콘티의 길이 = 생성 요청의 길이가 되게 한다.
+// 줄바꿈 = 자막 한 줄. 빈 줄은 무시. 옛 표시 " / "(앞뒤 공백 있는 /)도 줄바꿈으로 본다. **강조**는 그대로 둔다
+function genCaptionLines(text) {
+  return String(text || "").replace(/\r/g, "").replace(/[ \t]+\/[ \t]+/g, "\n")
+    .split("\n").map((l) => l.trim()).filter(Boolean);
+}
+// 예상 목소리 길이(초) = max(0.6, 글자수 / 4.3 / (1 + tts_rate/100)). 글자수는 공백·**·/를 뺀 길이
+function genCaptionEst(line, ttsRate) {
+  const len = String(line || "").replace(/\*\*/g, "").replace(/\//g, "").replace(/\s+/g, "").length;
+  const rate = 1 + (Number(ttsRate) || 0) / 100;
+  return Math.max(0.6, len / 4.3 / (rate > 0 ? rate : 1));
+}
+// 줄별 최종 길이: 정한 값(asset_trims.__cap_secs[i])이 있으면 그 값(단, 예상 길이보다 짧을 수 없다), 없거나 null이면 예상 길이 + 0.3
+function genCaptionSecs(lines, capSecs, ttsRate) {
+  const arr = Array.isArray(capSecs) ? capSecs : [];
+  return lines.map((l, i) => {
+    const est = genCaptionEst(l, ttsRate);
+    const v = Number(arr[i]);
+    return arr[i] != null && v > 0 ? Math.max(est, v) : est + 0.3;
+  });
 }
 
 // 콘티(장면)의 대사를 이어붙인 것이 실제 음성/자막의 원본이 된다. 대사에서 **글자**로 표시한 부분은 강조 자막이 된다.
 function genToMarkdown(r, segRows) {
   const baseTerms = (r.emphasize_terms || "").split(",").map((s) => s.trim()).filter(Boolean);
   const markedTerms = [];
+  // 장면 안의 자막 줄(줄바꿈)은 그대로 줄로 넣는다 (빈 줄만 뺀다)
   const lines = (segRows || [])
-    .map((s) => (s.script_text || "").trim())
+    .map((s) => (s.script_text || "").replace(/\r/g, "").split("\n").map((l) => l.trim()).filter(Boolean).join("\n"))
     .filter(Boolean)
     .map((t) => t.replace(/\*\*(.+?)\*\*/g, (_, term) => { markedTerms.push(term.trim()); return term; }));
   const terms = [...new Set([...baseTerms, ...markedTerms])];
@@ -49,18 +73,28 @@ ${body}
 `;
 }
 
-function genBuildSegments(segRows) {
+// videoSettings: youtube_scripts.video_settings. tts_rate로 자막 줄 예상 길이를 계산한다.
+// 큐레이션(mode=curation)은 옛 방식 그대로라 자막 줄(caption_lines)을 보내지 않는다 (계약서 6-4 마지막 줄)
+function genBuildSegments(segRows, videoSettings) {
+  const vs = videoSettings || {};
+  const lineMode = vs.mode !== "curation";
   return [...segRows].sort((a, b) => a.order_no - b.order_no).map((s) => {
     const trims = s.asset_trims || {};
     const weights = trims.__weights || {};
+    // 자막 줄과 줄별 길이 (계약서 6-3). 자동인 줄도 숫자로 풀어서 보낸다
+    const capLines = lineMode ? genCaptionLines(s.script_text) : [];
+    const capSecs = genCaptionSecs(capLines, trims.__cap_secs, vs.tts_rate).map((v) => Number(v.toFixed(2)));
+    const capSum = Number(capSecs.reduce((a, b) => a + b, 0).toFixed(2));
     return {
       section: s.section,
       script_text: s.script_text,
       keyword: s.keyword,
       direction: s.direction,
-      weight_seconds: s.target_seconds > 0 ? Number(s.target_seconds) : genEstimateSeconds(s.script_text),
+      ...(lineMode ? { caption_lines: capLines, caption_secs: capSecs } : {}),
+      // 자막 줄이 있으면 줄 길이 합. 없으면(빈 "내 의견" 등) 노출 시간(target_seconds), 그것도 없으면 대사 길이 추정(빈 대사면 1)
+      weight_seconds: capLines.length ? capSum : s.target_seconds > 0 ? Number(s.target_seconds) : genEstimateSeconds(s.script_text),
       asset_urls: (s.asset_paths || []).map(genAssetUrl),
-      // 영상/GIF 소재별 사용 구간 (소재 주소 -> {start, end}). __focus/__weights/__autofill/__cleared/__pexels 같은 "__" 칸은 소재가 아니라서 뺀다
+      // 영상/GIF 소재별 사용 구간 (소재 주소 -> {start, end}). __focus/__weights/__autofill/__cleared/__pexels/__cap_secs 같은 "__" 칸은 소재가 아니라서 뺀다
       asset_trims: Object.fromEntries(Object.entries(trims).filter(([k]) => !k.startsWith("__")).map(([path, t]) => [genAssetUrl(path), t])),
       // 사진/영상을 화면 비율로 자를 때 남길 부분 (asset_trims.__focus에 소재별로 저장됨)
       asset_focus: Object.fromEntries(Object.entries(trims.__focus || {}).filter(([k]) => !k.startsWith("__")).map(([path, f]) => [genAssetUrl(path), f])),
@@ -111,8 +145,8 @@ async function genFetchStatus(scriptId) {
 
 // 깃허브 액션에 영상 생성을 시킨다. 실패하면 Error를 던진다.
 async function genStart(row, segRows, version) {
-  const segments = genBuildSegments(segRows);
   const vs = row.video_settings || {};
+  const segments = genBuildSegments(segRows, vs);
   const settings = {
     caption_font_size: vs.caption_font_size,
     layout: vs.layout,

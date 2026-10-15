@@ -28,6 +28,9 @@
   .seg-duration-input { width:64px; padding:4px 6px; font-size:0.8rem; margin:0; }
   .seg-item input, .seg-item textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
   .seg-script, .seg-direction { min-height:50px; background:#17141c; color:#ffffff; resize:none; overflow:hidden; }
+  /* 자막 칸: 한 줄 = 자막 한 번 (줄바꿈이 그대로 보이게) */
+  .seg-item .seg-script { color:#7cff4a; font-size:0.85rem; line-height:1.6; white-space:pre-wrap; }
+  .seg-item .seg-script::placeholder { color:#4f7a3c; }
   .seg-thumb-empty { width:100%; height:50px; border-radius:3px; background:#0f0a14; margin-bottom:8px; display:flex; align-items:center; justify-content:center; color:#a89bb5; font-size:0.8rem; text-align:center; padding:8px; }
   .seg-icon-btn { width:26px; height:26px; padding:0; margin:0; border-radius:50%; background:#0f0a14; color:#a89bb5; font-size:0.95rem; line-height:1; flex-shrink:0; text-transform:none; }
   .seg-icon-btn:hover { background:#7cff4a; color:#0f0a14; }
@@ -188,13 +191,12 @@
   .seg-stage .pv-cut { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
   .seg-stage .pv-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:14px; text-align:center; color:#a89bb5; font-size:0.95rem; line-height:1.5; background:#17101f; }
   .seg-stage-side { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
-  .seg-play { width:52px; height:52px; padding:0; margin:0; border-radius:50%; background:#7cff4a; color:#0f0a14; font-size:1.25rem; line-height:1; text-transform:none; letter-spacing:0; }
-  .seg-play:hover { background:#ffffff; }
-  .seg-play.on { background:#ffffff; }
+  /* 멈춰 있을 때만 화면 가운데 반투명 ▶ (누르는 건 화면 자체가 받는다) */
+  .seg-play { position:absolute; left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px; border-radius:50%; background:rgba(15,10,20,0.45); color:rgba(255,255,255,0.85); font-size:1.3rem; display:flex; align-items:center; justify-content:center; padding-left:4px; box-sizing:border-box; pointer-events:none; z-index:4; transition:opacity .15s; }
+  .seg-play.on { opacity:0; }
   .seg-pv-time { font-variant-numeric:tabular-nums; font-weight:800; font-size:0.85rem; color:#fff; }
   .seg-pv-info { color:#a89bb5; font-size:0.7rem; line-height:1.4; }
   .seg-pv-info .warn { color:#ffd93d; }
-  .seg-stage-side .pv-opt { margin-top:auto; font-size:0.68rem; line-height:1.3; align-items:flex-start; }
   /* 순서 바꾸기 중: 미리보기 자리에 잡고 있는 클립을 크게 */
   .seg-stage-ro { display:none; position:absolute; inset:0; z-index:5; background:#0f0a14; }
   .seg-stage-ro.on { display:block; }
@@ -231,6 +233,25 @@
   .seg-tl-play.on { display:block; }
   .seg-tl-add { flex:0 0 36px; width:36px; height:48px; align-self:flex-end; margin:0; padding:0; border-radius:6px; background:#0f0a14; color:#7cff4a; border:2px dashed #7cff4a; font-size:1.4rem; line-height:1; text-transform:none; letter-spacing:0; }
   .seg-tl-add.on { background:#7cff4a; color:#0f0a14; border-style:solid; }
+  /* 자막 트랙 (EDITS 자막 줄처럼): 영상 트랙 바로 아래, 같은 시간축. 블록 끝을 끌어 그 줄의 화면 유지 시간을 바꾼다 */
+  .seg-cap-area { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; margin-top:6px; }
+  .seg-cap-area:empty { display:none; }
+  .seg-cap-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#a89bb5; font-size:0.68rem; margin-bottom:3px; min-height:20px; }
+  .seg-cap-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:#0f0a14; color:#ffd93d; text-transform:none; letter-spacing:0; flex-shrink:0; }
+  .seg-cap-spacer { flex:0 0 36px; }
+  .seg-cap-track { position:relative; height:36px; margin:0 8px; background:#0f0a14; border-radius:4px; }
+  .seg-cap-blk { position:absolute; top:0; bottom:0; box-sizing:border-box; background:#5c4a12; border:1px solid #ffd93d; border-radius:4px; color:#fff3c4; touch-action:pan-y; cursor:pointer; }
+  .seg-cap-blk.set { background:#7a5f0c; }
+  .seg-cap-blk.on { background:#a07c10; }
+  .seg-cap-in { position:absolute; inset:0 10px 0 4px; overflow:hidden; display:flex; flex-direction:column; justify-content:center; pointer-events:none; line-height:1.15; }
+  .seg-cap-in .t { font-size:0.62rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .seg-cap-in .s { font-size:0.56rem; color:#ffd93d; white-space:nowrap; }
+  .seg-cap-handle { position:absolute; top:-2px; bottom:-2px; right:-12px; width:24px; touch-action:none; cursor:ew-resize; z-index:3; display:flex; justify-content:center; align-items:center; }
+  .seg-cap-handle::after { content:""; width:6px; height:70%; border-radius:3px; background:#ffd93d; box-shadow:0 0 0 2px #0f0a14; }
+  .seg-cap-handle.drag::after { background:#ffffff; }
+  .seg-cap-play { position:absolute; top:-3px; bottom:-3px; width:2px; margin-left:-1px; background:#fff; box-shadow:0 0 3px #000; pointer-events:none; z-index:4; display:none; }
+  .seg-cap-play.on { display:block; }
+  .pv-emph { font-family:'Black Han Sans',sans-serif; font-weight:400; color:#ffff00; font-size:1.15em; }
   .seg-tl-empty { flex:1; height:48px; align-self:flex-end; border:2px dashed #3a2f4a; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#7d7189; font-size:0.72rem; }
   /* + 메뉴 */
   .seg-add-menu { display:none; position:absolute; right:0; z-index:20; width:220px; background:#17101f; border:1px solid #3a2f4a; border-radius:6px; padding:6px; box-shadow:0 8px 24px rgba(0,0,0,0.6); }
@@ -361,6 +382,20 @@
     </div>
 
     <!-- 구간 지정 팝업: 영상/GIF에서 쓸 부분(시작~끝 초)을 고른다 -->
+    <div class="cap-modal" id="pvGuideModal">
+      <div class="cap-modal-box" style="max-width:320px;">
+        <div class="cap-modal-hint" style="font-size:0.9rem;font-weight:700;color:#fff;">장면 미리보기 안내</div>
+        <div style="color:#e8def5;font-size:0.82rem;line-height:1.6;margin:8px 0 4px;">
+          · 미리보기 화면을 누르면 재생, 다시 누르면 멈춰요.<br>
+          · 소리는 <b>휴대폰 목소리</b>로 읽어 줘요. 실제 영상의 목소리와는 달라요.<br>
+          · 화면 배치·자막 줄과 자막 길이·클립 전환은 실제 영상과 같아요.
+        </div>
+        <div class="trim-actions">
+          <button type="button" id="pvGuideOk" style="flex:1;background:#7cff4a;color:#0f0a14;">확인</button>
+          <button type="button" id="pvGuideNever" style="flex:1;background:#2d2240;border:1px solid #4a3a63;color:#e8def5;font-size:0.8rem;">다시 알림 보지 않기</button>
+        </div>
+      </div>
+    </div>
     <div class="cap-modal" id="trimModal">
       <div class="cap-modal-box" style="max-width:340px;">
         <button type="button" id="trimX" class="trim-x" title="저장하지 않고 닫기">✕</button>
@@ -446,6 +481,8 @@
   </div>
 
 <script src="/config.js"></script>
+<!-- 자막 줄 계산(genCaption*)을 콘티 화면도 같이 쓰므로 먼저 불러온다 -->
+<script src="/youtube/generate.js"></script>
 <script>
   const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
   const SUPABASE_ANON_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
@@ -527,10 +564,12 @@
   function isSubscribeSeg(seg) {
     return partOf(seg.section) === SUBSCRIBE_PART;
   }
-  // 장면 길이: 카드가 화면에 있으면 입력 중인 대사 기준, 없으면 저장된 값 기준
+  // 장면 길이: 카드가 화면에 있으면 입력 중인 자막 기준, 없으면 저장된 값 기준 (자막 줄이 있으면 줄 길이 합)
   function segSecondsOf(seg) {
     const el = document.querySelector(`.seg-item[data-id="${seg.id}"]`);
     if (el) return effectiveSeconds(el, seg);
+    const st = capState(seg.script_text, seg, null);
+    if (st.lines.length) return st.total;
     return seg.target_seconds > 0 ? Number(seg.target_seconds) : estimateSeconds(seg.script_text);
   }
   function clipWeights(seg) {
@@ -771,7 +810,7 @@
     const paths = seg.asset_paths || [];
     if (el._selPath && !paths.includes(el._selPath)) el._selPath = null;
     // 미리보기와 같은 길이 기준 (미리보기는 최소 2초)
-    const pvSecs = Math.max(2, secs);
+    const pvSecs = hasCaps(el) ? secs : Math.max(2, secs);
     const plan = clipPlan(seg, pvSecs);
     const stageRow = el.querySelector(".seg-stage-row");
     if (stageRow) stageRow.style.display = paths.length ? "flex" : "none";
@@ -863,7 +902,7 @@
     try { handle.setPointerCapture(e.pointerId); } catch {}
     handle.classList.add("drag");
     host.dataset.dragging = "1";
-    const secs = Math.max(2, effectiveSeconds(el, seg));
+    const secs = pvSecsOf(el, seg);
     const ws = clipWeights(seg);
     const sum = ws.reduce((a, b) => a + b, 0) || 1;
     const fr = ws.map((w) => w / sum);
@@ -1011,7 +1050,7 @@
   function pvSeekClip(el, idx) {
     const seg = segOfEl(el);
     if (!seg || idx < 0) return;
-    const plan = clipPlan(seg, Math.max(2, effectiveSeconds(el, seg)));
+    const plan = clipPlan(seg, pvSecsOf(el, seg));
     if (!plan[idx]) return;
     pvSeek(el, plan.slice(0, idx).reduce((a, c) => a + c.alloc, 0) + 0.02);
   }
@@ -1048,7 +1087,7 @@
     const avail = host.clientWidth || 280;
     const w = Math.max(18, Math.min(56, Math.floor((avail - gap * (n - 1)) / n)));
     const h = Math.round(w * 16 / 9);
-    const plan = clipPlan(seg, Math.max(2, effectiveSeconds(el, seg)));
+    const plan = clipPlan(seg, pvSecsOf(el, seg));
     Object.assign(g, { paths, step: w + gap, to: g.idx, rx0: g.lastX });
     const wrap = document.createElement("div");
     wrap.className = "seg-ro-wrap";
@@ -1143,9 +1182,178 @@
     return Math.max(1, len / CHARS_PER_SEC);
   }
 
+  // 장면 길이 = 자막 줄 길이 합 (자막이 없는 장면만 노출 시간 target_seconds, 그것도 없으면 1초)
   function effectiveSeconds(el, seg) {
+    const text = el.querySelector(".seg-script").value;
+    const st = capState(text, seg, el._capLive);
+    if (st.lines.length) return st.total;
     if (seg && seg.target_seconds > 0) return Number(seg.target_seconds);
-    return estimateSeconds(el.querySelector(".seg-script").value);
+    return estimateSeconds(text);
+  }
+  // 미리보기·타임라인 시간축 길이 (자막이 없는 장면은 미리보기 최소 2초)
+  function pvSecsOf(el, seg) {
+    const secs = effectiveSeconds(el, seg);
+    return hasCaps(el) ? secs : Math.max(2, secs);
+  }
+  function hasCaps(el) {
+    return genCaptionLines(el.querySelector(".seg-script").value).length > 0;
+  }
+
+  // ───── 자막 줄 = 화면 단위 (docs/storyboard-contract.md 6절). 식은 generate.js의 genCaption* 를 같이 쓴다 ─────
+  // 옛 표시 " / "는 화면에 보여줄 때 줄바꿈으로 (저장하면 줄바꿈으로 저장된다)
+  function normalizeScript(text) {
+    return String(text || "").replace(/\r/g, "").replace(/[ \t]+\/[ \t]+/g, "\n");
+  }
+  function ttsRateNow() {
+    return Number(currentSettings.tts_rate) || 0;
+  }
+  // 줄, 줄별 길이, 최소(예상 목소리) 길이, 직접 정한 줄인지. live: 끄는 중인 값 배열(없으면 저장된 __cap_secs)
+  function capState(text, seg, live) {
+    const lines = genCaptionLines(text);
+    const src = live || ((seg && seg.asset_trims) || {}).__cap_secs || [];
+    const rate = ttsRateNow();
+    const secs = genCaptionSecs(lines, src, rate);
+    const est = lines.map((l) => genCaptionEst(l, rate));
+    const custom = lines.map((_, i) => src[i] != null && Number(src[i]) > 0);
+    const starts = [];
+    let acc = 0;
+    secs.forEach((s) => { starts.push(acc); acc += s; });
+    return { lines, secs, est, custom, starts, total: acc };
+  }
+  function capStateOf(el, seg) {
+    return capState(el.querySelector(".seg-script").value, seg, el._capLive);
+  }
+  function capPlainText(line) {
+    return String(line || "").replace(/\*\*/g, "");
+  }
+  // 자막 한 줄을 화면용 HTML로 (**글자** → 노란 강조)
+  function capLineHtml(line) {
+    return String(line || "").split(/(\*\*[^*]+\*\*)/).map((part) =>
+      /^\*\*[^*]+\*\*$/.test(part) ? `<span class="pv-emph">${escapeHtml(part.slice(2, -2))}</span>` : escapeHtml(part.replace(/\*\*/g, ""))
+    ).join("");
+  }
+
+  // 자막 트랙 그리기: 블록 폭 = 줄 길이 비율 (영상 트랙과 같은 시간축). 끄는 중에는 다시 만들지 않고 위치만 고친다
+  function updateCapView(el, seg) {
+    const host = el.querySelector(".seg-cap-area");
+    if (!host || !seg) return;
+    const st = capStateOf(el, seg);
+    if (!st.lines.length) {
+      if (host.innerHTML) { host.innerHTML = ""; host._sig = null; }
+      return;
+    }
+    const anyCustom = st.custom.some(Boolean);
+    const sig = JSON.stringify([st.lines, st.custom, anyCustom]);
+    if (host._sig !== sig && !host.dataset.dragging) {
+      host._sig = sig;
+      host.innerHTML = `
+        <div class="seg-cap-head">
+          <span>자막 ${st.lines.length}줄 · 탭: 그 줄 보기 · 끝: 길이</span>
+          ${anyCustom ? '<button type="button" class="seg-cap-reset">자동으로</button>' : ""}
+        </div>
+        <div class="seg-tl-row">
+          <div class="seg-tl-col">
+            <div class="seg-cap-track">
+              ${st.lines.map((l, i) => `<div class="seg-cap-blk${st.custom[i] ? " set" : ""}" data-i="${i}"><div class="seg-cap-in"><span class="t">${escapeHtml(capPlainText(l))}</span><span class="s"></span></div><div class="seg-cap-handle" data-i="${i}"></div></div>`).join("")}
+              <div class="seg-cap-play"></div>
+            </div>
+          </div>
+          <div class="seg-cap-spacer"></div>
+        </div>`;
+    }
+    paintCapTrack(el, st);
+  }
+  function paintCapTrack(el, st) {
+    const host = el.querySelector(".seg-cap-area");
+    const blks = host ? host.querySelectorAll(".seg-cap-blk") : [];
+    const axis = st.total || 1;
+    blks.forEach((b, i) => {
+      if (st.secs[i] == null) return;
+      b.style.left = st.starts[i] / axis * 100 + "%";
+      b.style.width = st.secs[i] / axis * 100 + "%";
+      b.classList.toggle("set", st.custom[i]);
+      const s = b.querySelector(".s");
+      if (s) s.textContent = st.secs[i].toFixed(1) + "초";
+    });
+  }
+  // 블록 오른쪽 끝 손잡이를 끌어 그 줄 길이를 바꾼다 (최소 = 예상 목소리 길이). 장면 길이가 바뀌므로 영상 트랙·전체 길이도 같이 다시 그린다
+  let capPaintRaf = 0;
+  function startCapDrag(e, el, i) {
+    const seg = segOfEl(el);
+    const host = el.querySelector(".seg-cap-area");
+    const track = host && host.querySelector(".seg-cap-track");
+    if (!seg || !track) return;
+    const st = capStateOf(el, seg);
+    if (!st.lines[i]) return;
+    e.preventDefault();
+    e.stopPropagation();
+    closeAddMenus();
+    const handle = e.target.closest(".seg-cap-handle");
+    try { handle.setPointerCapture(e.pointerId); } catch {}
+    handle.classList.add("drag");
+    host.dataset.dragging = "1";
+    const stored = ((seg.asset_trims || {}).__cap_secs || []);
+    el._capLive = st.lines.map((_, k) => (stored[k] != null && Number(stored[k]) > 0 ? Number(stored[k]) : null));
+    const pps = (track.clientWidth || 1) / (st.total || 1);   // 끄는 동안 손가락 1px = 시작할 때 축 기준 초
+    const x0 = e.clientX, len0 = st.secs[i], est = st.est[i];
+    let moved = false;
+    const move = (ev) => {
+      if (Math.abs(ev.clientX - x0) > 2) moved = true;
+      if (!moved) return;
+      const v = Math.min(60, Math.max(est, len0 + (ev.clientX - x0) / pps));
+      el._capLive[i] = v <= est + 0.005 ? est : Math.round(v * 20) / 20;   // 0.05초 단위 (최소는 예상 길이 그대로)
+      paintCapTrack(el, capStateOf(el, seg));
+      if (!capPaintRaf) capPaintRaf = requestAnimationFrame(() => { capPaintRaf = 0; updateRuntimeSummary(); });
+    };
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+      handle.classList.remove("drag");
+      delete host.dataset.dragging;
+      if (moved) saveCapSecs(String(seg.id), el._capLive.slice());
+      else { el._capLive = null; updateRuntimeSummary(); }
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
+  // 줄별 길이를 asset_trims.__cap_secs에 저장 (null = 자동). 전부 자동이면 칸을 지운다
+  async function saveCapSecs(id, arr) {
+    const seg = segments.find((s) => String(s.id) === String(id));
+    const el = document.querySelector(`.seg-item[data-id="${id}"]`);
+    if (!seg) return;
+    const next = { ...(seg.asset_trims || {}) };
+    const vals = (arr || []).map((v) => (v != null && Number(v) > 0 ? Number(Number(v).toFixed(2)) : null));
+    if (vals.some((v) => v != null)) next.__cap_secs = vals; else delete next.__cap_secs;
+    try {
+      await saveField(id, "asset_trims", next);
+    } catch (err) {
+      showMsg("자막 길이 저장 실패: " + err.message, false);
+    } finally {
+      if (el) el._capLive = null;
+    }
+    updateRuntimeSummary();
+    pvRefreshCard(id);   // 자막 구간·장면 길이가 바뀌었으니 미리보기도 다시
+  }
+  function bindCapGestures(el) {
+    const host = el.querySelector(".seg-cap-area");
+    host.addEventListener("contextmenu", (e) => e.preventDefault());
+    host.addEventListener("pointerdown", (e) => {
+      const h = e.target.closest(".seg-cap-handle");
+      if (h && e.button <= 0) startCapDrag(e, el, Number(h.dataset.i));
+    });
+    host.addEventListener("click", (e) => {
+      if (e.target.closest(".seg-cap-reset")) { saveCapSecs(el.dataset.id, null); return; }
+      if (e.target.closest(".seg-cap-handle")) return;
+      const b = e.target.closest(".seg-cap-blk");
+      if (!b) return;
+      const seg = segOfEl(el);
+      if (!seg) return;
+      const st = capStateOf(el, seg);
+      const i = Number(b.dataset.i);
+      if (st.starts[i] != null) pvSeek(el, st.starts[i] + 0.02);   // 미리보기가 그 줄 시작으로
+    });
   }
 
   // 장면이 길어서 사진 하나가 오래 머물면 지루하다. 콘티를 열 때 모자란 컷을 키워드로 Pexels 영상으로 자동 배치하지만
@@ -1190,12 +1398,17 @@
       const pct = total > 0 ? (seconds / total) * 100 : 0;
       const display = el.querySelector(".seg-duration-display");
       if (display) display.textContent = `${seconds.toFixed(1)}초 (${pct.toFixed(0)}%)`;
+      // 자막 줄이 있는 장면은 자막 트랙이 길이를 정한다 → 노출 시간 "수정"은 자막이 없는 장면에서만
+      updateCapView(el, segOfEl(el));
+      const editBtn = el.querySelector(".seg-duration-edit");
+      const durIn = el.querySelector(".seg-duration-input");
+      if (editBtn && !(durIn && durIn.style.display !== "none")) editBtn.style.display = hasCaps(el) ? "none" : "inline-block";
     });
 
     box.style.display = "block";
     refreshGroupHeaders();
     $("runtimeText").innerHTML = `전체 예상 길이: 약 ${total.toFixed(1)}초 (${(total / 60).toFixed(1)}분)` +
-      `<span class="note">대사 기준 추정치이며, 실제 음성 속도에 따라 달라질 수 있습니다. 장면 번호 옆 "수정"으로 노출 시간을 직접 바꿀 수 있어요.</span>`;
+      `<span class="note">자막 줄 길이의 합이에요. 줄 길이는 장면마다 자막 트랙의 블록 끝을 끌어 늘려요(기본은 예상 목소리 길이 + 0.3초). 실제 목소리가 예상보다 길면 그 줄만 자동으로 늘어나요. 자막이 없는 장면만 장면 번호 옆 "수정"으로 노출 시간을 정해요.</span>`;
   }
 
   // ───── 전체 설정 카드 (자막 크기 / 배경음악 / 분위기 / 화면 전환) ─────
@@ -1670,6 +1883,7 @@
     $("voiceSample").playbackRate = 1 + currentSettings.tts_rate / 100;
     updateVoiceLabels();
     markSettingsDirty();
+    updateRuntimeSummary();   // 목소리 속도가 바뀌면 자막 줄 예상 길이(=장면 길이)도 바뀐다
   });
   $("ttsPitch").addEventListener("input", () => {
     currentSettings.tts_pitch = Number($("ttsPitch").value);
@@ -2054,16 +2268,16 @@
                 <div class="cap-src"></div>
                 <div class="cap-lines"><div class="cap-normal"></div></div>
               </div>
+              <div class="seg-play" aria-hidden="true">▶</div>
               <div class="seg-stage-ro"></div>
             </div>
             <div class="seg-stage-side">
-              <button type="button" class="seg-play" title="이 장면 재생 / 멈춤">▶</button>
               <div class="seg-pv-time">00:00 / 00:00</div>
               <div class="seg-pv-info"></div>
-              <label class="pv-opt"><input type="checkbox" class="seg-voice"${pvVoiceOn ? " checked" : ""}> 휴대폰 목소리로 읽기 (실제 영상 목소리와 달라요)</label>
             </div>
           </div>
           <div class="seg-tl-area"></div>
+          <div class="seg-cap-area"></div>
           <div class="seg-add-menu">
             <button type="button" class="seg-add-file">📁 내 사진/영상 (여러 개)</button>
             <button type="button" class="seg-add-pexels">🔎 Pexels에서 찾기</button>
@@ -2075,17 +2289,8 @@
           <div class="seg-pexels-preview"></div>
         </div>
         <div class="seg-media-hint" style="display:none;color:#ffd93d;font-size:0.78rem;margin:2px 0 8px;"></div>
-        <!-- 제목은 한 줄로, 버튼은 그 아래 줄에 반반 (폰 폭에서 제목이 버튼에 밀려 접히지 않게) -->
-        <div style="margin:14px 0 6px;">
-          <div style="color:#a89bb5;font-size:0.9rem;font-weight:600;">대사 <span style="font-weight:400;font-size:0.75rem;">— 영상의 음성·자막이 이 내용으로 만들어져요</span></div>
-          <div style="display:flex;gap:6px;margin-top:6px;">
-            <button type="button" class="seg-brk-btn" style="flex:1;padding:7px 8px;font-size:0.72rem;margin:0;background:#2d2240;border:1px solid #4a3a63;color:#e8def5;">여기서 자막 끊기</button>
-            <button type="button" class="seg-emph-btn" style="flex:1;padding:7px 8px;font-size:0.72rem;margin:0;background:#2d2240;border:1px solid #4a3a63;color:#e8def5;">선택한 글자 강조</button>
-          </div>
-        </div>
-        <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 비워두면 이 장면은 거의 나오지 않습니다 (노출 시간 1초 기준)' : '이 장면에서 나오는 대본 문장'}">${escapeHtml(seg.script_text)}</textarea>
-        <div class="seg-capsplit" style="color:#7cff4a;font-size:0.78rem;line-height:1.6;margin:-2px 0 6px;"></div>
-        <div class="settings-note" style="margin:-4px 0 8px;">자막은 이렇게 끊겨 나와요(위 초록 글씨, ｜가 끊기는 자리). 어색하면 끊고 싶은 글자 사이에 커서를 놓고 "여기서 자막 끊기"를 누르세요. <b>/</b>로 표시되고 읽지는 않아요. · 강조할 글자를 드래그해서 선택한 뒤 "선택한 글자 강조"를 누르면 <b>**글자**</b>로 표시되고, 자막에서 노란색으로 튀어 보입니다. (다시 누르면 해제)</div>
+        <div style="margin:14px 0 6px;color:#a89bb5;font-size:0.9rem;font-weight:600;">자막</div>
+        <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
         <label>ACTION <span style="font-weight:400;font-size:0.75rem;text-transform:none;letter-spacing:0;">— 사진의 카메라 연출 (줌인 · 줌아웃 · 패닝 · 틸트업)</span></label>
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
         <input type="hidden" class="seg-section" value="${escapeAttr(seg.section)}">
@@ -2110,9 +2315,7 @@
       });
 
       const scriptEl = el.querySelector(".seg-script");
-      const capSplitEl = el.querySelector(".seg-capsplit");
-      const showCapSplit = () => { capSplitEl.textContent = "자막: " + pvGroups(scriptEl.value).groups.map((g) => g.text).join(" ｜ "); };
-      // 대사·연출이 바뀌면 미리보기도 따라간다 (정지 화면은 바로, 살아 있는 미리보기는 입력이 멈추면 다시 만든다)
+      // 자막·연출이 바뀌면 미리보기도 따라간다 (정지 화면은 바로, 살아 있는 미리보기는 입력이 멈추면 다시 만든다)
       const pvTextChanged = () => {
         const seg = segOfEl(el);
         if (!seg) return;
@@ -2120,42 +2323,8 @@
         clearTimeout(el._pvTimer);
         el._pvTimer = setTimeout(() => { if (pvActive && pvActive.el === el && !pvActive.playing) pvRefreshCard(id); }, 500);
       };
-      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); showCapSplit(); pvTextChanged(); });
+      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); pvTextChanged(); });
       autoGrow(scriptEl);
-      showCapSplit();
-      // 자막 끊기: 커서 위치에 " / " 를 넣는다 (한 번 더 누르면 그 자리의 표시를 지운다). 영상에서는 읽지 않고 자막만 끊는다.
-      el.querySelector(".seg-brk-btn").addEventListener("click", (e) => {
-        e.preventDefault();
-        const v = scriptEl.value, pos = scriptEl.selectionStart;
-        const near = /\s\/\s/.exec(v.slice(Math.max(0, pos - 3), pos + 3));
-        if (near) {
-          const at = Math.max(0, pos - 3) + near.index;
-          scriptEl.value = v.slice(0, at) + " " + v.slice(at + 3);
-        } else {
-          const before = v.slice(0, pos).replace(/\s+$/, ""), after = v.slice(pos).replace(/^\s+/, "");
-          if (!before || !after) { showMsg("자막을 끊을 자리(글자 사이)에 커서를 먼저 놓으세요.", false); return; }
-          scriptEl.value = before + " / " + after;
-          scriptEl.setSelectionRange(before.length + 3, before.length + 3);
-        }
-        scriptEl.dispatchEvent(new Event("input", { bubbles: true }));
-      });
-      el.querySelector(".seg-emph-btn").addEventListener("click", (e) => {
-        e.preventDefault();
-        const start = scriptEl.selectionStart, end = scriptEl.selectionEnd;
-        if (start === end) { showMsg("먼저 대사에서 강조할 글자를 드래그해서 선택하세요.", false); return; }
-        const v = scriptEl.value;
-        const selected = v.slice(start, end);
-        const wrapped = /^\*\*.+\*\*$/.test(selected) ? selected.slice(2, -2)
-          : (v.slice(start - 2, start) === "**" && v.slice(end, end + 2) === "**")
-            ? null : `**${selected}**`;
-        if (wrapped === null) {
-          // 이미 강조된 글자 안쪽을 선택한 경우: 바깥 ** 를 제거
-          scriptEl.value = v.slice(0, start - 2) + selected + v.slice(end + 2);
-        } else {
-          scriptEl.value = v.slice(0, start) + wrapped + v.slice(end);
-        }
-        scriptEl.dispatchEvent(new Event("input", { bubbles: true }));
-      });
       const directionEl = el.querySelector(".seg-direction");
       directionEl.addEventListener("input", () => { autoGrow(directionEl); markDirty(); pvTextChanged(); });
       autoGrow(directionEl);
@@ -2204,16 +2373,10 @@
         box.style.display = open ? "block" : "none";
         if (open) box.innerHTML = blankButtonsHtml(segOfEl(el) || {});
       });
-      el.querySelector(".seg-play").addEventListener("click", () => pvToggle(el));
       el.querySelector(".seg-stage").addEventListener("click", () => pvToggle(el));
-      el.querySelector(".seg-voice").addEventListener("change", (e) => {
-        pvVoiceOn = e.target.checked;
-        try { localStorage.setItem("pvVoice", pvVoiceOn ? "1" : "0"); } catch {}
-        document.querySelectorAll(".seg-voice").forEach((c) => { c.checked = pvVoiceOn; });
-        if (!pvVoiceOn) { try { speechSynthesis.cancel(); } catch {} }
-      });
       el.querySelector(".seg-media").addEventListener("contextmenu", (e) => { if (e.target.closest(".seg-stage-box, .seg-tl-area")) e.preventDefault(); });
       bindTimelineGestures(el);
+      bindCapGestures(el);
       el.querySelector(".seg-revert-btn").addEventListener("click", () => { clearTimeout(el._autoTimer); revertSegmentCard(id, el); });
       el.querySelector(".seg-delete-btn").addEventListener("click", () => { clearTimeout(el._autoTimer); deleteSegmentCard(id, el); });
 
@@ -2378,17 +2541,29 @@
     delete el.dataset.dirty;
     stateEl.className = "seg-save-state";
     stateEl.textContent = "저장 중…";
+    // 자막 줄이 줄었으면 줄별 길이(__cap_secs)도 줄 수만큼만 남긴다 (인덱스 기준 유지, 넘치는 건 버림)
+    const seg0 = segments.find((s) => String(s.id) === id);
+    const fields = { script_text: scriptText, direction, section, keyword };
+    const capSecs = ((seg0 && seg0.asset_trims) || {}).__cap_secs;
+    const lineCount = genCaptionLines(scriptText).length;
+    if (Array.isArray(capSecs) && capSecs.length > lineCount) {
+      const nextTrims = { ...seg0.asset_trims };
+      const kept = capSecs.slice(0, lineCount);
+      if (kept.some((v) => v != null)) nextTrims.__cap_secs = kept; else delete nextTrims.__cap_secs;
+      fields.asset_trims = nextTrims;
+    }
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
         method: "PATCH",
         headers: jsonHeaders,
         keepalive: true,
-        body: JSON.stringify({ script_text: scriptText, direction, section, keyword }),
+        body: JSON.stringify(fields),
       });
       if (!res.ok) throw new Error(await res.text());
       const seg = segments.find((s) => String(s.id) === id);
       const keywordChanged = seg && (seg.keyword || "").trim() !== keyword.trim();
       if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
+      if (seg && fields.asset_trims) seg.asset_trims = fields.asset_trims;
       if (keywordChanged) enqueueAutofill(id);   // 키워드를 바꿨으면 (모자란 장면이고 직접 지운 적 없으면) 새 키워드로 자동 배치
       // 저장하는 동안 또 고쳤다면 다시 수정됨 상태로 둔다
       if (el.dataset.dirty) { stateEl.textContent = "수정됨"; return; }
@@ -2449,7 +2624,7 @@
 
     const scriptEl = el.querySelector(".seg-script");
     const directionEl = el.querySelector(".seg-direction");
-    scriptEl.value = seg.script_text || "";
+    scriptEl.value = normalizeScript(seg.script_text);
     directionEl.value = seg.direction || "";
     el.querySelector(".seg-section").value = seg.section || "";
     el.querySelector(".seg-part").innerHTML = partOptionsHtml(seg.section);
@@ -2788,114 +2963,17 @@
     }[mode];
     return img.animate(f, { duration: len * 1000, fill: "forwards", easing: "linear" });
   }
-  // 대사를 자막 덩어리로: **강조** 단어와 숫자 단어는 단독, 그 밖에는 6단어/18자 또는 문장 끝에서 끊는다
-  // 한 문장(또는 끊김 사이)의 단어들을 비슷한 길이로 나눈다 (영상 쪽 02_tts.py의 _split_run과 같은 규칙)
-  function pvSplitRun(run, maxWords, maxChars) {
-    const n = run.length;
-    if (n <= 1) return n ? [run] : [];
-    const total = run.reduce((a, x) => a + x.w.length + 1, 0);
-    const k = Math.min(n, Math.max(Math.ceil(n / maxWords), Math.ceil(total / maxChars)));
-    if (k <= 1) return [run];
-    const out = [];
-    let start = 0;
-    for (let part = 1; part < k; part++) {
-      const left = k - part + 1;
-      const rest = run.slice(start).reduce((a, x) => a + x.w.length + 1, 0);
-      const target = rest / left;
-      let best = null, acc = 0;
-      for (let j = start; j < n - (left - 1); j++) {
-        acc += run[j].w.length + 1;
-        const cost = Math.abs(acc - target) - (/[,，]$/.test(run[j].w) ? 3 : 0);
-        if (!best || cost < best.cost) best = { cost, j };
-        if (acc > target * 1.6) break;
-      }
-      out.push(run.slice(start, best.j + 1));
-      start = best.j + 1;
-    }
-    out.push(run.slice(start));
-    return out;
-  }
-  // 자막이 한 줄에 들어가는지 실제 글자 폭으로 잰다 (영상 쪽 02_tts.py의 CaptionFit과 같은 규칙: 조금 넘치면 자간 7%·장평 85%까지 줄여 한 줄로)
-  function capMeasurer() {
-    const size = Number($("capSize").value) || 80;
-    const wt = WEIGHTS[Number($("capWeight").value)] || WEIGHTS[0];
-    capMeasurer.ctx = capMeasurer.ctx || document.createElement("canvas").getContext("2d");
-    const ctx = capMeasurer.ctx;
-    ctx.font = `${wt.weight} ${size}px ${wt.family}, sans-serif`;
-    return { size, avail: (1080 - 40 - 2 * 3) * 0.98, width: (t) => ctx.measureText(t).width };
-  }
-  function capFits(m, text) {
-    const w = m.width(text);
-    if (w <= m.avail) return true;
-    const n = Math.max(1, text.length);
-    if ((w - m.avail) / n * 1.05 <= 0.07 * m.size) return true;
-    const w2 = w - 0.07 * m.size * n;
-    return w2 > 0 && m.avail / w2 >= 0.85;
-  }
-  function pvSplitRunWidth(run, m) {
-    const n = run.length;
-    if (n <= 1) return n ? [run] : [];
-    const textOf = (ws) => ws.map((x) => x.w).join(" ");
-    const total = m.width(textOf(run));
-    for (let k = Math.max(1, Math.ceil(total / (m.avail * 1.06))); k <= n; k++) {
-      const out = [];
-      let start = 0;
-      for (let part = 1; part < k; part++) {
-        const left = k - part + 1;
-        const target = m.width(textOf(run.slice(start))) / left;
-        let best = null;
-        for (let j = start; j < n - (left - 1); j++) {
-          const w = m.width(textOf(run.slice(start, j + 1)));
-          const cost = Math.abs(w - target) - (/[,，]$/.test(run[j].w) ? 0.6 * m.size : 0);
-          if (!best || cost < best.cost) best = { cost, j };
-          if (w > target * 1.6) break;
-        }
-        out.push(run.slice(start, best.j + 1));
-        start = best.j + 1;
-      }
-      out.push(run.slice(start));
-      if (out.every((g) => capFits(m, textOf(g)))) return out;
-    }
-    return run.map((x) => [x]);
-  }
-  function pvGroups(raw) {
-    const words = [];
-    let pendingBreak = false;
-    String(raw || "").split(/(\*\*[^*]+\*\*)/).forEach((part) => {
-      const emph = /^\*\*[^*]+\*\*$/.test(part);
-      (emph ? part.slice(2, -2) : part).split(/\s+/).filter(Boolean).forEach((w) => {
-        if (!emph && w === "/") { pendingBreak = true; return; }   // " / " 는 자막을 끊는 표시 (읽지 않음)
-        words.push({ w, emph, brk: pendingBreak });
-        pendingBreak = false;
-      });
-    });
-    const groups = [];
-    let run = [];
-    let meas = null;
-    try { meas = capMeasurer(); } catch { meas = null; }
-    const flush = () => { (meas ? pvSplitRunWidth(run, meas) : pvSplitRun(run, 6, 18)).forEach((r) => groups.push({ words: r, emph: false })); run = []; };
-    words.forEach((x, i) => {
-      if (x.brk) flush();
-      // 숫자 단어를 단독으로 띄우는 기능은 채널 설정(emphasize_numbers_standalone)에서 꺼져 있어서, **강조**한 글자만 단독 자막이 된다
-      if (x.emph) { flush(); groups.push({ words: [x], emph: true }); return; }
-      run.push(x);
-      if (/[.?!。]$/.test(x.w)) flush();
-    });
-    flush();
-    // 글자 위치(음성 경계 이벤트용)와 글자 수 비율(시간 배분용)
-    let pos = 0, total = 0;
-    groups.forEach((g) => { g.text = g.words.map((x) => x.w).join(" "); g.chars = g.text.replace(/\s/g, "").length || 1; total += g.chars; });
-    let acc = 0;
-    groups.forEach((g) => { g.t0 = acc / total; acc += g.chars; g.t1 = acc / total; g.charStart = pos; pos += g.text.length + 1; });
-    return { groups, plain: groups.map((g) => g.text).join(" ") };
+  // 자막 구간: 자막 한 줄 = 화면 한 번. 줄마다 정확한 시작·끝(초)을 자막 트랙과 같은 값으로 (영상 생성과 같은 규칙, 계약서 6절)
+  function capGroups(el, seg) {
+    const st = capStateOf(el, seg);
+    return st.lines.map((l, i) => ({ raw: l, text: capPlainText(l), s0: st.starts[i], s1: st.starts[i] + st.secs[i] }));
   }
 
   // ───── 카드 안 미리보기 ─────
   // 평소엔 첫 클립의 정지 화면(가벼운 썸네일). ▶ 또는 화면을 누르면 재생, 타임라인을 누르거나 끌면 그 시점 화면.
   // 한 번에 한 카드만 살아 있다(pvActive). 다른 카드를 재생/선택하면 이전 카드는 멈추고 정지 화면으로 돌아간다.
-  let pvActive = null;   // { el, id, P, secs, cuts, cutEnds, groups, plain, size, wt, framed, t, playing, ... }
-  let pvVoiceOn = true;
-  try { pvVoiceOn = localStorage.getItem("pvVoice") !== "0"; } catch {}
+  let pvActive = null;   // { el, id, P, secs, cuts, cutEnds, groups, size, wt, framed, t, playing, ... }
+  const pvVoiceOn = true;   // 미리보기는 늘 휴대폰 목소리로 읽는다 (처음 한 번 안내 팝업으로 알려준다)
 
   function pvParts(el) {
     const st = el.querySelector(".seg-stage");
@@ -2929,12 +3007,13 @@
     P.lines.style.bottom = (Number($("capPos").value) / 100 * 480) + "px";
     return { P, framed, size, wt };
   }
+  // 자막 한 줄을 한 번에 보여준다. **강조** 부분만 노란색(강조 글꼴)
   function pvCapShow(cap, g, size, wt) {
-    cap.textContent = g ? g.text : "";
-    cap.style.fontFamily = g && g.emph ? "'Black Han Sans', sans-serif" : `${wt.family}, sans-serif`;
-    cap.style.fontWeight = g && g.emph ? 400 : wt.weight;
-    cap.style.color = g && g.emph ? "#ffff00" : "#fff";
-    cap.style.fontSize = ((g && g.emph ? size * 1.15 : size) * 0.25) + "px";
+    cap.innerHTML = g ? capLineHtml(g.raw) : "";
+    cap.style.fontFamily = `${wt.family}, sans-serif`;
+    cap.style.fontWeight = wt.weight;
+    cap.style.color = "#fff";
+    cap.style.fontSize = (size * 0.25) + "px";
   }
   // 클립 하나의 화면 요소. light=true면 정지 화면용(영상은 썸네일 그림으로 대신)
   function pvCutNode(seg, p, framed, light) {
@@ -2995,7 +3074,7 @@
     if (pvActive && pvActive.el === el) return;
     const { P, framed, size, wt } = pvDecor(el);
     const paths = seg.asset_paths || [];
-    const secs = Math.max(2, effectiveSeconds(el, seg));
+    const secs = pvSecsOf(el, seg);
     const p = paths[0];
     const direction = el.querySelector(".seg-direction").value;
     const key = JSON.stringify([p, framed, p ? thumbNow(p) : 0, p ? ((seg.asset_trims || {}).__focus || {})[p] : 0, p ? (seg.asset_trims || {})[p] : 0, pvMode(direction, 0)]);
@@ -3013,22 +3092,23 @@
         }
       }
     }
-    const { groups } = pvGroups(el.querySelector(".seg-script").value);
-    pvCapShow(P.cap, groups[0], size, wt);
+    pvCapShow(P.cap, capGroups(el, seg)[0], size, wt);
     P.play.textContent = "▶";
     P.play.classList.remove("on");
     P.time.textContent = pvTimeText(0, secs);
     P.info.innerHTML = pvInfoHtml(seg, clipPlan(seg, secs), secs);
     const ph = el.querySelector(".seg-tl-play");
     if (ph) ph.classList.remove("on");
+    const cp = el.querySelector(".seg-cap-play");
+    if (cp) cp.classList.remove("on");
+    el.querySelectorAll(".seg-cap-blk.on").forEach((b) => b.classList.remove("on"));
   }
 
   // 미리보기를 살린다: 장면의 클립을 전부 순서대로, 비중(__weights)만큼 나눠 보여줄 준비 (영상 생성과 같은 규칙)
   function pvBuild(el, seg) {
     const { P, framed, size, wt } = pvDecor(el);
-    const text = el.querySelector(".seg-script").value;
     const direction = el.querySelector(".seg-direction").value;
-    const secs = Math.max(2, effectiveSeconds(el, seg));
+    const secs = pvSecsOf(el, seg);
     const paths = seg.asset_paths || [];
     const plan = clipPlan(seg, secs);
     el._idleKey = null;
@@ -3043,10 +3123,10 @@
       cutEnds.push(acc);
     });
     if (!paths.length) P.media.appendChild(pvEmptyNode(el, seg));
-    const { groups, plain } = pvGroups(text);
+    const groups = capGroups(el, seg);
     P.info.innerHTML = pvInfoHtml(seg, plan, secs);
-    return { el, id: String(seg.id), P, secs, cuts, cutEnds, groups, plain, size, wt, framed,
-      t: 0, playing: false, cutIdx: -1, shown: -2, raf: 0, t0: 0, boundary: false, bGroup: -1, speaking: false };
+    return { el, id: String(seg.id), P, secs, cuts, cutEnds, groups, size, wt, framed,
+      t: 0, playing: false, cutIdx: -1, shown: -2, raf: 0, t0: 0, speaking: false };
   }
   function pvActivate(el) {
     if (pvActive && pvActive.el === el) return pvActive;
@@ -3095,6 +3175,10 @@
   function pvPlayhead(ctx) {
     const ph = ctx.el.querySelector(".seg-tl-play");
     if (ph) { ph.classList.add("on"); ph.style.left = Math.min(100, ctx.t / ctx.secs * 100) + "%"; }
+    // 자막 트랙도 같은 시점 (지금 나오는 줄 블록을 밝게)
+    const cp = ctx.el.querySelector(".seg-cap-play");
+    if (cp) { cp.classList.add("on"); cp.style.left = Math.min(100, ctx.t / ctx.secs * 100) + "%"; }
+    ctx.el.querySelectorAll(".seg-cap-blk").forEach((b, i) => b.classList.toggle("on", i === ctx.shown));
     ctx.P.time.textContent = pvTimeText(ctx.t, ctx.secs);
   }
   // t초 시점 화면. seek=true면 그 시점으로 맞춘다(재생 중이 아니면 멈춘 화면)
@@ -3122,25 +3206,26 @@
         }
       }
     }
-    // 자막: 낭독 위치를 알려주는 기기에서는 낭독을 따라가고, 아니면 글자 수 비율로 추정
+    // 자막: 그 줄의 구간(자막 트랙과 같은 시작·끝) 동안 그 줄 전체를 보여준다. 재생 중 줄이 바뀌면 휴대폰 목소리도 그 줄을 읽는다
     let gi = -1;
-    if (ctx.playing && ctx.boundary && ctx.bGroup >= 0) gi = ctx.bGroup;
-    else if (t < ctx.secs || !ctx.playing) gi = ctx.groups.findIndex((g) => Math.min(t, ctx.secs - 0.001) / ctx.secs >= g.t0 && Math.min(t, ctx.secs - 0.001) / ctx.secs < g.t1);
+    if (t < ctx.secs || !ctx.playing) {
+      const tt = Math.max(0, Math.min(t, ctx.secs - 0.001));   // 첫 프레임 시각이 시작 시각보다 살짝 앞설 수 있다
+      gi = ctx.groups.findIndex((g) => tt >= g.s0 && tt < g.s1);
+    }
     if (gi !== ctx.shown) {
       ctx.shown = gi;
       pvCapShow(ctx.P.cap, ctx.groups[gi], ctx.size, ctx.wt);
+      if (ctx.playing && gi >= 0) pvSpeak(ctx, gi);
     }
     ctx.t = Math.min(Math.max(0, t), ctx.secs);
     pvPlayhead(ctx);
   }
-  // 음성: 휴대폰 목소리 (실제 영상의 목소리와 다르다). 중간부터 재생하면 그 자막 덩어리부터 읽는다
-  function pvSpeak(ctx) {
-    if (!pvVoiceOn || !ctx.plain || !("speechSynthesis" in window)) return;
+  // 음성: 휴대폰 목소리 (실제 영상의 목소리와 다르다). 자막 줄마다 그 줄이 시작될 때 따로 읽는다
+  function pvSpeak(ctx, gi) {
+    const g = ctx.groups[gi];
+    if (!pvVoiceOn || !g || !("speechSynthesis" in window)) return;
     try {
-      let gi = ctx.groups.findIndex((g) => ctx.t / ctx.secs < g.t1);
-      if (gi < 0) return;
-      const from = ctx.t > 0.05 ? ctx.groups[gi].charStart : 0;
-      const u = new SpeechSynthesisUtterance(ctx.plain.slice(from));
+      const u = new SpeechSynthesisUtterance(g.text);
       u.lang = "ko-KR";
       const ko = (speechSynthesis.getVoices() || []).find((v) => /^ko/i.test(v.lang));
       if (ko) u.voice = ko;
@@ -3148,13 +3233,6 @@
       u.pitch = Math.max(0.5, Math.min(2, 1 + (Number(currentSettings.tts_pitch) || 0) / 100));
       u.onstart = () => { if (pvActive === ctx) ctx.speaking = true; };
       u.onend = u.onerror = () => { ctx.speaking = false; };
-      u.onboundary = (e) => {
-        if (pvActive !== ctx || !ctx.playing) return;
-        ctx.boundary = true;
-        let b = 0;
-        ctx.groups.forEach((g, i) => { if (g.charStart <= e.charIndex + from) b = i; });
-        ctx.bGroup = b;
-      };
       speechSynthesis.cancel();
       speechSynthesis.speak(u);
     } catch {}
@@ -3164,16 +3242,16 @@
     if (!ctx) return;
     if (ctx.t >= ctx.secs - 0.05) ctx.t = 0;
     ctx.playing = true;
-    ctx.boundary = false; ctx.bGroup = -1; ctx.speaking = false;
+    ctx.speaking = false;
+    ctx.shown = -2;   // 재생을 시작한 그 줄부터 읽게
     ctx.P.play.textContent = "❚❚";
     ctx.P.play.classList.add("on");
     ctx.t0 = performance.now() - ctx.t * 1000;
     pvShow(ctx, ctx.t, true);
-    pvSpeak(ctx);
     const tick = (now) => {
       if (pvActive !== ctx || !ctx.playing) return;
       const t = (now - ctx.t0) / 1000;
-      if (t < ctx.secs || (ctx.speaking && t < ctx.secs + 20)) {
+      if (t < ctx.secs) {   // 장면 길이(자막 줄 길이 합)에서 끝난다 — 영상과 같다
         pvShow(ctx, t, false);
         ctx.raf = requestAnimationFrame(tick);
       } else {
@@ -3189,7 +3267,26 @@
   }
   function pvToggle(el) {
     if (pvActive && pvActive.el === el && pvActive.playing) pvStop(pvActive);
+    else if (pvGuideNeeded()) pvShowGuide(() => pvPlay(el));
     else pvPlay(el);
+  }
+  // 미리보기 첫 재생 안내: "다시 알림 보지 않기"를 누르기 전까지는 화면을 열 때마다 첫 재생에서 한 번 보여준다
+  let pvGuideShownThisVisit = false;
+  function pvGuideNeeded() {
+    if (pvGuideShownThisVisit) return false;
+    try { return localStorage.getItem("pvGuideOff") !== "1"; } catch { return true; }
+  }
+  function pvShowGuide(then) {
+    pvGuideShownThisVisit = true;
+    const m = $("pvGuideModal");
+    const close = (never) => {
+      if (never) { try { localStorage.setItem("pvGuideOff", "1"); } catch {} }
+      m.classList.remove("open");
+      then();
+    };
+    $("pvGuideOk").onclick = () => close(false);
+    $("pvGuideNever").onclick = () => close(true);
+    m.classList.add("open");
   }
   // 그 시점으로 이동 (재생 중이면 거기서 이어서, 목소리는 멈춘다)
   function pvSeek(el, t) {
@@ -3198,7 +3295,8 @@
     t = Math.max(0, Math.min(ctx.secs, t));
     if (ctx.playing) {
       ctx.t0 = performance.now() - t * 1000;
-      if (ctx.speaking || ctx.boundary) { try { speechSynthesis.cancel(); } catch {} ctx.speaking = false; ctx.boundary = false; }
+      if (ctx.speaking) { try { speechSynthesis.cancel(); } catch {} ctx.speaking = false; }
+      ctx.shown = -2;   // 옮긴 자리의 줄부터 다시 읽는다
     }
     pvShow(ctx, t, true);
   }
@@ -3605,7 +3703,8 @@
       const version = await genNextVersion(scriptId);
       if (!confirm(`v${version} 영상 생성을 시작할까요? 몇 분 걸리고, 완성되면 알려드립니다. 영상은 Studio에서 확인하세요.`)) { btn.disabled = false; return; }
       genRequestPermission();
-      await genStart(row, segments, version);
+      // 자막 줄 길이를 계산한 목소리 속도(화면에 보이는 값)를 그대로 넘긴다 — 저장된 설정에 tts_rate가 없을 때도 콘티 길이 = 요청 길이
+      await genStart({ ...row, video_settings: { ...(row.video_settings || {}), tts_rate: ttsRateNow() } }, segments, version);
       row.generation_status = "running";
       btn.textContent = "영상 생성 중... (몇 분 걸려요)";
       watchGeneration(scriptId);
@@ -3719,7 +3818,6 @@
     navigator.serviceWorker.register("/sw.js");
   }
 </script>
-<script src="/youtube/generate.js"></script>
 <script src="/hub-nav.js"></script>
 </body>
 </html>
