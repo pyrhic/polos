@@ -274,7 +274,6 @@
   .seg-tools button.set { color:#7cff4a; }
   .seg-tools button.del { color:#ff8a80; }
   .seg-tools button.del:hover { background:#ff8a80; color:#0f0a14; }
-  .seg-tools-info { color:#a89bb5; font-size:0.66rem; line-height:1.3; flex:1 1 100%; }
   .seg-news-badge { font-size:0.66rem; line-height:1.3; color:#ffd93d; text-decoration:none; }
   .seg-news-badge:hover { text-decoration:underline; }
   .seg-short-list { margin:6px 0 0; color:#ffd93d; font-size:0.72rem; line-height:1.45; }
@@ -773,7 +772,6 @@
     const focus = trims.__focus || {};
     const n = (seg.asset_notes || {})[p];
     const tip = n ? `${n.articleTitle || ""}${n.caption ? " / 사진 설명: " + n.caption : ""}` : "";
-    const kind = isBlank(p) ? `빈 화면(${blankLabel(p)})` : isImage(p) ? (/\.gif(\?|$)/i.test(p) ? "GIF" : "사진") : "영상";
     const badge = !n ? "" : n.license
       ? `<a class="seg-news-badge" style="color:#7cff4a;" href="${escapeAttr(n.articleUrl || "#")}" target="_blank" rel="noopener" title="${escapeAttr((n.artist || "") + " / " + n.license)}">위키 · ${escapeHtml(n.license)} · 출처는 설명에 자동 표기</a>`
       : `<a class="seg-news-badge" href="${escapeAttr(n.articleUrl || "#")}" target="_blank" rel="noopener" title="${escapeAttr(tip)}">뉴스 · ${escapeHtml(n.source || "")} · 저작권 확인 필요</a>`;
@@ -782,7 +780,6 @@
       ${!isBlank(p) ? `<button type="button" class="seg-tool-pos${focus[p] ? " set" : ""}">⌖ ${focus[p] ? "위치 조정됨" : "위치"}</button>` : ""}
       <button type="button" class="seg-tool-del del">🗑 삭제</button>
       ${badge}
-      <div class="seg-tools-info">${i + 1}번 클립 · ${kind} · ${c.alloc.toFixed(1)}초 나와요${c.src != null ? ` (영상 ${c.src.toFixed(1)}초)` : ""}</div>
     </div>`;
   }
 
