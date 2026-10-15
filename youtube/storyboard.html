@@ -98,7 +98,7 @@
   .settings-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .settings-title { font-weight:800; margin-bottom:6px; }
   .settings-title span { color:#1d4a0c; font-weight:400; font-size:0.75rem; margin-left:6px; }
-  .settings-dirty-badge { display:none; background:#0f0a14; color:#ffd93d; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; }
+  .settings-dirty-badge { display:none; flex-shrink:0; background:#0f0a14; color:#ffd93d; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:10px; }
   .settings-summary { display:grid; grid-template-columns:auto 1fr; gap:3px 12px; font-size:0.8rem; margin:4px 0 10px; }
   .settings-summary dt { color:#1d4a0c; font-weight:600; }
   .settings-summary dd { margin:0; font-weight:700; word-break:break-all; }
@@ -120,8 +120,12 @@
   .settings-card .sr-input { background:transparent; border:none; border-radius:0; padding:0; margin:0; font-size:0.8rem; font-weight:800; color:#0f0a14; width:100%; }
   .settings-card .sr-input::placeholder { color:#3f7a28; font-weight:400; }
   .settings-card .sr-input:focus { outline:none; background:rgba(255,255,255,0.55); }
-  .sr-framed { display:none; }
-  .sr-framed.show { display:grid; }
+  /* 카드 머리의 콘티 이름 (누르면 그 자리에서 고침) */
+  .conti-name { flex:1; min-width:0; font-weight:800; font-size:1.15rem; line-height:1.3; margin-bottom:6px; cursor:text; overflow-wrap:anywhere; }
+  .conti-name:focus-visible { outline:2px solid #0f0a14; outline-offset:2px; }
+  .settings-card .conti-name-input { flex:1; min-width:0; background:rgba(255,255,255,0.55); border:none; border-radius:3px; padding:2px 4px; margin:0 0 6px; font:inherit; font-weight:800; font-size:1.15rem; line-height:1.3; color:#0f0a14; }
+  .settings-card .conti-name-input:focus { outline:none; }
+  #soundHead:not(.show) { display:none; }
   /* 굴러가는 선택 휠 */
   .wheel-wrap { position:relative; margin:0; }
   .wheel { height:132px; overflow-y:auto; scroll-snap-type:y mandatory; background:#0f0a14; border-radius:6px; padding:44px 0; scrollbar-width:none; -webkit-mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); }
@@ -336,27 +340,24 @@
     <div class="msg" id="msg"></div>
 
     <div class="card-box settings-card" id="settingsCard" style="display:none;margin-top:14px;">
+      <!-- 카드 머리 = 콘티 이름. 누르면 그 자리에서 고치고 Enter/바깥 누르기로 바로 저장, Esc로 취소 -->
       <div class="settings-head">
-        <div class="settings-title">전체 설정</div>
+        <div class="conti-name" id="contiName" role="button" tabindex="0" title="눌러서 이름 바꾸기"></div>
+        <input class="conti-name-input" id="contiNameInput" maxlength="40" placeholder="콘티 이름 (영상 제목에 v1, v2…로 붙음)" style="display:none;">
         <span class="settings-dirty-badge" id="settingsDirtyBadge"></span>
       </div>
       <div class="sr-list" id="settingsSummary">
-        <div class="sr"><span class="k">콘티 이름</span><span class="v"><input class="sr-input" id="srName" placeholder="콘티 이름 (영상 제목에 v1, v2…로 붙음)"></span></div>
-        <div class="sr"><span class="k">화면 구성</span><span class="v"><button type="button" class="tok" data-wheel="layout" id="tokLayout"></button></span></div>
-        <div class="sr sr-framed"><span class="k">제목 1줄</span><span class="v"><input class="sr-input" id="srT1" maxlength="20" placeholder="노란색, 10자 안팎"></span></div>
-        <div class="sr sr-framed"><span class="k">제목 2줄</span><span class="v"><input class="sr-input" id="srT2" maxlength="20" placeholder="흰색"></span></div>
-        <div class="sr sr-framed"><span class="k">출처 문구</span><span class="v"><input class="sr-input" id="srSrc" maxlength="60" placeholder="영상 아래 작은 글씨"></span></div>
+        <div class="sr"><span class="k">제목 1줄</span><span class="v"><input class="sr-input" id="srT1" maxlength="20" placeholder="노란색, 10자 안팎"></span></div>
+        <div class="sr"><span class="k">제목 2줄</span><span class="v"><input class="sr-input" id="srT2" maxlength="20" placeholder="흰색"></span></div>
+        <div class="sr"><span class="k">출처 문구</span><span class="v"><input class="sr-input" id="srSrc" maxlength="60" placeholder="영상 아래 작은 글씨"></span></div>
         <div class="sr"><span class="k">분위기</span><span class="v"><button type="button" class="tok" data-wheel="mood" id="tokMood"></button></span></div>
-        <div class="sr"><span class="k"></span><span class="v"><input class="sr-input" id="srMoodNote" placeholder="분위기 메모 (예: 긴장감 있게)"></span></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
-        <button type="button" class="tok tok-btn" id="settingsSaveBtn" style="display:none;margin-left:0;">전체 설정 저장</button>
+        <button type="button" class="tok tok-btn" id="settingsSaveBtn" style="display:none;margin-left:0;">저장</button>
       </div>
 
       <!-- 아래 입력들은 화면에 보이지 않는 실제 값 저장소. 위 요약 줄들이 이 값을 읽고 바꾼다 -->
       <div id="settingsBody">
-        <input type="text" id="convName">
-        <select id="layoutSel"><option value="full">full</option><option value="framed">framed</option></select>
         <input type="text" id="title1"><input type="text" id="title2"><input type="text" id="sourceText">
         <input type="range" id="capSize" min="40" max="140" step="2">
         <input type="range" id="capWeight" min="0" max="4" step="1">
@@ -369,14 +370,12 @@
         <input type="file" id="bgmFile" accept="audio/*">
         <input type="range" id="bgmVol" min="0" max="100" step="1"><b id="bgmVolVal"></b>
         <select id="moodSel"></select>
-        <textarea id="moodNote"></textarea>
       </div>
     </div>
 
-    <!-- 음향: 성우(목소리·속도·높낮이·샘플)와 BGM(올리기·볼륨). 값은 전체 설정과 같은 저장 경로(currentSettings → 저장)로 간다 -->
+    <!-- 음향: 성우(목소리·속도·높낮이·샘플)와 BGM(올리기·볼륨). 위 카드와 따로 저장된다(이 카드의 키만 덮어씀) -->
     <div class="card-box settings-card" id="soundCard" style="display:none;margin-top:14px;">
-      <div class="settings-head">
-        <div class="settings-title">음향</div>
+      <div class="settings-head" id="soundHead" style="justify-content:flex-end;">
         <span class="settings-dirty-badge" id="soundDirtyBadge"></span>
       </div>
       <div class="sr-list">
@@ -1680,11 +1679,12 @@
     { id: "calm", label: "차분한 다큐", desc: "차분하고 담담한 다큐멘터리 분위기" },
   ];
   const DEFAULT_SETTINGS = {
-    caption_font_size: 80, bgm_path: null, bgm_volume: 0.15, mood: "neutral", mood_note: "", transition: "cut",
+    caption_font_size: 80, bgm_path: null, bgm_volume: 0.15, mood: "neutral", transition: "cut",
     tts_voice: "ko-KR-InJoonNeural", tts_rate: -3, tts_pitch: -5, name: "",
     caption_weight: 0, caption_position_pct: 7,
-    layout: "full", title1: "", title2: "", source_text: "",
+    layout: "framed", title1: "", title2: "", source_text: "",
   };
+  // 이 콘티 화면(뉴스·위키 등)에서 만드는 영상은 늘 "제목 + 영상 + 출처"(framed). 큐레이션(curation.html)은 따로라 영향 없음
   // 폰트 두께 단계 (영상 쪽 02_tts.py의 WEIGHT_FONTS와 같은 순서)
   const WEIGHTS = [
     { label: "가늘게", family: "'IBM Plex Sans KR'", weight: 300 },
@@ -1702,9 +1702,31 @@
   let savedBgmPath = null;
   const $ = (id) => document.getElementById(id);
 
-  // 전체 설정은 저장 버튼으로, 장면 카드는 카드에서 빠져나오면 자동 저장된다
+  // ───── 설정 저장: 부분(카드)별로 따로 ─────
+  // main = 첫 카드(제목·출처·분위기·메모), sound = 음향 카드, cap = 미리보기 자막 조작(자동 저장), name = 카드 머리 이름(바로 저장).
+  // 저장할 때는 마지막으로 저장된 video_settings 위에 그 부분의 키만 덮어쓴다(다른 카드의 아직 저장 안 한 값은 섞이지 않는다).
+  const PART_KEYS = {
+    main: ["title1", "title2", "source_text", "mood"],   // 분위기 메모(mood_note)는 화면에서 없앴다. 예전 값은 저장된 그대로 둔다
+    sound: ["tts_voice", "tts_rate", "tts_pitch", "bgm_path", "bgm_volume"],
+    cap: ["caption_font_size", "caption_weight", "caption_position_pct"],
+    name: ["name"],
+  };
+  const PART_BTN = { main: "settingsSaveBtn", sound: "soundSaveBtn" };
+  const dirtyParts = new Set();
+  const savingParts = new Set();
+  const partEdits = { main: 0, sound: 0, cap: 0, name: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
+  const justSavedParts = new Set();
+  let saveChain = Promise.resolve();   // 저장은 하나씩 차례로(앞 저장 결과 위에 다음 저장을 덮어쓰도록)
+
+  // 두 카드 중 하나라도 저장 안 됐으면 true. 장면 카드는 카드에서 빠져나오면 자동 저장된다
   function hasDirty() {
-    return !!document.querySelector("#settingsSaveBtn.dirty");
+    return dirtyParts.has("main") || dirtyParts.has("sound");
+  }
+  // 자막 조작은 잠시 뒤 자동 저장된다. 그 전에 나가거나 영상을 만들면 바로 저장한다
+  function capPending() { return dirtyParts.has("cap"); }
+  function flushCapSave() {
+    clearTimeout(capSaveTimer);
+    return capPending() ? savePart("cap") : saveChain;
   }
   function cardsDirty() {
     return !!document.querySelector(".seg-item[data-dirty]");
@@ -1715,10 +1737,10 @@
     return Promise.all(saves);
   }
 
-  function markSettingsDirty() {
-    const b = $("settingsSaveBtn");
-    b.classList.add("dirty");
-    b.textContent = "전체 설정 저장";
+  function markPartDirty(part) {
+    dirtyParts.add(part);
+    partEdits[part]++;
+    justSavedParts.delete(part);
     updateSettingsSummary();
   }
 
@@ -1726,7 +1748,6 @@
   // 실제 값은 화면 밖 입력들(#settingsBody)이 들고 있고, 요약 줄은 그 값을 읽어 보여 주고 바꿀 때 같은 이벤트를 쏜다.
   function range(a, b, step) { const o = []; for (let n = a; n <= b; n += step) o.push(n); return o; }
   const WHEELS = {
-    layout: { ctl: "layoutSel", opts: () => [["full", "전체 화면"], ["framed", "제목 + 영상 + 출처"]] },
     voice: { ctl: "voiceSel", opts: () => VOICES.map((v) => [v.id, v.label.replace(/ — .*/, "")]) },
     rate: { ctl: "ttsRate", opts: () => range(-30, 30, 1).map((n) => [String(n), `속도 ${n > 0 ? "+" : ""}${n}%`]) },
     pitch: { ctl: "ttsPitch", opts: () => range(-20, 20, 1).map((n) => [String(n), `높낮이 ${n > 0 ? "+" : ""}${n}Hz`]) },
@@ -1745,7 +1766,7 @@
     openWheel = null;
     $("pickModal").classList.remove("open");
   }
-  const WHEEL_TITLES = { layout: "화면 구성", voice: "목소리", rate: "말하기 속도", pitch: "목소리 높낮이", bgmVol: "배경음악 볼륨", mood: "영상 분위기" };
+  const WHEEL_TITLES = { voice: "목소리", rate: "말하기 속도", pitch: "목소리 높낮이", bgmVol: "배경음악 볼륨", mood: "영상 분위기" };
   function openWheelFor(tok) {
     const key = tok.dataset.wheel;
     closeWheel();
@@ -1790,21 +1811,18 @@
     });
   }
 
-  let settingsJustSaved = false;
   let bgmPlayer = null;
   function stopBgmPlayer() { if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer = null; } }
 
   function updateSettingsSummary() {
     const mirror = (srId, ctlId) => { const el = $(srId); if (document.activeElement !== el) el.value = $(ctlId).value; };
-    mirror("srName", "convName"); mirror("srT1", "title1"); mirror("srT2", "title2"); mirror("srSrc", "sourceText"); mirror("srMoodNote", "moodNote");
+    mirror("srT1", "title1"); mirror("srT2", "title2"); mirror("srSrc", "sourceText");
     const label = (key) => {
       const cfg = WHEELS[key], v = $(cfg.ctl).value;
       const hit = cfg.opts().find((o) => o[0] === v);
       return hit ? hit[1] : v;
     };
-    const framed = $("layoutSel").value === "framed";
-    document.querySelectorAll(".sr-framed").forEach((el) => el.classList.toggle("show", framed));
-    $("tokLayout").textContent = label("layout");
+    $("contiName").textContent = contiDisplayName();
     $("tokVoice").textContent = label("voice");
     const r = Number($("ttsRate").value), p = Number($("ttsPitch").value);
     $("tokRate").textContent = `속도 ${r > 0 ? "+" : ""}${r}%`;
@@ -1814,22 +1832,28 @@
     $("bgmExtra").style.display = hasBgm ? "inline" : "none";
     $("tokBgmVol").textContent = `볼륨 ${$("bgmVol").value}%`;
     $("tokMood").textContent = label("mood");
-    const dirty = $("settingsSaveBtn").classList.contains("dirty");
-    $("settingsSaveBtn").style.display = dirty || $("settingsSaveBtn").disabled ? "inline" : "none";
-    // 음향 카드의 저장 버튼은 전체 설정 저장 버튼과 같은 상태를 보여 준다(저장 경로는 하나)
-    const sb = $("soundSaveBtn");
-    sb.classList.toggle("dirty", dirty);
-    sb.disabled = $("settingsSaveBtn").disabled;
-    sb.textContent = sb.disabled ? "저장 중..." : "저장";
-    sb.style.display = $("settingsSaveBtn").style.display;
-    // 저장할 게 없으면 버튼 줄 자체를 숨겨 카드 아래 빈 공간이 생기지 않게 한다
-    [$("settingsSaveBtn"), sb].forEach((x) => { x.parentElement.style.display = x.style.display === "none" ? "none" : "flex"; });
-    const badgeText = dirty ? "저장 안 됨" : (settingsJustSaved ? "저장됨 ✓" : "");
-    ["settingsDirtyBadge", "soundDirtyBadge"].forEach((id) => {
-      const badge = $(id);
+    // 카드마다 저장 버튼과 "저장 안 됨" 표시를 따로 보여 준다
+    [["main", "settingsDirtyBadge"], ["sound", "soundDirtyBadge"]].forEach(([part, badgeId]) => {
+      const btn = $(PART_BTN[part]);
+      const dirty = dirtyParts.has(part), saving = savingParts.has(part);
+      btn.classList.toggle("dirty", dirty);
+      btn.disabled = saving;
+      btn.textContent = saving ? "저장 중..." : "저장";
+      btn.style.display = dirty || saving ? "inline" : "none";
+      // 저장할 게 없으면 버튼 줄 자체를 숨겨 카드 아래 빈 공간이 생기지 않게 한다
+      btn.parentElement.style.display = btn.style.display === "none" ? "none" : "flex";
+      const badgeText = dirty ? "저장 안 됨" : (justSavedParts.has(part) ? "저장됨 ✓" : "");
+      const badge = $(badgeId);
       badge.textContent = badgeText;
       badge.style.display = badgeText ? "inline-block" : "none";
     });
+    $("soundHead").classList.toggle("show", $("soundDirtyBadge").style.display !== "none");
+  }
+
+  // 카드 머리에 보이는 이름: 정한 이름, 없으면 대본 후킹 앞부분
+  function contiDisplayName() {
+    const row = scripts.find((r) => String(r.id) === String($("scriptSelect").value));
+    return currentSettings.name || (row ? (row.hook || "").slice(0, 20) : "") || "(이름 없음)";
   }
 
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeWheel(); });
@@ -1853,9 +1877,9 @@
     stopBgmPlayer();
     currentSettings.bgm_path = null;
     renderBgm();
-    markSettingsDirty();
+    markPartDirty("sound");
   });
-  [["srName", "convName"], ["srT1", "title1"], ["srT2", "title2"], ["srSrc", "sourceText"], ["srMoodNote", "moodNote"]].forEach(([sr, ctl]) => {
+  [["srT1", "title1"], ["srT2", "title2"], ["srSrc", "sourceText"]].forEach(([sr, ctl]) => {
     $(sr).addEventListener("input", () => { $(ctl).value = $(sr).value; fireCtl($(ctl)); });
   });
   $("pickClose").addEventListener("click", closeWheel);
@@ -1874,7 +1898,7 @@
     $("bgmRemove").addEventListener("click", () => {
       currentSettings.bgm_path = null;
       renderBgm();
-      markSettingsDirty();
+      markPartDirty("sound");
     });
   }
 
@@ -1884,11 +1908,16 @@
     if (!row) { card.style.display = "none"; $("soundCard").style.display = "none"; return; }
     currentSettings = { ...DEFAULT_SETTINGS, ...(row.video_settings || {}) };
     savedBgmPath = currentSettings.bgm_path || null;
-    // 이름을 따로 안 정했으면 대본 후킹 앞부분을 기본 이름으로 제안
-    currentSettings.name = currentSettings.name || (row.hook || "").slice(0, 20);
-    $("convName").value = currentSettings.name;
+    // 이름을 따로 안 정했으면 카드 머리에는 대본 후킹 앞부분을 보여 준다(contiDisplayName). 저장값은 그대로 둔다
+    currentSettings.name = currentSettings.name || "";
+    // 예전에 "전체 화면"(full)으로 저장됐거나 layout이 없는 콘티는 framed로 바꾼다. 자막 위치는 예전 화면 구성 전환 규칙 그대로
+    // (전체 화면 기본 위치 7 → 영상 영역 아래쪽 안 22). 바뀐 값(layout + 자막 키)은 자막 자동 저장으로 바로 저장한다
+    const needFramed = (row.video_settings || {}).layout !== "framed";
+    currentSettings.layout = "framed";
+    if (needFramed && Number(currentSettings.caption_position_pct) === 7) currentSettings.caption_position_pct = 22;
+    dirtyParts.clear(); justSavedParts.clear();
+    $("contiNameInput").style.display = "none"; $("contiName").style.display = "";
     $("capSize").value = currentSettings.caption_font_size;
-    $("layoutSel").value = currentSettings.layout;
     $("title1").value = currentSettings.title1 || "";
     $("title2").value = currentSettings.title2 || "";
     $("sourceText").value = currentSettings.source_text || "";
@@ -1897,16 +1926,12 @@
     $("bgmVol").value = Math.round(currentSettings.bgm_volume * 100);
     $("bgmVolVal").textContent = $("bgmVol").value + "%";
     $("moodSel").value = currentSettings.mood;
-    $("moodNote").value = currentSettings.mood_note || "";
     currentSettings.transition = "cut";   // 화면 전환 설정은 없앴다. 늘 컷 (예전 fade 콘티도 컷)
     $("voiceSel").value = currentSettings.tts_voice;
     $("voiceSample").src = `/youtube/voices/${currentSettings.tts_voice}.mp3`;
     $("ttsRate").value = currentSettings.tts_rate;
     $("ttsPitch").value = currentSettings.tts_pitch;
     updateVoiceLabels();
-    const b = $("settingsSaveBtn");
-    b.classList.remove("dirty");
-    b.textContent = "전체 설정 저장";
     card.style.display = "block";
     $("soundCard").style.display = "block";
     closeWheel();
@@ -1914,6 +1939,7 @@
     renderBgm();
     updateSettingsPreview();
     updateSettingsSummary();
+    if (needFramed) { markPartDirty("cap"); capScheduleSave(); }
   }
 
   function updateVoiceLabels() {
@@ -1935,54 +1961,70 @@
       if (!upRes.ok) throw new Error(await upRes.text());
       currentSettings.bgm_path = path;
       renderBgm();
-      markSettingsDirty();
+      markPartDirty("sound");
       showMsg("음악을 올렸습니다. '저장'을 눌러야 적용됩니다.", true);
     } catch (err) {
       showMsg("음악 업로드 실패: " + err.message, false);
     }
   }
 
-  async function saveSettings() {
-    const btn = $("settingsSaveBtn");
+  // 한 부분(main/sound/cap/name)만 저장한다. 값은 부른 그 순간의 것을 쓰고, 저장은 차례로 해서
+  // 늘 "마지막으로 저장된 video_settings + 이 부분의 키"만 PATCH한다. layout은 늘 framed로 같이 쓴다.
+  function savePart(part) {
     const scriptId = $("scriptSelect").value;
-    btn.disabled = true;
-    btn.textContent = "저장 중...";
+    const row = scripts.find((r) => String(r.id) === String(scriptId));
+    if (!row) return Promise.resolve(false);
+    const vals = {};
+    PART_KEYS[part].forEach((k) => { vals[k] = currentSettings[k]; });
+    const edit = partEdits[part];
+    const prevBgm = part === "sound" ? savedBgmPath : null;
+    savingParts.add(part);
     updateSettingsSummary();
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${scriptId}`, {
-        method: "PATCH", headers: jsonHeaders,
-        body: JSON.stringify({ video_settings: currentSettings }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const row = scripts.find((r) => String(r.id) === String(scriptId));
-      if (row) row.video_settings = { ...currentSettings };
-      if (savedBgmPath && savedBgmPath !== currentSettings.bgm_path && !isExternalUrl(savedBgmPath)) {
-        await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${savedBgmPath}`, { method: "DELETE", headers });
+    const run = saveChain.then(async () => {
+      const same = () => String($("scriptSelect").value) === String(scriptId);
+      try {
+        const next = { ...(row.video_settings || {}), ...vals, layout: "framed" };
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${scriptId}`, {
+          method: "PATCH", headers: jsonHeaders,
+          body: JSON.stringify({ video_settings: next }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        row.video_settings = next;
+        if (part === "sound") {
+          if (prevBgm && prevBgm !== next.bgm_path && !isExternalUrl(prevBgm)) {
+            await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${prevBgm}`, { method: "DELETE", headers });
+          }
+          if (same()) savedBgmPath = next.bgm_path || null;
+        }
+        if (part === "name") renderScriptList();   // 콘티 목록·선택 칸의 이름도 같이 바뀐다
+        scheduleDefaultsSave(next);   // 마지막으로 저장한 설정이 곧 기본값
+        if (same()) {
+          if (partEdits[part] === edit) dirtyParts.delete(part);   // 저장하는 동안 또 고쳤으면 "저장 안 됨" 유지
+          if (PART_BTN[part]) {
+            justSavedParts.add(part);
+            setTimeout(() => { justSavedParts.delete(part); updateSettingsSummary(); }, 1800);
+          }
+        }
+        return true;
+      } catch (err) {
+        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름" }[part];
+        showMsg(`${what} 저장 실패: ${err.message}`, false);
+        if (same()) dirtyParts.add(part);
+        return false;
+      } finally {
+        savingParts.delete(part);
+        if (same()) updateSettingsSummary();
       }
-      savedBgmPath = currentSettings.bgm_path || null;
-      scheduleDefaultsSave();   // 마지막으로 저장한 설정이 곧 기본값
-      btn.classList.remove("dirty");
-      btn.textContent = "전체 설정 저장";
-      settingsJustSaved = true;
-      setTimeout(() => { settingsJustSaved = false; updateSettingsSummary(); }, 1800);
-      updateSettingsSummary();
-      setTimeout(() => { if (!btn.classList.contains("dirty")) btn.textContent = "전체 설정 저장"; }, 1500);
-    } catch (err) {
-      showMsg("전체 설정 저장 실패: " + err.message, false);
-      btn.classList.add("dirty");
-      btn.textContent = "전체 설정 저장";
-      updateSettingsSummary();
-    } finally {
-      btn.disabled = false;
-      updateSettingsSummary();
-    }
+    });
+    saveChain = run.catch(() => false);
+    return run;
   }
 
   // ───── 기본값: 항상 마지막으로 저장한 설정이 기본값이고, 새 콘티가 그 값으로 시작한다 ─────
   // 서버(youtube_default_settings, 기기를 바꿔도 유지)에 저장하고, 이 기기에도 복사본을 둔다. 서버 표가 아직 없거나 연결이 안 되면
   // 이 기기 복사본으로 동작한다. 콘티마다 다른 값(이름, 제목 1·2줄, 출처 문구, 직접 올린 배경음악)은 기본값에서 뺀다.
   const DEFAULTS_LS_KEY = "polos_youtube_default_settings";
-  const DEFAULT_KEYS = ["caption_font_size", "bgm_volume", "mood", "mood_note", "tts_voice", "tts_rate", "tts_pitch", "caption_weight", "caption_position_pct", "layout"];
+  const DEFAULT_KEYS = ["caption_font_size", "bgm_volume", "mood", "tts_voice", "tts_rate", "tts_pitch", "caption_weight", "caption_position_pct"];   // layout은 콘티 화면에서 늘 framed라 기본값에서 뺐다
   function pickDefaults(settings) {
     const o = {};
     DEFAULT_KEYS.forEach((k) => { if (settings[k] !== undefined) o[k] = settings[k]; });
@@ -2021,8 +2063,8 @@
   // 지난번에 쓴 기본값과 같으면 서버에 다시 쓰지 않는다.
   const DEFAULTS_SAVE_DELAY = 1500;
   let defaultsSaveTimer = 0;
-  function scheduleDefaultsSave() {
-    const snapshot = pickDefaults(currentSettings);   // 저장된 그 순간의 값(다른 콘티로 넘어가도 섞이지 않게)
+  function scheduleDefaultsSave(savedSettings) {
+    const snapshot = pickDefaults(savedSettings);   // 저장된 그 순간의 값(아직 저장 안 한 다른 카드 값이나 다른 콘티 값이 섞이지 않게)
     clearTimeout(defaultsSaveTimer);
     defaultsSaveTimer = setTimeout(async () => {
       defaultsSaveTimer = 0;
@@ -2038,23 +2080,22 @@
   $("settingsBody").addEventListener("change", () => setTimeout(updateSettingsSummary, 0));
   MOODS.forEach((m) => $("moodSel").add(new Option(m.label, m.id)));
   VOICES.forEach((v) => $("voiceSel").add(new Option(v.label, v.id)));
-  $("convName").addEventListener("input", () => { currentSettings.name = $("convName").value; markSettingsDirty(); });
   $("voiceSel").addEventListener("change", () => {
     currentSettings.tts_voice = $("voiceSel").value;
     $("voiceSample").src = `/youtube/voices/${currentSettings.tts_voice}.mp3`;
-    markSettingsDirty();
+    markPartDirty("sound");
   });
   $("ttsRate").addEventListener("input", () => {
     currentSettings.tts_rate = Number($("ttsRate").value);
     $("voiceSample").playbackRate = 1 + currentSettings.tts_rate / 100;
     updateVoiceLabels();
-    markSettingsDirty();
+    markPartDirty("sound");
     updateRuntimeSummary();   // 목소리 속도가 바뀌면 자막 줄 예상 길이(=장면 길이)도 바뀐다
   });
   $("ttsPitch").addEventListener("input", () => {
     currentSettings.tts_pitch = Number($("ttsPitch").value);
     updateVoiceLabels();
-    markSettingsDirty();
+    markPartDirty("sound");
   });
   $("voiceSample").addEventListener("play", () => {
     $("voiceSample").playbackRate = 1 + currentSettings.tts_rate / 100;
@@ -2062,59 +2103,87 @@
   $("capSize").addEventListener("input", () => {
     currentSettings.caption_font_size = Number($("capSize").value);
     updateSettingsPreview();
-    markSettingsDirty();
-  });
-  $("layoutSel").addEventListener("change", () => {
-    currentSettings.layout = $("layoutSel").value;
-    // 제목+영상+출처 구성에서는 자막이 영상 영역 아래쪽 안에 오도록 기본 위치를 같이 바꿔준다
-    if (currentSettings.layout === "framed" && Number($("capPos").value) === 7) $("capPos").value = 22;
-    if (currentSettings.layout === "full" && Number($("capPos").value) === 22) $("capPos").value = 7;
-    currentSettings.caption_position_pct = Number($("capPos").value);
-    updateSettingsPreview();
-    markSettingsDirty();
+    markPartDirty("cap");
   });
   [["title1", "title1"], ["title2", "title2"], ["sourceText", "source_text"]].forEach(([id, key]) => {
     $(id).addEventListener("input", () => {
       currentSettings[key] = $(id).value;
       updateSettingsPreview();
-      markSettingsDirty();
+      markPartDirty("main");
     });
   });
   $("capWeight").addEventListener("input", () => {
     currentSettings.caption_weight = Number($("capWeight").value);
     updateSettingsPreview();
-    markSettingsDirty();
+    markPartDirty("cap");
   });
   $("capPos").addEventListener("input", () => {
     currentSettings.caption_position_pct = Number($("capPos").value);
     updateSettingsPreview();
-    markSettingsDirty();
+    markPartDirty("cap");
   });
   $("bgmVol").addEventListener("input", () => {
     currentSettings.bgm_volume = Number($("bgmVol").value) / 100;
     $("bgmVolVal").textContent = $("bgmVol").value + "%";
-    markSettingsDirty();
+    markPartDirty("sound");
   });
-  $("moodSel").addEventListener("change", () => { currentSettings.mood = $("moodSel").value; markSettingsDirty(); });
-  $("moodNote").addEventListener("input", () => { currentSettings.mood_note = $("moodNote").value; markSettingsDirty(); });
+  $("moodSel").addEventListener("change", () => { currentSettings.mood = $("moodSel").value; markPartDirty("main"); });
   $("bgmFile").addEventListener("change", (e) => { if (e.target.files[0]) uploadBgm(e.target.files[0]); e.target.value = ""; });
-  $("settingsSaveBtn").addEventListener("click", saveSettings);
-  $("soundSaveBtn").addEventListener("click", () => { if (!$("settingsSaveBtn").disabled) saveSettings(); });
+  $("settingsSaveBtn").addEventListener("click", () => { if (!savingParts.has("main")) savePart("main"); });
+  $("soundSaveBtn").addEventListener("click", () => { if (!savingParts.has("sound")) savePart("sound"); });
+
+  // ───── 카드 머리의 콘티 이름: 누르면 그 자리에서 고침. Enter/바깥 누르기 = 저장, Esc = 취소 ─────
+  function startNameEdit() {
+    const inp = $("contiNameInput");
+    inp.value = currentSettings.name || "";
+    $("contiName").style.display = "none";
+    inp.style.display = "";
+    inp.focus();
+    inp.select();
+  }
+  function endNameEdit(commit) {
+    const inp = $("contiNameInput");
+    if (inp.style.display === "none") return;
+    inp.style.display = "none";
+    $("contiName").style.display = "";
+    const v = inp.value.trim();
+    if (commit && v !== (currentSettings.name || "")) {
+      currentSettings.name = v;
+      partEdits.name++;
+      updateSettingsSummary();
+      savePart("name");
+    }
+  }
+  $("contiName").addEventListener("click", startNameEdit);
+  $("contiName").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); startNameEdit(); } });
+  $("contiNameInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); endNameEdit(true); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); endNameEdit(false); }
+  });
+  $("contiNameInput").addEventListener("blur", () => endNameEdit(true));
+
+  // 콘티 목록과 (숨은) 선택 칸을 지금 scripts로 다시 그린다. 이름을 바꾼 뒤에도 부른다(고른 값은 그대로 둔다)
+  function renderScriptList() {
+    const sel = $("scriptSelect");
+    const keep = sel.value;
+    const nameOf = (r) => (r.video_settings && r.video_settings.name) || (r.hook || "").slice(0, 30) || "(이름 없음)";
+    sel.innerHTML = '<option value="">선택하세요</option>' +
+      scripts.map((r) => `<option value="${r.id}">${escapeHtml(nameOf(r))}</option>`).join("");
+    sel.value = keep;
+    $("contiList").innerHTML = scripts.length
+      ? scripts.map((r) => `<div class="conti-item" role="button" tabindex="0" data-id="${r.id}">
+          <div class="title">${escapeHtml(nameOf(r))}</div>
+          <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>
+        </div>`).join("")
+      : '<div class="empty" style="margin:20px 0;">아직 콘티가 없습니다</div>';
+  }
 
   async function loadScripts() {
     const sel = document.getElementById("scriptSelect");
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&category=neq.${encodeURIComponent("큐레이션")}&order=created_at.desc`, { headers });
       scripts = await res.json();
-      const nameOf = (r) => (r.video_settings && r.video_settings.name) || (r.hook || "").slice(0, 30) || "(이름 없음)";
-      sel.innerHTML = '<option value="">선택하세요</option>' +
-        scripts.map((r) => `<option value="${r.id}">${escapeHtml(nameOf(r))}</option>`).join("");
-      $("contiList").innerHTML = scripts.length
-        ? scripts.map((r) => `<div class="conti-item" role="button" tabindex="0" data-id="${r.id}">
-            <div class="title">${escapeHtml(nameOf(r))}</div>
-            <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>
-          </div>`).join("")
-        : '<div class="empty" style="margin:20px 0;">아직 콘티가 없습니다</div>';
+      renderScriptList();
     } catch (err) {
       sel.innerHTML = '<option value="">불러오기 실패</option>';
       $("contiList").innerHTML = '<div class="empty" style="margin:20px 0;">불러오기 실패</div>';
@@ -2294,7 +2363,9 @@
           ].join("\n"),
           status: "approved",
           slug: `${new Date().toISOString().slice(0, 10)}_${topic.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20)}`,
-          video_settings: { ...(userDefaults || {}), name: (data.name || topic).slice(0, 40), ...draftScreenText(data, articles) },
+          // 기본값의 자막 위치가 framed 기준(새 기본값엔 layout이 없다)이면 그대로 framed로 만든다. 기본값이 없거나 옛 full 기준이면
+          // layout을 비워 두고, 열 때 framed로 바꾸며 자막 위치 7→22 전환을 적용한다(loadSettingsCard)
+          video_settings: { ...(userDefaults || {}), ...(userDefaults && userDefaults.caption_position_pct != null && userDefaults.layout !== "full" ? { layout: "framed" } : {}), name: (data.name || topic).slice(0, 40), ...draftScreenText(data, articles), ...(data.mood ? { mood: data.mood } : {}) },   // 분위기는 Gemini가 기사를 보고 고른 값이 기본값보다 우선
         }),
       });
       if (!scriptRes.ok) throw new Error(await scriptRes.text());
@@ -3053,7 +3124,6 @@
   let posState = null;
   // "제목+영상+출처" 구성에서 세로/가로 1.3 이상인 소재는 영상 영역이 화면 맨 아래까지(1080x1500), 그 밖은 1080x1280 (영상 만들기와 같은 규칙)
   function posAspect(iw, ih) {
-    if ($("layoutSel").value !== "framed") return 1080 / 1920;
     return iw && ih && ih / iw >= 1.3 ? 1080 / 1500 : 1080 / 1280;
   }
   function layoutPos() {
@@ -3071,7 +3141,7 @@
     win.style.left = (st.slackX * st.x) + "px"; win.style.top = (st.slackY * st.y) + "px";
     $("posInfo").textContent = st.slackX < 2 && st.slackY < 2
       ? "이 소재는 화면 비율과 거의 같아서 위치를 바꿀 부분이 없어요"
-      : `가로 ${Math.round(st.x * 100)}% · 세로 ${Math.round(st.y * 100)}% (화면 구성: ${$("layoutSel").value === "framed" ? "제목+영상+출처" : "전체 화면"})`;
+      : `가로 ${Math.round(st.x * 100)}% · 세로 ${Math.round(st.y * 100)}%`;
   }
   function openPosModal(id, path) {
     const seg = segments.find((s) => String(s.id) === id);
@@ -3196,7 +3266,7 @@
   // 화면 구성 / 제목 / 자막 모양: 지금 설정 그대로
   function pvDecor(el) {
     const P = pvParts(el);
-    const framed = $("layoutSel").value === "framed";
+    const framed = true;   // 콘티 화면의 영상은 늘 제목 + 영상 + 출처
     P.media.style.cssText = framed ? "top:105px;height:375px;bottom:auto;" : "";
     [[P.t1, "title1"], [P.t2, "title2"], [P.src, "sourceText"]].forEach(([node, src]) => {
       const v = $(src).value.trim();
@@ -3521,13 +3591,13 @@
       pvIdle(el, seg);
     }
   }
-  // 전체 설정(화면 구성·제목·자막)이 바뀌면 모든 카드의 미리보기에 반영
+  // 설정(제목·자막)이 바뀌면 모든 카드의 미리보기에 반영
   function pvSyncAll() {
     document.querySelectorAll(".seg-item").forEach((el) => {
       const seg = segOfEl(el);
       if (!seg || !el.querySelector(".seg-stage")) return;
       if (pvActive && pvActive.el === el) {
-        const framed = $("layoutSel").value === "framed";
+        const framed = true;
         if (framed !== pvActive.framed && !pvActive.playing) { pvRefreshCard(el.dataset.id); return; }
         const d = pvDecor(el);
         pvActive.size = d.size; pvActive.wt = d.wt;
@@ -3540,7 +3610,7 @@
   // ───── 미리보기에서 자막 직접 조정 ─────
   // 자막을 위아래로 끌면 위치(caption_position_pct), 두 손가락 벌리기/오므리기(PC는 자막 위 마우스 휠)로 크기(caption_font_size),
   // 자막을 두 번 탭하면 굵기(caption_weight, WEIGHTS 순서로 순환). 전체 설정 값이라 모든 장면 미리보기에 같이 적용되고,
-  // 조작이 멈추면 잠시 뒤 전체 설정 저장(saveSettings)으로 저장된다. 숫자는 보여주지 않는다.
+  // 조작이 멈추면 잠시 뒤 자막 키만 자동 저장(savePart("cap"))된다. 숫자는 보여주지 않는다.
   // 화면 숨은 값 칸(capSize/capWeight/capPos)에 넣고 원래 이벤트를 쏘므로 currentSettings·미리보기 갱신·저장 표시는 기존 경로 그대로다.
   // 자막 위: 한 번 탭 = (두 번 탭이 아니면) 재생/멈춤, 두 번 탭 = 굵기, 끌기 = 위치. 자막 밖 탭 = 재생/멈춤. 두 손가락 = 어디서든 크기.
   const CAP_DBL_MS = 280;
@@ -3562,9 +3632,9 @@
   function capScheduleSave() {
     clearTimeout(capSaveTimer);
     capSaveTimer = setTimeout(() => {
-      if (!$("scriptSelect").value || !$("settingsSaveBtn").classList.contains("dirty")) return;
-      if ($("settingsSaveBtn").disabled) { capScheduleSave(); return; }   // 저장 중이면 끝난 뒤 다시
-      saveSettings();
+      if (!$("scriptSelect").value || !dirtyParts.has("cap")) return;
+      if (savingParts.has("cap")) { capScheduleSave(); return; }   // 저장 중이면 끝난 뒤 다시
+      savePart("cap");   // 자막 키(caption_*)만 덮어쓴다. 카드의 아직 저장 안 한 값은 섞이지 않는다
     }, 900);
   }
   function capCycleWeight() {
@@ -3834,10 +3904,11 @@
 
   let lastScriptId = "";
   document.getElementById("scriptSelect").addEventListener("change", (e) => {
-    if (hasDirty() && !confirm("전체 설정에 저장 안 한 수정사항이 있습니다. 그래도 넘어갈까요?")) {
+    if (hasDirty() && !confirm("설정 카드에 저장 안 한 수정사항이 있습니다. 그래도 넘어갈까요?")) {
       e.target.value = lastScriptId;
       return;
     }
+    flushCapSave();   // 자막 조작은 기다리지 않고 바로 저장(값은 지금 콘티 것으로 잡아 둔다)
     if (cardsDirty()) flushDirtyCards(); // 장면 카드는 자동 저장
     lastScriptId = e.target.value;
     const inDetail = !!e.target.value;
@@ -3952,7 +4023,8 @@
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && cardsDirty()) flushDirtyCards(); });
   window.addEventListener("beforeunload", (e) => {
     if (cardsDirty()) flushDirtyCards();
-    if (hasDirty() || cardsDirty()) {
+    if (capPending()) flushCapSave();
+    if (hasDirty() || capPending() || cardsDirty()) {
       e.preventDefault();
       e.returnValue = "";
     }
@@ -4005,11 +4077,13 @@
     const scriptId = $("scriptSelect").value;
     const row = scripts.find((r) => String(r.id) === String(scriptId));
     if (!row) return;
-    if (hasDirty()) { showMsg("전체 설정에 저장 안 한 수정사항이 있습니다. 먼저 저장한 뒤 영상을 생성하세요.", false); return; }
+    if (hasDirty()) { showMsg("설정 카드에 저장 안 한 수정사항이 있습니다. 먼저 저장한 뒤 영상을 생성하세요.", false); return; }
     const btn = $("genBtn");
     btn.disabled = true;
     try {
       await flushDirtyCards();
+      await flushCapSave();
+      if (capPending()) throw new Error("자막 설정 저장이 끝나지 않았습니다. 잠시 후 다시 눌러주세요.");
       if (cardsDirty()) throw new Error("장면 저장이 끝나지 않았습니다. 잠시 후 다시 눌러주세요.");
       // 콘티에서 보이는 것 = 생성되는 영상: 자동 배치가 끝나기 전이거나 빈 장면이 있으면 생성하지 않는다
       if (autofillPending()) throw new Error("Pexels 자동 배치가 아직 진행 중입니다. 끝난 뒤 다시 눌러주세요.");
@@ -4026,7 +4100,8 @@
       if (!confirm(`v${version} 영상 생성을 시작할까요? 몇 분 걸리고, 완성되면 알려드립니다. 영상은 Studio에서 확인하세요.`)) { btn.disabled = false; return; }
       genRequestPermission();
       // 자막 줄 길이를 계산한 목소리 속도(화면에 보이는 값)를 그대로 넘긴다 — 저장된 설정에 tts_rate가 없을 때도 콘티 길이 = 요청 길이
-      await genStart({ ...row, video_settings: { ...(row.video_settings || {}), tts_rate: ttsRateNow() } }, segments, version);
+      // 콘티 화면의 영상은 늘 "제목 + 영상 + 출처"(framed). 큐레이션은 curation.html에서 따로 genStart를 부르므로 영향 없음
+      await genStart({ ...row, video_settings: { ...(row.video_settings || {}), layout: "framed", tts_rate: ttsRateNow() } }, segments, version);
       row.generation_status = "running";
       btn.textContent = "영상 생성 중... (몇 분 걸려요)";
       watchGeneration(scriptId);
@@ -4091,8 +4166,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category: row.category, hook: row.hook, story: row.story, closing: row.closing,
-          mood: (MOODS.find((m) => m.id === currentSettings.mood) || {}).desc || "",
-          moodNote: currentSettings.mood_note || "",
+          mood: (MOODS.find((m) => m.id === currentSettings.mood) || {}).desc || "",   // 분위기 메모는 없앴다(보내지 않으면 서버 프롬프트에서 빠진다)
         }),
       });
       const data = await res.json();
