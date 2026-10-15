@@ -228,8 +228,8 @@ function genToast(text, ok) {
     box.style.cssText = "position:fixed;left:12px;right:12px;bottom:14px;z-index:60;max-width:436px;margin:0 auto;padding:12px 14px;border-radius:6px;font-size:0.9rem;font-weight:700;display:flex;gap:10px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,0.5);";
     document.body.appendChild(box);
   }
-  box.style.background = ok ? "#4fc3f7" : "#ff6b6b";
-  box.style.color = "#000000";
+  box.style.background = ok ? "#1c1c1c" : "#ff6b6b"; box.style.border = ok ? "1px solid #444" : "none";
+  box.style.color = ok ? "#ffffff" : "#000000";
   box.innerHTML = "";
   const span = document.createElement("span");
   span.style.flex = "1";
@@ -239,13 +239,13 @@ function genToast(text, ok) {
     const a = document.createElement("a");
     a.href = "/youtube/review.html";
     a.textContent = "Studio 열기";
-    a.style.cssText = "color:#000000;text-decoration:underline;white-space:nowrap;";
+    a.style.cssText = "color:#ffffff;text-decoration:underline;white-space:nowrap;";
     box.appendChild(a);
   }
   const x = document.createElement("button");
   x.type = "button";
   x.textContent = "×";
-  x.style.cssText = "width:auto;padding:0 6px;margin:0;background:none;box-shadow:none;color:#000000;font-size:1.2rem;";
+  x.style.cssText = "width:auto;padding:0 6px;margin:0;background:none;box-shadow:none;color:inherit;font-size:1.2rem;";
   x.addEventListener("click", () => box.remove());
   box.appendChild(x);
 }
