@@ -231,14 +231,13 @@
   .seg-tl-handle.drag::after { background:#ffffff; }
   .seg-tl-play { position:absolute; top:-6px; bottom:-6px; width:2px; margin-left:-1px; background:#fff; box-shadow:0 0 3px #000; pointer-events:none; z-index:4; display:none; }
   .seg-tl-play.on { display:block; }
-  .seg-tl-add { flex:0 0 36px; width:36px; height:48px; align-self:flex-end; margin:0; padding:0; border-radius:6px; background:#0f0a14; color:#7cff4a; border:2px dashed #7cff4a; font-size:1.4rem; line-height:1; text-transform:none; letter-spacing:0; }
-  .seg-tl-add.on { background:#7cff4a; color:#0f0a14; border-style:solid; }
+  .seg-tl-add { position:absolute; right:3px; top:50%; transform:translateY(-50%); z-index:6; width:26px; height:26px; margin:0; padding:0; border-radius:6px; background:#ffffff; color:#0f0a14; border:none; box-shadow:0 1px 4px rgba(0,0,0,0.5); font-size:1.1rem; font-weight:800; line-height:26px; text-align:center; text-transform:none; letter-spacing:0; touch-action:manipulation; }
+  .seg-tl-add.on { background:#7cff4a; }
   /* 자막 트랙 (EDITS 자막 줄처럼): 영상 트랙 바로 아래, 같은 시간축. 블록 끝을 끌어 그 줄의 화면 유지 시간을 바꾼다 */
   .seg-cap-area { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; margin-top:6px; }
   .seg-cap-area:empty { display:none; }
   .seg-cap-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#a89bb5; font-size:0.68rem; margin-bottom:3px; min-height:20px; }
   .seg-cap-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:#0f0a14; color:#ffd93d; text-transform:none; letter-spacing:0; flex-shrink:0; }
-  .seg-cap-spacer { flex:0 0 36px; }
   .seg-cap-track { position:relative; height:36px; margin:0 8px; background:#0f0a14; border-radius:4px; }
   .seg-cap-edit { display:none; margin:6px 0 4px; }
   .seg-cap-edit.open { display:block; }
@@ -255,7 +254,7 @@
   .seg-cap-play { position:absolute; top:-3px; bottom:-3px; width:2px; margin-left:-1px; background:#fff; box-shadow:0 0 3px #000; pointer-events:none; z-index:4; display:none; }
   .seg-cap-play.on { display:block; }
   .pv-emph { font-family:'Black Han Sans',sans-serif; font-weight:400; color:#ffff00; font-size:1.15em; }
-  .seg-tl-empty { flex:1; height:48px; align-self:flex-end; border:2px dashed #3a2f4a; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#7d7189; font-size:0.72rem; }
+  .seg-tl-empty { position:relative; flex:1; height:48px; align-self:flex-end; border:2px dashed #3a2f4a; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#7d7189; font-size:0.72rem; }
   /* + 메뉴 */
   .seg-add-menu { display:none; position:absolute; right:0; z-index:20; width:220px; background:#17101f; border:1px solid #3a2f4a; border-radius:6px; padding:6px; box-shadow:0 8px 24px rgba(0,0,0,0.6); }
   .seg-add-menu.open { display:block; }
@@ -822,7 +821,7 @@
       if (host._sig !== sig) {
         host._sig = sig;
         host.innerHTML = `<div class="seg-tl-head"><span>클립이 없어요 — 오른쪽 + 로 넣어요</span></div>
-          <div class="seg-tl-row"><div class="seg-tl-empty">빈 장면</div><button type="button" class="seg-tl-add" title="사진/영상/빈 화면 추가">+</button></div>
+          <div class="seg-tl-row"><div class="seg-tl-empty">빈 장면<button type="button" class="seg-tl-add" title="사진/영상/빈 화면 추가">+</button></div></div>
           <div style="margin-top:8px;">${emptyThumbsHtml(seg)}</div>`;
       }
       return;
@@ -841,9 +840,9 @@
               ${plan.map((c, i) => `<div class="seg-tl-clip ${clipKind(c.path)}${c.short ? " short" : ""}${c.path === el._selPath ? " sel" : ""}${i === plan.length - 1 ? " last" : ""}" data-i="${i}" style="flex:0 0 ${c.frac * 100}%;">${clipFillHtml(seg, c.path, tiles)}${clipLabHtml(i, c)}</div>`).join("")}
               ${plan.slice(0, -1).map((c, k) => `<div class="seg-tl-handle" data-k="${k}"></div>`).join("")}
               <div class="seg-tl-play"></div>
+              <button type="button" class="seg-tl-add" title="사진/영상/빈 화면 추가">+</button>
             </div>
           </div>
-          <button type="button" class="seg-tl-add" title="사진/영상/빈 화면 추가">+</button>
         </div>
         <div class="seg-tools-host"></div>
         <div class="seg-short-host"></div>`;
@@ -1252,7 +1251,6 @@
               <div class="seg-cap-play"></div>
             </div>
           </div>
-          <div class="seg-cap-spacer"></div>
         </div>`;
     }
     paintCapTrack(el, st);
