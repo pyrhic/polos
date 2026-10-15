@@ -29,7 +29,10 @@
   .seg-item input, .seg-item textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
   .seg-script, .seg-direction { min-height:50px; background:#17141c; color:#ffffff; resize:none; overflow:hidden; }
   /* 자막 칸: 한 줄 = 자막 한 번 (줄바꿈이 그대로 보이게) */
-  .seg-item .seg-script { color:#7cff4a; font-size:0.85rem; line-height:1.6; white-space:pre-wrap; }
+  .seg-item .seg-script { white-space:pre-wrap; }
+  .seg-side-lab { color:#a89bb5; font-size:0.66rem; font-weight:700; letter-spacing:0.06em; margin-top:2px; }
+  .seg-stage-side .seg-script, .seg-stage-side .seg-direction { margin:0; padding:6px 8px; font-size:0.8rem; line-height:1.5; min-height:44px; }
+  .seg-stage-side .seg-script { min-height:96px; }
   .seg-item .seg-script::placeholder { color:#4f7a3c; }
   .seg-thumb-empty { width:100%; height:50px; border-radius:3px; background:#0f0a14; margin-bottom:8px; display:flex; align-items:center; justify-content:center; color:#a89bb5; font-size:0.8rem; text-align:center; padding:8px; }
   .seg-icon-btn { width:26px; height:26px; padding:0; margin:0; border-radius:50%; background:#0f0a14; color:#a89bb5; font-size:0.95rem; line-height:1; flex-shrink:0; text-transform:none; }
@@ -239,9 +242,6 @@
   .seg-cap-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#a89bb5; font-size:0.68rem; margin-bottom:3px; min-height:20px; }
   .seg-cap-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:#0f0a14; color:#ffd93d; text-transform:none; letter-spacing:0; flex-shrink:0; }
   .seg-cap-track { position:relative; height:36px; margin:0 8px; background:#0f0a14; border-radius:4px; }
-  .seg-cap-edit { display:none; margin:6px 0 4px; }
-  .seg-cap-edit.open { display:block; }
-  .seg-cap-edit .seg-script { margin:0; }
   .seg-cap-blk { position:absolute; top:0; bottom:0; box-sizing:border-box; background:#5c4a12; border:1px solid #ffd93d; border-radius:4px; color:#fff3c4; touch-action:pan-y; cursor:pointer; }
   .seg-cap-blk.set { background:#7a5f0c; }
   .seg-cap-blk.on { background:#a07c10; }
@@ -812,7 +812,10 @@
     const pvSecs = hasCaps(el) ? secs : Math.max(2, secs);
     const plan = clipPlan(seg, pvSecs);
     const stageRow = el.querySelector(".seg-stage-row");
-    if (stageRow) stageRow.style.display = paths.length ? "flex" : "none";
+    if (stageRow) {
+      stageRow.style.display = "flex";
+      stageRow.querySelector(".seg-stage-box").style.display = paths.length ? "" : "none";
+    }
     const custom = Object.keys((seg.asset_trims || {}).__weights || {}).length > 0;
     const sig = JSON.stringify([paths, paths.map((p) => thumbNow(p) === undefined ? "?" : thumbNow(p) ? "t" : "v"), el._selPath, custom,
       plan.map((c) => c.short), paths.length ? "" : emptyThumbsHtml(seg), ((seg.asset_trims || {}).__focus || {})]);
@@ -1349,27 +1352,15 @@
     });
   }
 
-  // 자막 블록을 누르면 아래로 자막 입력칸이 펼쳐지고 그 줄이 선택된다. 펼친 채 같은 줄을 다시 누르면 접힌다.
+  // 자막 블록을 누르면 미리보기 옆 SCRIPT 칸에서 그 줄을 선택해 바로 고칠 수 있게 한다
   function capEditToggle(el, i) {
-    const box = el.querySelector(".seg-cap-edit");
     const ta = el.querySelector(".seg-script");
-    if (!box || !ta) return;
-    if (box.classList.contains("open") && box.dataset.line === String(i)) {
-      box.classList.remove("open");
-      delete box.dataset.line;
-      ta.blur();
-      return;
-    }
-    box.classList.add("open");
-    box.dataset.line = String(i);
-    autoGrow(ta);
-    // i번째 자막 줄(빈 줄 제외)의 위치를 찾아 그 줄을 선택한다
+    if (!ta) return;
     let pos = 0, n = -1;
-    for (const line of ta.value.split("\n")) {
+    for (const line of ta.value.split("\n")) {   // i번째 자막 줄(빈 줄 제외)
       if (line.trim() && ++n === i) { ta.focus({ preventScroll: true }); ta.setSelectionRange(pos, pos + line.length); break; }
       pos += line.length + 1;
     }
-    box.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   // 장면이 길어서 사진 하나가 오래 머물면 지루하다. 콘티를 열 때 모자란 컷을 키워드로 Pexels 영상으로 자동 배치하지만
@@ -2275,7 +2266,7 @@
           <button type="button" class="seg-icon-btn seg-delete-btn" title="이 장면 삭제">×</button>
         </div>
         <div class="seg-media">
-          <div class="seg-stage-row" style="display:none;">
+          <div class="seg-stage-row">
             <div class="seg-stage-box">
               <div class="cap-preview seg-stage" title="눌러서 재생 / 멈춤">
                 <div class="pv-layer"></div>
@@ -2290,13 +2281,14 @@
             <div class="seg-stage-side">
               <div class="seg-pv-time">00:00 / 00:00</div>
               <div class="seg-pv-info"></div>
+              <div class="seg-side-lab">SCRIPT</div>
+              <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
+              <div class="seg-side-lab">ACTION</div>
+              <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
             </div>
           </div>
           <div class="seg-tl-area"></div>
           <div class="seg-cap-area"></div>
-          <div class="seg-cap-edit${normalizeScript(seg.script_text).trim() ? "" : " open"}">
-            <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
-          </div>
           <div class="seg-add-menu">
             <button type="button" class="seg-add-file">📁 내 사진/영상 (여러 개)</button>
             <button type="button" class="seg-add-pexels">🔎 Pexels에서 찾기</button>
@@ -2308,8 +2300,6 @@
           <div class="seg-pexels-preview"></div>
         </div>
         <div class="seg-media-hint" style="display:none;color:#ffd93d;font-size:0.78rem;margin:2px 0 8px;"></div>
-        <label>ACTION <span style="font-weight:400;font-size:0.75rem;text-transform:none;letter-spacing:0;">— 사진의 카메라 연출 (줌인 · 줌아웃 · 패닝 · 틸트업)</span></label>
-        <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
         <input type="hidden" class="seg-section" value="${escapeAttr(seg.section)}">
         <label>자료사진/영상 검색 키워드</label>
         <input type="text" class="seg-keyword" value="${escapeAttr(seg.keyword)}" placeholder="Pexels 검색 키워드 (영어)">
