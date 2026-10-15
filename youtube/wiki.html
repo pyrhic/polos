@@ -154,7 +154,7 @@
           </select>
         </div>
         <div class="wk-field">
-          <label for="cardSel">구독 카드</label>
+          <label for="cardSel">채널 카드</label>
           <select id="cardSel"><option value="">불러오는 중...</option></select>
           <div class="wk-hint" id="cardHint"></div>
         </div>
@@ -319,13 +319,13 @@
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards?select=*&channel_slot=eq.${ch.slot}&order=sort_order.asc,id.asc`, { headers });
       if (!res.ok) throw new Error("구독 카드 표를 읽지 못함");
       cards = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
-      if (!cards.length) throw new Error(`${ch.label} 채널에 구독 카드가 없음`);
+      if (!cards.length) throw new Error(`${ch.label} 채널에 채널 카드가 없음`);
       sel.innerHTML = cards.map((c) => `<option value="${c.id}"${c.is_default ? " selected" : ""}>${esc(c.name)}${c.is_default ? " (기본)" : ""} · 사진 ${c.image_paths.length}장</option>`).join("");
       hint.textContent = `${ch.label} 채널의 카드예요. 카드 문구·사진은 채널 화면에서 고쳐요.`;
     } catch (e) {
       cards = [];
       sel.innerHTML = '<option value="">기본 문구 (카드를 못 읽음)</option>';
-      hint.textContent = `구독 카드를 불러오지 못해 기본 문구를 써요 (${e.message}).`;
+      hint.textContent = `채널 카드를 불러오지 못해 기본 문구를 써요 (${e.message}).`;
     }
   }
   loadCards();

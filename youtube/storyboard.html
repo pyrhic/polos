@@ -289,7 +289,6 @@
   .seg-cap-in .t .mute { color:#ffd76a; text-decoration:underline dotted; }
   .seg-cap-blk.on .seg-cap-in .t .mute { color:inherit; }
   .seg-cap-in .t .pz { opacity:0.6; font-weight:700; padding:0 1px; }   /* 쉼 표시(-) 자리 */
-  .pv-cap-hid { opacity:0.4; font-size:0.6em; font-weight:400; }
   .seg-cap-in .s { font-size:0.56rem; color:#9fdcfa; white-space:nowrap; }
   .seg-cap-handle { position:absolute; top:-2px; bottom:-2px; right:-12px; width:24px; touch-action:none; cursor:ew-resize; z-index:3; display:flex; justify-content:center; align-items:center; }
   .seg-cap-handle::after { content:""; width:6px; height:70%; border-radius:3px; background:var(--accent-strong); box-shadow:0 0 0 2px var(--inset); }
@@ -357,7 +356,7 @@
         <select id="draftMood"><option value="">자동 (Gemini가 판단)</option></select>
         <label for="draftNote">방향 메모 (선택)</label>
         <input type="text" id="draftNote" maxlength="300" placeholder="예: 경제 영향 위주로 / 찬반 입장 균형 있게">
-        <label for="draftCard">구독 카드</label>
+        <label for="draftCard">채널 카드</label>
         <select id="draftCard"><option value="">불러오는 중...</option></select>
         <div class="draft-hint" id="draftCardHint"></div>
         <button type="button" id="draftBtn" style="margin-top:12px;">대본 + 콘티 생성</button>
@@ -1773,10 +1772,10 @@
   function updateOverview(runs, total) {
     ovRuns = runs;
     $("ovTotal").textContent = `약 ${fmtDur(total)}`;
-    // "이름 [카드 n개] 00초" (카드 1개면 개수 생략), 구독/좋아요 묶음은 "구독 카드"
+    // "이름 00초", 구독/좋아요 묶음은 "채널 카드"
     $("ovParts").innerHTML = runs.length ? runs.map((r, i) => {
-      const label = r.part === SUBSCRIBE_PART ? "구독 카드"
-        : `${r.part}${r.els.length > 1 ? ` 카드 ${r.els.length}개` : ""} ${fmtDur(r.secs)}`;
+      const label = r.part === SUBSCRIBE_PART ? "채널 카드"
+        : `${r.part} ${fmtDur(r.secs)}`;
       return `<button type="button" class="tok" data-run="${i}">${escapeHtml(label)}</button>`;
     }).join(' <span class="ov-sep">/</span> ') : "-";
   }
@@ -2359,13 +2358,13 @@
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards?select=*&channel_slot=eq.${ch.slot}&order=sort_order.asc,id.asc`, { headers });
       if (!res.ok) throw new Error("구독 카드 표를 읽지 못함");
       draftCards = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
-      if (!draftCards.length) throw new Error(`${ch.label} 채널에 구독 카드가 없음`);
+      if (!draftCards.length) throw new Error(`${ch.label} 채널에 채널 카드가 없음`);
       sel.innerHTML = draftCards.map((c) => `<option value="${c.id}"${c.is_default ? " selected" : ""}>${escapeHtml(c.name)}${c.is_default ? " (기본)" : ""} · 사진 ${c.image_paths.length}장</option>`).join("");
       hint.textContent = `${ch.label} 채널의 카드예요. 카드 문구·사진은 채널 화면에서 고쳐요.`;
     } catch (err) {
       draftCards = [];
       sel.innerHTML = '<option value="">기본 문구 (카드를 못 읽음)</option>';
-      hint.textContent = `구독 카드를 불러오지 못해 기본 문구를 써요 (${err.message}).`;
+      hint.textContent = `채널 카드를 불러오지 못해 기본 문구를 써요 (${err.message}).`;
     }
   }
   // 카드 사진 중 한 장: 그 카드로 이미 만든 콘티 수 기준으로 돌아가며 (못 세면 무작위). 사진이 없으면 빈 배열
@@ -3449,7 +3448,7 @@
   function pvCapShow(cap, g, size, wt, still) {
     cap._g = g || null;
     const shown = g && capPlainText(genCaptionShown(g.raw)).trim() ? genCaptionShown(g.raw) : "";
-    cap.innerHTML = shown ? capLineHtml(shown) : (g && still ? '<span class="pv-cap-hid">(자막 숨김)</span>' : "");
+    cap.innerHTML = shown ? capLineHtml(shown) : "";   // 숨김 줄은 실제 영상처럼 미리보기에도 아무것도 안 보인다
     cap.style.fontFamily = `${wt.family}, sans-serif`;
     cap.style.fontWeight = wt.weight;
     cap.style.color = "#fff";

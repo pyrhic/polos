@@ -12,7 +12,7 @@
 
   let channels = [];
   let cards = [];
-  let openId = null;       // 펼친 구독 카드 id
+  let openId = null;       // 펼친 채널 카드 id
   let draft = null;        // 펼친 카드의 저장 전 값 { name, script_text, direction }
   let pvIndex = 0;         // 미리보기에서 보고 있는 자막 줄
   let busy = false;
@@ -103,7 +103,7 @@
         </span></div>
         ${c.ready ? "" : `<div class="ch-note" style="margin:-4px 0 6px;">끄면 업로드 화면의 채널 목록에 보이지 않습니다.</div>`}
         <div class="conn" data-conn="${c.slot}">${connHtml(c)}</div>
-        <div class="sc-title"><span class="k">구독 카드</span>
+        <div class="sc-title"><span class="k">채널 카드</span>
           <button type="button" class="btn-sm" data-act="new" data-slot="${c.slot}">+ 새 카드</button></div>
         ${cardsOf(c.slot).map(cardHtml).join("") || `<div class="ch-note" style="padding:6px 0;">아직 카드가 없습니다. "+ 새 카드"로 만드세요.</div>`}
       </div>`).join("");
@@ -237,7 +237,7 @@
   }
 
   function openCard(id) {
-    if (openId != null && String(openId) !== String(id) && isDirty() && !confirm("저장하지 않은 구독 카드 수정이 있어요. 버리고 다른 카드를 열까요?")) return;
+    if (openId != null && String(openId) !== String(id) && isDirty() && !confirm("저장하지 않은 채널 카드 수정이 있어요. 버리고 다른 카드를 열까요?")) return;
     if (String(openId) === String(id)) {
       if (isDirty() && !confirm("저장하지 않은 수정이 있어요. 버리고 닫을까요?")) return;
       openId = null; draft = null;
@@ -319,7 +319,7 @@
     const mine = cardsOf(slot);
     const body = {
       channel_slot: Number(slot),
-      name: from ? `${from.name} (복사)`.slice(0, 40) : "새 구독 카드",
+      name: from ? `${from.name} (복사)`.slice(0, 40) : "새 채널 카드",
       script_text: from ? from.script_text : "",
       image_paths: from ? [...from.image_paths] : [],
       direction: from ? from.direction : DIRECTIONS[0],
@@ -492,7 +492,7 @@
       if (act === "toggle") return openCard(t.dataset.card);
       if (act === "check") return checkChannel(t.dataset.slot, t);
       if (act === "new") return guarded(async () => {
-        if (openId != null && isDirty() && !confirm("저장하지 않은 구독 카드 수정이 있어요. 버리고 새 카드를 만들까요?")) return;
+        if (openId != null && isDirty() && !confirm("저장하지 않은 채널 카드 수정이 있어요. 버리고 새 카드를 만들까요?")) return;
         const row = await createCard(t.dataset.slot, null);
         openId = null; draft = null;
         openCard(row.id);
