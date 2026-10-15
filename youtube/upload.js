@@ -5,8 +5,8 @@ const YT_RESPONSIBILITY = "정확한 사실 확인은 원본 자료를 참고해
 
 function ytDefaultDescription(row) {
   const sources = (row.fact_sources || "").split("\n").map((s) => s.trim()).filter(Boolean);
-  // 큐레이션(사진+음악) 영상은 뉴스형 안내 문구 없이 사진·음악 출처만 적는다
-  if (row.category === "큐레이션") return sources.length ? "출처:\n" + sources.join("\n") : "";
+  // Pexels 슬라이드쇼(사진+음악) 영상은 뉴스형 안내 문구 없이 사진·음악 출처만 적는다
+  if (isPexelsCategory(row.category) || isPexelsMode((row.video_settings || {}).mode)) return sources.length ? "출처:\n" + sources.join("\n") : "";
   // 위키피디아 인물 영상: 글은 위키백과(CC BY-SA 4.0)를 바탕으로 재구성한 것이라 출처와 라이선스, 사진 저작자를 반드시 적는다
   if (String(row.category || "").startsWith("위키")) {
     return ["이 영상의 이야기는 위키백과의 글(CC BY-SA 4.0)을 바탕으로 다시 쓴 것입니다.", sources.length ? "출처:\n" + sources.join("\n") : ""]
@@ -51,7 +51,7 @@ function ytDefaultSlot(row) {
   const fixed = row && row.video_settings && row.video_settings.channel_slot != null ? String(row.video_settings.channel_slot) : "";
   if (fixed && has(fixed)) return fixed;   // 구독 카드를 고를 때 채널이 같이 정해진다 (준비 안 된 채널이면 아래 규칙으로)
   if (row && String(row.category || "").startsWith("위키") && has("1")) return "1";   // 위키 이야기(인물·사건·지식)는 Wicked Wiki 채널
-  if (row && row.category === "큐레이션" && has("3")) return "3";   // 사진 슬라이드쇼는 OUTSTAGRAM 채널(준비되면)
+  if (row && (isPexelsCategory(row.category) || isPexelsMode((row.video_settings || {}).mode)) && has("3")) return "3";   // 사진 슬라이드쇼는 OUTSTAGRAM 채널(준비되면)
   try { const s = localStorage.getItem("ytSlot"); if (has(s)) return s; } catch {}
   return chs.length ? chs[0].slot : "1";
 }

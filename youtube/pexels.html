@@ -108,7 +108,7 @@
     if (!picked.size) return;
     const photos = [...picked.values()].map((p) => ({ id: p.id, url: p.url, thumb: p.thumb, page_url: p.page_url, photographer: p.photographer, photographer_url: p.photographer_url, alt: p.alt || "" }));
     try { sessionStorage.setItem("pexelsPick", JSON.stringify({ query, photos })); } catch { alert("선택을 저장하지 못했어요. 다시 시도해주세요."); return; }
-    location.href = "/youtube/curation.html";
+    location.href = "/youtube/pexels-edit.html";
   });
 })();
 </script>

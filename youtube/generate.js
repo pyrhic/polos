@@ -117,11 +117,17 @@ ${body}
 `;
 }
 
+// Pexels 슬라이드쇼(사진+제목+음악). 예전 이름("curation"/"큐레이션")으로 저장된 행도 같은 것으로 본다.
+const PEXELS_CATEGORY = "Pexels";
+const PEXELS_CATEGORIES = [PEXELS_CATEGORY, "큐레이션"];   // 두 번째는 옛 카테고리 값(호환용)
+function isPexelsMode(mode) { return mode === "pexels" || mode === "curation"; }
+function isPexelsCategory(category) { return PEXELS_CATEGORIES.includes(category); }
+
 // videoSettings: youtube_scripts.video_settings. tts_rate로 자막 줄 예상 길이를 계산한다.
-// 큐레이션(mode=curation)은 옛 방식 그대로라 자막 줄(caption_lines)을 보내지 않는다 (계약서 6-4 마지막 줄)
+// Pexels 슬라이드쇼(mode=pexels)는 옛 방식 그대로라 자막 줄(caption_lines)을 보내지 않는다 (계약서 6-4 마지막 줄)
 function genBuildSegments(segRows, videoSettings) {
   const vs = videoSettings || {};
-  const lineMode = vs.mode !== "curation";
+  const lineMode = !isPexelsMode(vs.mode);
   return [...segRows].sort((a, b) => a.order_no - b.order_no).map((s) => {
     const trims = s.asset_trims || {};
     const weights = trims.__weights || {};
@@ -206,8 +212,8 @@ async function genStart(row, segRows, version) {
     tts_voice: vs.tts_voice,
     tts_rate: vs.tts_rate,
     tts_pitch: vs.tts_pitch,
-    // 큐레이션 영상(사진+제목+음악, 음성·자막 없음)용
-    mode: vs.mode,
+    // Pexels 슬라이드쇼(사진+제목+음악, 음성·자막 없음)용. 옛 값 "curation"도 "pexels"로 보낸다
+    mode: isPexelsMode(vs.mode) ? "pexels" : vs.mode,
     title_text: vs.title_text,
     secs_per_photo: vs.secs_per_photo,
     caption_mode: vs.caption_mode,   // off / name / name_desc

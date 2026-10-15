@@ -1,4 +1,4 @@
-// 큐레이션 페이지에서 검색어로 Pexels 사진을 찾아 보여주는 프록시 (API 키를 클라이언트에 노출하지 않기 위함).
+// Pexels 화면에서 검색어로 Pexels 사진을 찾아 보여주는 프록시 (API 키를 클라이언트에 노출하지 않기 위함).
 // 영상 제작에는 w=1600으로 줄인 주소를 쓴다 (원본은 수 MB라 내려받기만 오래 걸림).
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
 

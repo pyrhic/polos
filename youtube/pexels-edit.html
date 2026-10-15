@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Curation — wizard-yt</title>
+<title>Pexels — wizard-yt</title>
 <link rel="stylesheet" href="/youtube/style.css">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#000000">
@@ -26,13 +26,6 @@
   .cu-card h2 { font-size:0.95rem; margin:0 0 8px; }
   .cu-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .cu-row input[type="number"] { width:80px; }
-  .cu-list-item { display:block; background:var(--card); border:2px solid transparent; border-radius:3px; padding:14px 16px; margin-bottom:10px; cursor:pointer; }
-  .cu-list-item:hover { border-color:var(--accent); }
-  .cu-list-item .t { font-weight:800; margin-bottom:4px; }
-  .cu-list-item .m { color:var(--muted); font-size:0.8rem; }
-  .cu-list-item { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-  .cu-list-item.pressing { border-color:var(--danger); background:var(--danger-bg); }
-  .list-hint { color:var(--muted); font-size:0.72rem; text-align:center; margin:8px 0 0; }
   .cu-sum { background:var(--inset); border-radius:3px; padding:10px 14px; color:var(--text-2); font-weight:700; font-size:0.9rem; margin:10px 0; }
   .cu-main { background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--text); padding:12px; font-size:0.95rem; }
   .cu-main:hover { background:var(--hover); color:var(--on-accent); }
@@ -54,19 +47,10 @@
 </head>
 <body>
   <div class="wrap">
-    <a class="back" href="/youtube/index.html">← wizard-yt</a>
-    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">Curation</h1>
-
-    <div id="listView">
-      <div id="curList"><div class="empty">불러오는 중...</div></div>
-      <div class="list-hint">큐레이션을 길게 누르면 삭제할 수 있어요</div>
-      <button type="button" id="newBtn" class="cu-main" style="margin-top:10px;">+ 새 큐레이션 만들기</button>
-      <div class="msg" id="listMsg"></div>
-    </div>
+    <a class="back" href="/youtube/pexels.html">← Pexels</a>
+    <h1 style="font-size:1.4rem;margin-bottom:1.2rem;">Pexels</h1>
 
     <div id="editView" style="display:none;">
-      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;margin-bottom:12px;">← 큐레이션 목록</button>
-
       <div class="cu-card">
         <label for="curTitle" style="margin-top:0;">제목 (영상 첫 화면에 들어갑니다)</label>
         <input type="text" id="curTitle" maxlength="60" placeholder="예: 지구에서 가장 비현실적인 해변 10곳">
@@ -154,113 +138,30 @@
   const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
   const SUPABASE_ANON_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
   const BUCKET = "youtube-assets";
-  const CATEGORY = "큐레이션";
+  const CATEGORY = PEXELS_CATEGORY;   // generate.js (새 행은 "Pexels")
   const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
   const jsonHeaders = { ...headers, "Content-Type": "application/json" };
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-  let cur = null;          // 편집 중인 큐레이션
+  let cur = null;          // 편집 중인 슬라이드쇼
   let curRow = null;       // DB의 콘티 행
   const genWatch = new Map();
 
-  // ───────── 목록 ─────────
-  async function loadList() {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id,created_at,video_settings,generation_status&category=eq.${encodeURIComponent(CATEGORY)}&order=created_at.desc`, { headers });
-    const rows = res.ok ? await res.json() : [];
-    $("curList").innerHTML = rows.length ? rows.map((r) => `
-      <div class="cu-list-item" data-id="${r.id}" role="button" tabindex="0">
-        <div class="t">${esc((r.video_settings || {}).name || "(제목 없음)")}</div>
-        <div class="m">${esc((r.created_at || "").slice(0, 10))}${r.generation_status === "running" ? " · 영상 생성 중" : ""}</div>
-      </div>`).join("") : '<div class="empty" style="margin:20px 0;">아직 큐레이션이 없습니다</div>';
-  }
-  // 카드를 길게 누르면(0.6초) 삭제 확인이 뜬다. 스크롤하려고 손가락을 움직이면 취소하고,
-  // 길게 눌러서 확인창이 뜬 뒤에 이어지는 클릭은 카드를 열지 않게 막는다.
-  function bindLongPress(listEl, itemSel, onLong) {
-    let timer = null, startX = 0, startY = 0, fired = false;
-    const clear = () => {
-      clearTimeout(timer); timer = null;
-      listEl.querySelectorAll(itemSel + ".pressing").forEach((e) => e.classList.remove("pressing"));
-    };
-    listEl.addEventListener("pointerdown", (e) => {
-      const item = e.target.closest(itemSel);
-      if (!item || e.button > 0) return;
-      fired = false; startX = e.clientX; startY = e.clientY;
-      item.classList.add("pressing");
-      timer = setTimeout(() => {
-        fired = true; clear();
-        if (navigator.vibrate) navigator.vibrate(30);
-        onLong(item.dataset.id);
-      }, 600);
-    });
-    listEl.addEventListener("pointermove", (e) => { if (timer && Math.hypot(e.clientX - startX, e.clientY - startY) > 10) clear(); });
-    ["pointerup", "pointercancel", "pointerleave"].forEach((t) => listEl.addEventListener(t, () => { if (timer) clear(); }));
-    listEl.addEventListener("contextmenu", (e) => { if (e.target.closest(itemSel)) e.preventDefault(); });
-    listEl.addEventListener("click", (e) => { if (fired) { fired = false; e.stopPropagation(); e.preventDefault(); } }, true);
-  }
-  bindLongPress($("curList"), ".cu-list-item", (id) => deleteCuration(id));
-  $("curList").addEventListener("click", (e) => {
-    const item = e.target.closest(".cu-list-item");
-    if (item) openCuration(Number(item.dataset.id));
-  });
-
-  function showListMsg(t, ok) { const m = $("listMsg"); m.className = "msg " + (ok ? "ok" : "err"); m.textContent = t; }
-
-  // 콘티 하나를 통째로 지운다: 만든 영상(파일+기록), 올려둔 음악, 항목, 콘티 (유튜브에 올린 영상은 유튜브에 남는다)
-  async function deleteCuration(id) {
-    try {
-      const [sr, or] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=generation_status,video_settings&id=eq.${id}`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?select=id,storage_path,youtube_status&script_id=eq.${id}`, { headers }),
-      ]);
-      const row = (await sr.json())[0];
-      if (!row) return;
-      if (row.generation_status === "running") { showListMsg("영상 생성 중인 큐레이션은 끝난 뒤에 삭제할 수 있습니다.", false); return; }
-      const outs = or.ok ? await or.json() : [];
-      const onYt = outs.filter((o) => o.youtube_status === "done").length;
-      const name = (row.video_settings || {}).name || "(제목 없음)";
-      const lines = [`"${name}" 큐레이션을 삭제할까요?`, "", `· 항목과 올려둔 음악`, `· 만든 영상 ${outs.length}개`];
-      if (onYt) lines.push("", `※ 유튜브에 이미 올린 영상 ${onYt}개는 유튜브에 그대로 남습니다.`);
-      lines.push("", "되돌릴 수 없습니다.");
-      if (!confirm(lines.join("\n"))) return;
-      showListMsg("삭제하는 중...", true);
-      for (const o of outs) {
-        const r = await fetch(`${SUPABASE_URL}/storage/v1/object/youtube-outputs/${o.storage_path}`, { method: "DELETE", headers });
-        if (!r.ok && r.status !== 404) { const t = await r.text(); if (!/not_found|Object not found/i.test(t)) throw new Error("영상 파일 삭제 실패: " + t); }
-      }
-      if (outs.length) await fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?script_id=eq.${id}`, { method: "DELETE", headers });
-      const lr = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${BUCKET}`, { method: "POST", headers: jsonHeaders, body: JSON.stringify({ prefix: `${id}/`, limit: 1000 }) });
-      if (lr.ok) {
-        const files = (await lr.json()).filter((f) => f.name).map((f) => `${id}/${f.name}`);
-        if (files.length) await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, { method: "DELETE", headers: jsonHeaders, body: JSON.stringify({ prefixes: files }) });
-      }
-      let r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?script_id=eq.${id}`, { method: "DELETE", headers });
-      if (!r.ok) throw new Error("항목 삭제 실패: " + await r.text());
-      r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${id}`, { method: "DELETE", headers });
-      if (!r.ok) throw new Error("삭제 실패: " + await r.text());
-      if (genWatch.has(String(id))) { clearInterval(genWatch.get(String(id))); genWatch.delete(String(id)); }
-      await loadList();
-      showListMsg(`"${name}" 큐레이션을 삭제했습니다.`, true);
-    } catch (err) {
-      showListMsg("삭제 실패: " + err.message, false);
-      await loadList();
-    }
-  }
-
   // ───────── 열기 / 새로 만들기 ─────────
-  function newCuration() {
+  function newSlideshow() {
     cur = { id: null, title: "", count: 10, note: "", secs: 3.5, transition: "fade", caption_mode: "name_desc", caption_font: "sans", bgm_path: null, bgm_volume: 0.8, credit: "", items: [] };
     curRow = null;
     showEdit();
   }
 
-  async function openCuration(id) {
+  async function openSlideshow(id) {
     const [rr, sr] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&id=eq.${id}`, { headers }),
       fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=*&script_id=eq.${id}&order=order_no.asc`, { headers }),
     ]);
-    const row = (await rr.json())[0];
-    if (!row) return;
+    const row = rr.ok ? (await rr.json())[0] : null;
+    if (!row) return false;
     const segs = await sr.json();
     const vs = row.video_settings || {};
     curRow = row;
@@ -278,10 +179,10 @@
       }),
     };
     showEdit();
+    return true;
   }
 
   function showEdit() {
-    $("listView").style.display = "none";
     $("editView").style.display = "block";
     $("curTitle").value = cur.title; $("curCount").value = cur.count; $("curNote").value = cur.note;
     $("curSecs").value = cur.secs; $("curTrans").value = cur.transition; $("curCap").value = cur.caption_mode || "name_desc"; $("curCapFont").value = cur.caption_font || "sans";
@@ -293,14 +194,6 @@
     if (cur.id) refreshGenState();
   }
 
-  async function backToList() {
-    await flushSave();
-    cur = null; curRow = null;
-    $("editView").style.display = "none"; $("listView").style.display = "block";
-    await loadList();
-  }
-  $("backBtn").addEventListener("click", backToList);
-  $("newBtn").addEventListener("click", newCuration);
 
   // ───────── 항목 목록 ─────────
   function renderItems() {
@@ -406,17 +299,18 @@
       $("saveState").textContent = "저장 중…";
       const settings = {
         ...(curRow ? curRow.video_settings : {}),
-        name: cur.title.trim() || "(제목 없음)", mode: "curation", title_text: cur.title.trim(),
+        name: cur.title.trim() || "(제목 없음)", mode: "pexels", title_text: cur.title.trim(),
         secs_per_photo: cur.secs, transition: cur.transition, caption_mode: cur.caption_mode || "name_desc", caption_font: cur.caption_font || "sans", bgm_path: cur.bgm_path, bgm_volume: cur.bgm_volume, music_credit: cur.credit,
       };
       const scriptBody = { hook: cur.title.trim() || "(제목 없음)", fact_sources: creditLines(), video_settings: settings };
       if (!cur.id) {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts`, {
           method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
-          body: JSON.stringify({ category: CATEGORY, story: "", closing: "", status: "approved", slug: `curation-${Date.now()}`, ...scriptBody }),
+          body: JSON.stringify({ category: CATEGORY, story: "", closing: "", status: "approved", slug: `pexels-${Date.now()}`, ...scriptBody }),
         });
         if (!r.ok) { dirty = true; $("saveState").textContent = "저장 실패"; throw new Error(await r.text()); }
         curRow = (await r.json())[0]; cur.id = curRow.id;
+        history.replaceState(null, "", `?id=${cur.id}`);   // 새로고침해도 같은 슬라이드쇼를 다시 연다
       } else {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${cur.id}`, { method: "PATCH", headers: { ...jsonHeaders, Prefer: "return=representation" }, body: JSON.stringify(scriptBody) });
         if (!r.ok) { dirty = true; $("saveState").textContent = "저장 실패"; throw new Error(await r.text()); }
@@ -450,7 +344,7 @@
     const btn = $("planBtn"); btn.disabled = true; btn.textContent = "구성안 만드는 중... (10~20초)";
     $("planMsg").textContent = "";
     try {
-      const res = await fetch("/api/gemini-curation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, count: cur.count, note: cur.note }) });
+      const res = await fetch("/api/gemini-pexels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, count: cur.count, note: cur.note }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "구성안 생성 실패");
       cur.title = data.title || title; $("curTitle").value = cur.title;
@@ -531,7 +425,7 @@
       const info = await genFetchInfo(id);
       if (!info || info.status === "running") return;
       clearInterval(timer); genWatch.delete(String(id));
-      genNotify((curRow && curRow.video_settings && curRow.video_settings.name) || "큐레이션", info.status === "done");
+      genNotify((curRow && curRow.video_settings && curRow.video_settings.name) || "Pexels 슬라이드쇼", info.status === "done");
       if (cur && cur.id === id) refreshGenState();
     }, 8000);
     genWatch.set(String(id), timer);
@@ -566,7 +460,7 @@
     try { pick = JSON.parse(sessionStorage.getItem("pexelsPick") || "null"); sessionStorage.removeItem("pexelsPick"); } catch { /* 없음 */ }
     if (!pick || !Array.isArray(pick.photos) || !pick.photos.length) return false;
     pickTheme = pick.query || "";
-    newCuration();
+    newSlideshow();
     cur.count = pick.photos.length;
     cur.items = pick.photos.map((p) => ({ name: "", comment: "", keyword: pick.query || "", photo: toPhoto(p) }));
     showEdit();
@@ -592,8 +486,13 @@
     finally { btn.disabled = false; btn.textContent = "AI로 이름·설명 쓰기"; }
   });
 
-  loadList();
-  startFromPexelsPick();
+  // pexels.html에서 넘어온 흐름만 받는다: 고른 사진으로 새로 만들기, 또는 ?id=로 특정 슬라이드쇼 편집. 그 밖에는 Pexels 화면으로 보낸다
+  (async () => {
+    if (startFromPexelsPick()) return;
+    const id = Number(new URLSearchParams(location.search).get("id"));
+    if (id && await openSlideshow(id).catch(() => false)) return;
+    location.replace("/youtube/pexels.html");
+  })();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 </script>
 <script src="/hub-nav.js"></script>

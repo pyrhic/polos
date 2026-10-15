@@ -1793,7 +1793,7 @@
     caption_weight: 0, caption_position_pct: 7,
     layout: "framed", title1: "", title2: "", source_text: "",
   };
-  // 이 콘티 화면(뉴스·위키 등)에서 만드는 영상은 늘 "제목 + 영상 + 출처"(framed). 큐레이션(curation.html)은 따로라 영향 없음
+  // 이 콘티 화면(뉴스·위키 등)에서 만드는 영상은 늘 "제목 + 영상 + 출처"(framed). Pexels 슬라이드쇼(pexels-edit.html)는 따로라 영향 없음
   // 폰트 두께 단계 (영상 쪽 02_tts.py의 WEIGHT_FONTS와 같은 순서)
   const WEIGHTS = [
     { label: "가늘게", family: "'IBM Plex Sans KR'", weight: 300 },
@@ -2315,7 +2315,7 @@
   async function loadScripts() {
     const sel = document.getElementById("scriptSelect");
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&category=neq.${encodeURIComponent("큐레이션")}&order=created_at.desc`, { headers });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&category=not.in.(${PEXELS_CATEGORIES.map((c) => encodeURIComponent(c)).join(",")})&order=created_at.desc`, { headers });
       scripts = await res.json();
       renderScriptList();
     } catch (err) {
@@ -4552,7 +4552,7 @@
       if (!confirm(`v${version} 영상 생성을 시작할까요? 몇 분 걸리고, 완성되면 알려드립니다. 영상은 Studio에서 확인하세요.`)) { btn.disabled = false; return; }
       genRequestPermission();
       // 자막 줄 길이를 계산한 목소리 속도(화면에 보이는 값)를 그대로 넘긴다 — 저장된 설정에 tts_rate가 없을 때도 콘티 길이 = 요청 길이
-      // 콘티 화면의 영상은 늘 "제목 + 영상 + 출처"(framed). 큐레이션은 curation.html에서 따로 genStart를 부르므로 영향 없음
+      // 콘티 화면의 영상은 늘 "제목 + 영상 + 출처"(framed). Pexels 슬라이드쇼는 pexels-edit.html에서 따로 genStart를 부르므로 영향 없음
       await genStart({ ...row, video_settings: { ...(row.video_settings || {}), layout: "framed", tts_rate: ttsRateNow() } }, segments, version);
       row.generation_status = "running";
       btn.textContent = "영상 생성 중... (몇 분 걸려요)";

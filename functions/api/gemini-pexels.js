@@ -1,11 +1,11 @@
-// 큐레이션 영상의 구성안을 만든다: 제목/주제와 개수를 받아 항목(이름, 선정 이유 메모, Pexels 사진 검색어)을 제안한다.
-// 제미나이 호출은 1번. 구성안은 초안일 뿐이고, 사용자가 항목을 고르고 고치는 것이 큐레이션의 핵심이다.
+// Pexels 슬라이드쇼의 구성안을 만든다: 제목/주제와 개수를 받아 항목(이름, 선정 이유 메모, Pexels 사진 검색어)을 제안한다.
+// 제미나이 호출은 1번. 구성안은 초안일 뿐이고, 사용자가 항목을 고르고 고치는 것이 이 화면의 핵심이다.
 import { callGemini } from "../_lib/gemini.js";
 
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
 
 function buildPrompt(title, count, note) {
-  return `너는 사진 큐레이션 영상 기획자다. 주제에 맞는 사진 ${count}장을 고르기 위한 항목 ${count}개를 제안해라.
+  return `너는 사진 슬라이드쇼 영상 기획자다. 주제에 맞는 사진 ${count}장을 고르기 위한 항목 ${count}개를 제안해라.
 
 [주제/제목] ${title}
 ${note ? `[작성자 요청] ${note}\n` : ""}
