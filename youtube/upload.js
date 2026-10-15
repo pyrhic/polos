@@ -44,10 +44,12 @@ function ytChannels() {
   // ready: false 인 채널(아직 로그인 승인 전)은 목록에 보이지 않는다
   return (Array.isArray(list) && list.length ? list : [{ slot: "1", label: "기존 채널" }, { slot: "2", label: "새 채널" }]).filter((c) => c.ready !== false);
 }
-// 기본 채널: 마지막으로 올린 채널 (처음이면 첫 채널). 올리기 전에 언제든 바꿀 수 있다.
+// 기본 채널: 콘티를 만들 때 정해진 채널(video_settings.channel_slot) > 종류별 채널 > 마지막으로 올린 채널 (처음이면 첫 채널). 올리기 전에 언제든 바꿀 수 있다.
 function ytDefaultSlot(row) {
   const chs = ytChannels();
   const has = (s) => chs.some((c) => c.slot === s);
+  const fixed = row && row.video_settings && row.video_settings.channel_slot != null ? String(row.video_settings.channel_slot) : "";
+  if (fixed && has(fixed)) return fixed;   // 구독 카드를 고를 때 채널이 같이 정해진다 (준비 안 된 채널이면 아래 규칙으로)
   if (row && String(row.category || "").startsWith("위키") && has("1")) return "1";   // 위키 이야기(인물·사건·지식)는 Wicked Wiki 채널
   if (row && row.category === "큐레이션" && has("3")) return "3";   // 사진 슬라이드쇼는 OUTSTAGRAM 채널(준비되면)
   try { const s = localStorage.getItem("ytSlot"); if (has(s)) return s; } catch {}

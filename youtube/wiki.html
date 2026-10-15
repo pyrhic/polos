@@ -44,6 +44,9 @@
   #makeBtn { background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--text); }
   #makeBtn:hover { background:var(--hover); color:var(--on-accent); }
   #makeBtn:disabled { background:var(--line-strong); color:var(--muted-2); box-shadow:none; }
+  .wk-field { margin:10px 0; }
+  .wk-field select { margin:4px 0 0; }
+  .wk-hint { color:var(--muted); font-size:0.75rem; line-height:1.4; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -139,6 +142,21 @@
             <option value="120" selected>약 2분</option>
             <option value="180">약 3분</option>
           </select>
+        </div>
+        <div class="wk-field">
+          <label for="moodSel">분위기</label>
+          <select id="moodSel">
+            <option value="">자동 (Gemini가 판단)</option>
+            <option value="neutral">기본</option>
+            <option value="mystery">어둡고 미스터리</option>
+            <option value="bright">밝고 경쾌</option>
+            <option value="calm">차분한 다큐</option>
+          </select>
+        </div>
+        <div class="wk-field">
+          <label for="cardSel">구독 카드</label>
+          <select id="cardSel"><option value="">불러오는 중...</option></select>
+          <div class="wk-hint" id="cardHint"></div>
         </div>
         <button type="button" id="makeBtn">선택한 이야기로 콘티 만들기</button>
         <div class="wk-note">이야기 하나마다 제미나이를 1번 써요(무료 한도: 하루 약 20회). 사진은 위키피디아 문서에 실린 자유 라이선스 사진만 가져오고, 출처와 라이선스는 영상 설명에 자동으로 적혀요.</div>
@@ -287,9 +305,46 @@
     finally { $("ideaBtn").disabled = false; $("ideaBtn").textContent = "이야기 후보 다시 찾기"; }
   });
 
+  // ───── 구독 카드: 위키 콘티를 올리는 채널(youtube_channels.source = wiki)의 카드 중에서 고른다 ─────
+  // 고른 카드로 새 콘티의 구독/좋아요 장면을 채운다. 카드를 못 읽으면 Gemini 기본 문구를 그대로 쓴다
+  let cards = [], channelSlot = null;
+  async function loadCards() {
+    const sel = $("cardSel"), hint = $("cardHint");
+    try {
+      const chRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_channels?select=slot,label&source=eq.wiki&order=sort_order.asc,slot.asc&limit=1`, { headers });
+      if (!chRes.ok) throw new Error("채널 표를 읽지 못함");
+      const ch = (await chRes.json())[0];
+      if (!ch) throw new Error("위키 채널이 정해지지 않음");
+      channelSlot = ch.slot;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards?select=*&channel_slot=eq.${ch.slot}&order=sort_order.asc,id.asc`, { headers });
+      if (!res.ok) throw new Error("구독 카드 표를 읽지 못함");
+      cards = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
+      if (!cards.length) throw new Error(`${ch.label} 채널에 구독 카드가 없음`);
+      sel.innerHTML = cards.map((c) => `<option value="${c.id}"${c.is_default ? " selected" : ""}>${esc(c.name)}${c.is_default ? " (기본)" : ""} · 사진 ${c.image_paths.length}장</option>`).join("");
+      hint.textContent = `${ch.label} 채널의 카드예요. 카드 문구·사진은 채널 화면에서 고쳐요.`;
+    } catch (e) {
+      cards = [];
+      sel.innerHTML = '<option value="">기본 문구 (카드를 못 읽음)</option>';
+      hint.textContent = `구독 카드를 불러오지 못해 기본 문구를 써요 (${e.message}).`;
+    }
+  }
+  loadCards();
+  // 카드 사진 중 한 장: 그 카드로 이미 만든 콘티 수 기준으로 돌아가며 (못 세면 무작위). 사진이 없으면 빈 배열
+  async function pickCardPhoto(card) {
+    const list = card.image_paths || [];
+    if (!list.length) return [];
+    let n = Math.floor(Math.random() * list.length);
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id&video_settings->>subscribe_card_id=eq.${card.id}`, { headers });
+      if (r.ok) n = (await r.json()).length;
+    } catch { /* 무작위 */ }
+    return [list[n % list.length]];
+  }
+
   // ───── 콘티 만들기 ─────
   const slugOf = (s) => String(s).replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 24);
-  async function createOne(idea, secs) {
+  // opts: { mood: 직접 고른 분위기(""이면 Gemini 값), card: 고른 구독 카드(없으면 null) }
+  async function createOne(idea, secs, opts) {
     const lang = ideasData.article.lang;
     const res = await fetch("/api/gemini-wiki-draft", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -298,6 +353,16 @@
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || "대본 생성 실패");
     await userDefaultsReady;
+    // 구독/좋아요 장면을 고른 카드로 채운다 (문구·연출·사진 한 장)
+    const card = opts && opts.card;
+    if (card) {
+      const photo = await pickCardPhoto(card);
+      d.segments = d.segments.map((s) => s.section === "구독/좋아요"
+        ? { ...s, script_text: card.script_text || s.script_text, direction: card.direction || s.direction, asset_paths: photo }
+        : s);
+    }
+    const mood = (opts && opts.mood) || d.mood;   // 직접 고른 분위기 > Gemini 판단
+    const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : (channelSlot != null ? { channel_slot: channelSlot } : {});
     const texts = d.segments.map((s) => s.script_text);
     const sourceLines = [
       ...d.sources.map((s) => `${s.title} (CC BY-SA 4.0) ${s.url}`),
@@ -309,14 +374,14 @@
         category: { person: "위키 인물", event: "위키 사건", thing: "위키 지식" }[ideasData.kind] || "위키 인물", hook: texts[0], story: texts.slice(1).join("\n"), closing: "",
         fact_sources: sourceLines.join("\n"), status: "approved",
         slug: `${new Date().toISOString().slice(0, 10)}_wiki-${slugOf(ideasData.person.name_ko)}-${Date.now() % 10000}`,
-        video_settings: { ...(userDefaults || {}), name: (d.name || idea.title).slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과", ...(d.mood ? { mood: d.mood } : {}) },
+        video_settings: { ...(userDefaults || {}), name: (d.name || idea.title).slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과", ...(mood ? { mood } : {}), ...cardSettings },
       }),
     });
     if (!sRes.ok) throw new Error(await sRes.text());
     const script = (await sRes.json())[0];
     const gRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
       method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
-      body: JSON.stringify(d.segments.map((s, i) => ({ script_id: script.id, order_no: i + 1, section: s.section, script_text: s.script_text, keyword: s.keyword, direction: s.direction }))),
+      body: JSON.stringify(d.segments.map((s, i) => ({ script_id: script.id, order_no: i + 1, section: s.section, script_text: s.script_text, keyword: s.keyword, direction: s.direction, ...(s.asset_paths && s.asset_paths.length ? { asset_paths: s.asset_paths } : {}) }))),
     });
     if (!gRes.ok) throw new Error(await gRes.text());
     const segs = (await gRes.json()).sort((a, b) => a.order_no - b.order_no);
@@ -352,11 +417,12 @@
     if (!picked.length) { msg($("msg2"), "만들 이야기를 하나 이상 고르세요.", false); return; }
     if (picked.length > 3 && !confirm(`${picked.length}편을 만들면 제미나이를 ${picked.length}번 써요 (하루 약 20회 한도). 계속할까요?`)) return;
     const secs = Number($("secSel").value);
+    const opts = { mood: $("moodSel").value, card: cards.find((c) => String(c.id) === $("cardSel").value) || null };
     $("makeBtn").disabled = true;
     const made = [];
     for (let i = 0; i < picked.length; i++) {
       $("makeBtn").textContent = `콘티 만드는 중… (${i + 1}/${picked.length}) — 한 편에 20~40초`;
-      try { made.push(await createOne(picked[i], secs)); }
+      try { made.push(await createOne(picked[i], secs, opts)); }
       catch (e) { msg($("msg2"), `"${picked[i].title}" 실패: ${e.message}` + (made.length ? ` (앞의 ${made.length}편은 만들어졌어요)` : ""), false); break; }
     }
     $("makeBtn").disabled = false; $("makeBtn").textContent = "선택한 이야기로 콘티 만들기";

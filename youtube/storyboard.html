@@ -268,6 +268,7 @@
   .seg-cap-in .t .hid { opacity:0.45; font-style:italic; }
   .seg-cap-in .t .mute { color:#ffd76a; text-decoration:underline dotted; }
   .seg-cap-blk.on .seg-cap-in .t .mute { color:inherit; }
+  .seg-cap-in .t .pz { opacity:0.6; font-weight:700; padding:0 1px; }   /* 쉼 표시(-) 자리 */
   .pv-cap-hid { opacity:0.4; font-size:0.6em; font-weight:400; }
   .seg-cap-in .s { font-size:0.56rem; color:#9fdcfa; white-space:nowrap; }
   .seg-cap-handle { position:absolute; top:-2px; bottom:-2px; right:-12px; width:24px; touch-action:none; cursor:ew-resize; z-index:3; display:flex; justify-content:center; align-items:center; }
@@ -309,6 +310,10 @@
   .seg-ro-card img, .seg-ro-card video { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
   .seg-ro-card .seg-tl-lab { font-size:0.58rem; }
   .seg-ro-card.held { transition:none; z-index:3; border-color:var(--accent); box-shadow:0 6px 16px rgba(0,0,0,0.7); }
+  /* 새 콘티 만들기 폼 */
+  .draft-hint { font-size:0.75rem; font-weight:400; color:var(--muted); line-height:1.4; }
+  .draft-arts { margin:0 0 8px; padding-left:18px; }
+  .draft-arts li { font-size:0.82rem; line-height:1.35; color:var(--text-2); margin:5px 0; overflow-wrap:anywhere; }
 </style>
 </head>
 <body>
@@ -325,16 +330,17 @@
         <label for="draftTopic">주제</label>
         <input type="text" id="draftTopic" maxlength="100" placeholder="Trend에서 고르거나 직접 입력">
         <div id="draftArticlesWrap" style="display:none;">
-          <label>참고 기사</label>
-          <div id="draftArticles" style="margin-bottom:8px;"></div>
+          <label>참고 기사 <span class="draft-hint">(전부 읽고, 기사 사진·영상도 장면에 가져와요)</span></label>
+          <ul id="draftArticles" class="draft-arts"></ul>
         </div>
+        <label for="draftMood">분위기</label>
+        <select id="draftMood"><option value="">자동 (Gemini가 판단)</option></select>
         <label for="draftNote">방향 메모 (선택)</label>
         <input type="text" id="draftNote" maxlength="300" placeholder="예: 경제 영향 위주로 / 찬반 입장 균형 있게">
-        <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:400;color:var(--text-2);">
-          <input type="checkbox" id="draftImages" checked style="width:auto;margin-top:3px;">
-          <span style="font-size:0.82rem;line-height:1.4;">기사 사진·영상도 장면에 가져오기</span>
-        </label>
-        <button type="button" id="draftBtn">대본 + 콘티 생성</button>
+        <label for="draftCard">구독 카드</label>
+        <select id="draftCard"><option value="">불러오는 중...</option></select>
+        <div class="draft-hint" id="draftCardHint"></div>
+        <button type="button" id="draftBtn" style="margin-top:12px;">대본 + 콘티 생성</button>
         <div class="msg" id="draftMsg"></div>
       </details>
     </div>
@@ -568,6 +574,10 @@
   // 스토리지에 실제 파일이 있는 소재 (지울 때 파일도 같이 지운다)
   function isStoragePath(path) {
     return !isExternalUrl(path) && !isBlank(path);
+  }
+  // 이 콘티만 쓰는 스토리지 파일인지: 구독 카드 사진(subscribe/...)은 여러 콘티가 같이 쓰므로 콘티에서 지우지 않는다
+  function isOwnStoragePath(path) {
+    return isStoragePath(path) && !String(path).startsWith("subscribe/");
   }
 
   // 구간을 고를 수 있는 소재: 영상과 GIF (사진·빈 화면은 해당 없음)
@@ -1253,12 +1263,15 @@
     return String(line || "").replace(/\*\*/g, "");
   }
   // 자막 트랙 블록 글자: [숨김]은 연한 기울임, {자막만}은 다른 색 점선 밑줄로(기호 없이) 보여 구분한다
+  // 쉼 표시(-, 계약서 10절)는 글자 대신 작은 점(·)으로 자리만 보인다
   function capTrackHtml(line) {
-    return String(line || "").split(/(\[[^\[\]]*\]|\{[^{}]*\})/).map((part) => {
-      const inner = escapeHtml(capPlainText(part.slice(1, -1)));
+    const pz = (t) => t.replace(/\u0002+/g, (m) => `<span class="pz" title="쉼 ${(m.length * GEN_CAP_PAUSE_SEC).toFixed(1)}초">${"·".repeat(m.length)}</span>`);
+    const marked = String(line || "").replace(GEN_CAP_PAUSE_RE, (_, a, d) => a + "\u0002".repeat(d.length));
+    return marked.split(/(\[[^\[\]]*\]|\{[^{}]*\})/).map((part) => {
+      const inner = pz(escapeHtml(capPlainText(part.slice(1, -1))));
       if (/^\[[^\[\]]*\]$/.test(part)) return inner ? `<span class="hid" title="읽기만 (자막 숨김)">${inner}</span>` : "";
       if (/^\{[^{}]*\}$/.test(part)) return inner ? `<span class="mute" title="자막만 (읽지 않음)">${inner}</span>` : "";
-      return escapeHtml(capPlainText(part));
+      return pz(escapeHtml(capPlainText(part)));
     }).join("");
   }
   // 자막 한 줄을 화면용 HTML로 (**글자** → 노란 강조). [숨김]은 미리 빼고 넘긴다(genCaptionShown)
@@ -1698,7 +1711,7 @@
     box.style.display = "block";
     refreshGroupHeaders();
     $("runtimeText").innerHTML = `전체 예상 길이: 약 ${total.toFixed(1)}초 (${(total / 60).toFixed(1)}분)` +
-      `<span class="note">자막 줄 길이의 합이에요. 줄 길이는 장면마다 자막 트랙의 블록 끝을 끌어 늘려요(기본은 예상 목소리 길이 + 0.3초). 실제 목소리가 예상보다 길면 그 줄만 자동으로 늘어나요. 자막이 없는 장면만 장면 번호 옆 "수정"으로 노출 시간을 정해요.</span>`;
+      `<span class="note">자막 줄 길이의 합이에요. 줄 길이는 장면마다 자막 트랙의 블록 끝을 끌어 늘려요(기본은 예상 목소리 길이, 실제 길이는 생성 때 자연스럽게 읽은 길이). 직접 늘린 줄은 그 줄 끝에 쉼이 들어가요. 자막이 없는 장면만 장면 번호 옆 "수정"으로 노출 시간을 정해요.</span>`;
   }
 
   // ───── 전체 설정 카드 (자막 크기 / 배경음악 / 분위기 / 화면 전환) ─────
@@ -2111,6 +2124,7 @@
   $("settingsBody").addEventListener("input", () => setTimeout(updateSettingsSummary, 0));
   $("settingsBody").addEventListener("change", () => setTimeout(updateSettingsSummary, 0));
   MOODS.forEach((m) => $("moodSel").add(new Option(m.label, m.id)));
+  MOODS.forEach((m) => $("draftMood").add(new Option(m.label, m.id)));   // 새 콘티 만들기 폼 (맨 앞 "자동"은 HTML에)
   VOICES.forEach((v) => $("voiceSel").add(new Option(v.label, v.id)));
   $("voiceSel").addEventListener("change", () => {
     currentSettings.tts_voice = $("voiceSel").value;
@@ -2233,15 +2247,55 @@
     m.textContent = text;
   }
 
+  // 후보 기사는 고르지 않고 전부 쓴다. 목록은 무엇을 읽는지 안내용으로만 보여준다
   function renderDraftArticles() {
     const box = $("draftArticles");
     if (!draftCandidates.length) return;
     $("draftArticlesWrap").style.display = "block";
-    box.innerHTML = draftCandidates.map((a, i) => `
-      <label style="display:flex;gap:8px;align-items:flex-start;margin:6px 0;font-weight:400;color:var(--text-2);">
-        <input type="checkbox" class="draft-art" data-i="${i}" checked style="width:auto;margin-top:3px;">
-        <span style="font-size:0.82rem;line-height:1.35;">${escapeHtml(a.title)} <span style="color:var(--muted);">— ${escapeHtml(a.source || "")}</span></span>
-      </label>`).join("");
+    box.innerHTML = draftCandidates.map((a) => `
+      <li>${escapeHtml(a.title)} <span style="color:var(--muted);">— ${escapeHtml(a.source || "")}</span></li>`).join("");
+  }
+
+  // ───── 구독 카드: 트렌드 콘티를 올리는 채널(youtube_channels.source = trend)의 카드 중에서 고른다 ─────
+  // 고른 카드로 새 콘티의 구독/좋아요 장면을 채운다. 카드를 못 읽으면 Gemini 기본 문구를 그대로 쓴다
+  let draftCards = [], draftChannelSlot = null;
+  async function loadDraftCards() {
+    const sel = $("draftCard"), hint = $("draftCardHint");
+    try {
+      const chRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_channels?select=slot,label&source=eq.trend&order=sort_order.asc,slot.asc&limit=1`, { headers });
+      if (!chRes.ok) throw new Error("채널 표를 읽지 못함");
+      const ch = (await chRes.json())[0];
+      if (!ch) throw new Error("트렌드 채널이 정해지지 않음");
+      draftChannelSlot = ch.slot;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards?select=*&channel_slot=eq.${ch.slot}&order=sort_order.asc,id.asc`, { headers });
+      if (!res.ok) throw new Error("구독 카드 표를 읽지 못함");
+      draftCards = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
+      if (!draftCards.length) throw new Error(`${ch.label} 채널에 구독 카드가 없음`);
+      sel.innerHTML = draftCards.map((c) => `<option value="${c.id}"${c.is_default ? " selected" : ""}>${escapeHtml(c.name)}${c.is_default ? " (기본)" : ""} · 사진 ${c.image_paths.length}장</option>`).join("");
+      hint.textContent = `${ch.label} 채널의 카드예요. 카드 문구·사진은 채널 화면에서 고쳐요.`;
+    } catch (err) {
+      draftCards = [];
+      sel.innerHTML = '<option value="">기본 문구 (카드를 못 읽음)</option>';
+      hint.textContent = `구독 카드를 불러오지 못해 기본 문구를 써요 (${err.message}).`;
+    }
+  }
+  // 카드 사진 중 한 장: 그 카드로 이미 만든 콘티 수 기준으로 돌아가며 (못 세면 무작위). 사진이 없으면 빈 배열
+  async function pickCardPhoto(card) {
+    const list = card.image_paths || [];
+    if (!list.length) return [];
+    let n = Math.floor(Math.random() * list.length);
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id&video_settings->>subscribe_card_id=eq.${card.id}`, { headers });
+      if (r.ok) n = (await r.json()).length;
+    } catch { /* 무작위 */ }
+    return [list[n % list.length]];
+  }
+  // 새 콘티 장면 목록에서 구독/좋아요 장면을 카드 값으로 바꾼다. card가 없으면 그대로 둔다
+  function applyCardToSegs(segs, card, photo) {
+    if (!card) return segs;
+    return segs.map((s) => s.section === "구독/좋아요"
+      ? { ...s, script_text: card.script_text || s.script_text, direction: card.direction || s.direction, asset_paths: photo }
+      : s);
   }
 
   function initDraftFromTrend() {
@@ -2362,8 +2416,9 @@
   async function createDraft() {
     const topic = $("draftTopic").value.trim();
     if (!topic) { showDraftMsg("주제를 입력하세요.", false); return; }
-    const articles = Array.from(document.querySelectorAll(".draft-art"))
-      .filter((c) => c.checked).map((c) => draftCandidates[Number(c.dataset.i)]);
+    const articles = draftCandidates.slice();   // 후보 기사는 전부 쓴다
+    const card = draftCards.find((c) => String(c.id) === $("draftCard").value) || null;
+    const pickedMood = $("draftMood").value;   // 직접 고른 분위기가 Gemini 판단보다 우선
 
     const btn = $("draftBtn");
     btn.disabled = true;
@@ -2379,7 +2434,11 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "생성 실패");
 
-      const segs = data.segments;
+      const cardPhoto = card ? await pickCardPhoto(card) : [];
+      const segs = applyCardToSegs(data.segments, card, cardPhoto);
+      const mood = pickedMood || data.mood;
+      // 구독 카드와 채널: 카드를 골랐으면 그 카드의 채널, 못 읽었으면 트렌드 채널만 (업로드 기본 채널로 쓴다)
+      const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : (draftChannelSlot != null ? { channel_slot: draftChannelSlot } : {});
       const texts = segs.map((s) => s.script_text);
       const scriptRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts`, {
         method: "POST",
@@ -2397,7 +2456,7 @@
           slug: `${new Date().toISOString().slice(0, 10)}_${topic.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20)}`,
           // 기본값의 자막 위치가 framed 기준(새 기본값엔 layout이 없다)이면 그대로 framed로 만든다. 기본값이 없거나 옛 full 기준이면
           // layout을 비워 두고, 열 때 framed로 바꾸며 자막 위치 7→22 전환을 적용한다(loadSettingsCard)
-          video_settings: { ...(userDefaults || {}), ...(userDefaults && userDefaults.caption_position_pct != null && userDefaults.layout !== "full" ? { layout: "framed" } : {}), name: (data.name || topic).slice(0, 40), ...draftScreenText(data, articles), ...(data.mood ? { mood: data.mood } : {}) },   // 분위기는 Gemini가 기사를 보고 고른 값이 기본값보다 우선
+          video_settings: { ...(userDefaults || {}), ...(userDefaults && userDefaults.caption_position_pct != null && userDefaults.layout !== "full" ? { layout: "framed" } : {}), name: (data.name || topic).slice(0, 40), ...draftScreenText(data, articles), ...(mood ? { mood } : {}), ...cardSettings },   // 분위기: 직접 고른 값 > Gemini가 기사를 보고 고른 값 > 기본값
         }),
       });
       if (!scriptRes.ok) throw new Error(await scriptRes.text());
@@ -2409,14 +2468,15 @@
         body: JSON.stringify(segs.map((s, i) => ({
           script_id: created.id, order_no: i + 1,
           section: s.section, script_text: s.script_text, keyword: s.keyword, direction: s.direction,
+          ...(s.asset_paths && s.asset_paths.length ? { asset_paths: s.asset_paths } : {}),   // 구독 카드 사진
         }))),
       });
       if (!segRes.ok) throw new Error(await segRes.text());
       const createdSegs = (await segRes.json()).sort((a, b) => a.order_no - b.order_no);
 
       let imageNote = "";
-      if ($("draftImages").checked && (data.images || []).length) {
-        imageNote = await importArticleImages(created.id, createdSegs, [...data.images.filter((m) => m.type !== "video").slice(0, 8), ...data.images.filter((m) => m.type === "video").slice(0, 3)], btn);
+      if ((data.images || []).length) {   // 기사 사진·영상은 늘 가져온다 (구독/좋아요 장면에는 넣지 않는다)
+        imageNote = await importArticleImages(created.id, createdSegs.filter((sg) => sg.section !== "구독/좋아요"), [...data.images.filter((m) => m.type !== "video").slice(0, 8), ...data.images.filter((m) => m.type === "video").slice(0, 3)], btn);
       }
 
       imageNote += embedNote(data.embeds);
@@ -2865,7 +2925,7 @@
     if (!confirm(`${seg.order_no}번 장면을 삭제할까요? 직접 올린 사진/영상도 함께 지워집니다.`)) return;
 
     try {
-      for (const path of (seg.asset_paths || []).filter(isStoragePath)) {
+      for (const path of (seg.asset_paths || []).filter(isOwnStoragePath)) {
         await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
       }
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, { method: "DELETE", headers });
@@ -3758,7 +3818,7 @@
     const seg = segments.find((s) => String(s.id) === id);
     const paths = (seg.asset_paths || []).filter((p) => p !== path);
     try {
-      if (isStoragePath(path)) {
+      if (isOwnStoragePath(path)) {
         await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, { method: "DELETE", headers });
       }
       // 이 소재의 구간/위치/비중/원본 길이 기록도 같이 지운다
@@ -4180,6 +4240,7 @@
     if (id) openConti(id);
   });
   initDraftFromTrend();
+  loadDraftCards();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js");

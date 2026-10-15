@@ -27,29 +27,50 @@ function genCaptionLines(text) {
 // { ... } = 화면 자막에는 보이고 목소리로는 읽지 않는다 (계약서 8-2절). 짝이 맞는 기호만, 짝 없는 기호는 일반 글자
 const GEN_CAP_HIDE_RE = /\[([^\[\]]*)\]/g;
 const GEN_CAP_MUTE_RE = /\{([^{}]*)\}/g;
-// 읽는 글자: {..}는 통째로 빼고, [..]는 기호만 뗀다
+// 쉼 표시 (계약서 10절): 따로 떨어진 -(앞뒤가 공백·줄 시작·줄 끝). 하나마다 0.3초. --처럼 붙은 덩어리는 개수만큼.
+// 단어 안 하이픈(K-pop, 1-2위, 코로나-19)은 일반 글자. 쉼 표시는 읽지도 보이지도 않는다
+const GEN_CAP_PAUSE_RE = /(^|\s)(-+)(?=\s|$)/g;
+const GEN_CAP_PAUSE_SEC = 0.3;
+function genCaptionPauseCount(line) {
+  let n = 0;
+  String(line || "").replace(GEN_CAP_PAUSE_RE, (_, a, d) => { n += d.length; return a; });
+  return n;
+}
+function genCaptionStripPause(line) {
+  return String(line || "").replace(GEN_CAP_PAUSE_RE, " ").replace(/\s+/g, " ").trim();
+}
+// 읽는 글자: {..}는 통째로 빼고, [..]는 기호만 뗀다. 쉼 표시(-)도 뺀다
 function genCaptionSpoken(line) {
-  return String(line || "").replace(GEN_CAP_MUTE_RE, " ").replace(GEN_CAP_HIDE_RE, "$1").replace(/\s+/g, " ").trim();
+  return genCaptionStripPause(String(line || "").replace(GEN_CAP_MUTE_RE, " ").replace(GEN_CAP_HIDE_RE, "$1"));
 }
-// 화면에 보이는 글자: [..]는 통째로 빼고, {..}는 기호만 뗀다 (전부 숨김이면 "")
+// 화면에 보이는 글자: [..]는 통째로 빼고, {..}는 기호만 뗀다 (전부 숨김이면 ""). 쉼 표시(-)도 뺀다
 function genCaptionShown(line) {
-  return String(line || "").replace(GEN_CAP_HIDE_RE, " ").replace(GEN_CAP_MUTE_RE, "$1").replace(/\s+/g, " ").trim();
+  return genCaptionStripPause(String(line || "").replace(GEN_CAP_HIDE_RE, " ").replace(GEN_CAP_MUTE_RE, "$1"));
 }
-// 예상 목소리 길이(초) = max(0.6, 글자수 / 4.3 / (1 + tts_rate/100)). 글자수는 읽는 글자(공백·**·/·기호 제외, [ ] 안 포함, { } 안 제외).
+// 예상 목소리 길이(초) = max(0.6, 글자수 / 4.3 / (1 + tts_rate/100)) + 쉼 개수 × 0.3. 글자수는 읽는 글자(공백·**·/·기호·쉼 표시 제외, [ ] 안 포함, { } 안 제외).
 // 읽을 글자가 없는 줄(전부 { })은 보이는 글자수로 같은 식 — 자막이 너무 빨리 사라지지 않게
 function genCaptionEst(line, ttsRate) {
   const cnt = (t) => t.replace(/\*\*/g, "").replace(/\//g, "").replace(/\s+/g, "").length;
   const len = cnt(genCaptionSpoken(line)) || cnt(genCaptionShown(line));
   const rate = 1 + (Number(ttsRate) || 0) / 100;
-  return Math.max(0.6, len / 4.3 / (rate > 0 ? rate : 1));
+  return Math.max(0.6, len / 4.3 / (rate > 0 ? rate : 1)) + genCaptionPauseCount(line) * GEN_CAP_PAUSE_SEC;
 }
-// 줄별 최종 길이: 정한 값(asset_trims.__cap_secs[i])이 있으면 그 값(단, 예상 길이보다 짧을 수 없다), 없거나 null이면 예상 길이 + 0.3
+// 줄별 길이: 정한 값(asset_trims.__cap_secs[i])이 있으면 그 값(단, 예상 길이보다 짧을 수 없다), 없거나 null이면 예상 길이(est) 그대로 (계약서 9절: +0.3 여유 없음)
+// 콘티 화면(자막 트랙·장면 길이·미리보기)이 이 값을 쓴다
 function genCaptionSecs(lines, capSecs, ttsRate) {
   const arr = Array.isArray(capSecs) ? capSecs : [];
   return lines.map((l, i) => {
     const est = genCaptionEst(l, ttsRate);
     const v = Number(arr[i]);
-    return arr[i] != null && v > 0 ? Math.max(est, v) : est + 0.3;
+    return arr[i] != null && v > 0 ? Math.max(est, v) : est;
+  });
+}
+// 생성 요청용 줄별 길이 (계약서 9절): 직접 정한 줄만 숫자(최소 est 보정), 자동 줄은 null — 파이프라인이 자연 길이로 읽는다
+function genCaptionSecsForRequest(lines, capSecs, ttsRate) {
+  const arr = Array.isArray(capSecs) ? capSecs : [];
+  return lines.map((l, i) => {
+    const v = Number(arr[i]);
+    return arr[i] != null && v > 0 ? Number(Math.max(genCaptionEst(l, ttsRate), v).toFixed(2)) : null;
   });
 }
 
@@ -95,10 +116,10 @@ function genBuildSegments(segRows, videoSettings) {
   return [...segRows].sort((a, b) => a.order_no - b.order_no).map((s) => {
     const trims = s.asset_trims || {};
     const weights = trims.__weights || {};
-    // 자막 줄과 줄별 길이 (계약서 6-3). 자동인 줄도 숫자로 풀어서 보낸다
+    // 자막 줄과 줄별 길이 (계약서 9절). 직접 정한 줄만 숫자, 자동 줄은 null. weight_seconds는 콘티 화면 예상 합계(자동 줄 = est)
     const capLines = lineMode ? genCaptionLines(s.script_text) : [];
-    const capSecs = genCaptionSecs(capLines, trims.__cap_secs, vs.tts_rate).map((v) => Number(v.toFixed(2)));
-    const capSum = Number(capSecs.reduce((a, b) => a + b, 0).toFixed(2));
+    const capSecs = genCaptionSecsForRequest(capLines, trims.__cap_secs, vs.tts_rate);
+    const capSum = Number(genCaptionSecs(capLines, trims.__cap_secs, vs.tts_rate).reduce((a, b) => a + b, 0).toFixed(2));
     return {
       section: s.section,
       script_text: s.script_text,
