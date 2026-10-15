@@ -147,7 +147,7 @@
                 <button type="button" class="del" data-act="ph-del" data-i="${i}" aria-label="사진 삭제">✕</button>
                 <button type="button" data-act="ph-right" data-i="${i}" aria-label="뒤로"${i === n - 1 ? " disabled" : ""}>▶</button>
               </div></div>`).join("")}
-          <label class="ph-add"><span class="plus">+</span>사진 추가<input type="file" class="f-files" accept="image/*" multiple></label>
+          <label class="ph-add"><span class="plus">+</span>사진 추가<span class="sub">끌어다 놓기 · Ctrl+V</span><input type="file" class="f-files" accept="image/*" multiple></label>
         </div>
         <div class="sc-hint">사진은 영상마다 돌아가며 한 장씩 쓰입니다. 사진 추가·삭제·순서는 바로 저장돼요.</div>
         <label>카메라 연출</label>
@@ -574,6 +574,58 @@
       updatePreview(); refreshDirty();
     }
   });
+  // ───── 사진 끌어다 놓기 · 붙여넣기 ─────
+  // 파일을 끌 때만(dataTransfer.types에 'Files') 반응한다. 열린 카드 안에 놓으면 "+ 사진 추가"와 같은 길로 올린다.
+  const hasFiles = (e) => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files"));
+  const isImage = (f) => (f.type ? f.type.startsWith("image/") : /\.(jpe?g|png|gif|webp|avif|bmp|heic|heif)$/i.test(f.name || ""));
+  const dropZone = (e) => {
+    const box = e.target && e.target.closest ? e.target.closest(".sc-item.open") : null;
+    return box ? box.querySelector(".ph-grid") : null;
+  };
+  let dropTimer = null;
+  // dragover는 끄는 동안 계속 오므로, 잠깐 끊기면(창 밖으로 나감 등) 표시를 지운다
+  function markDrop(zone) {
+    document.querySelectorAll(".ph-grid.drop-on").forEach((g) => { if (g !== zone) g.classList.remove("drop-on"); });
+    clearTimeout(dropTimer);
+    if (zone) { zone.classList.add("drop-on"); dropTimer = setTimeout(() => markDrop(null), 250); }
+  }
+  function addImageFiles(list) {
+    const all = Array.from(list || []);
+    const imgs = all.filter(isImage);
+    const skipped = all.length - imgs.length;
+    if (!imgs.length) { if (all.length) cardMsg("사진 파일만 올릴 수 있어요.", false); return; }
+    if (busy) { cardMsg("다른 작업이 끝난 뒤 다시 올려 주세요.", false); return; }
+    guarded(async () => {
+      await uploadPhotos(imgs);
+      const m = document.querySelector(".sc-item.open .sc-msg");
+      if (skipped && m) m.textContent += ` (사진이 아닌 파일 ${skipped}개는 건너뜀)`;
+    });
+  }
+  document.addEventListener("dragover", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();   // 브라우저가 파일을 여는 것을 막는다
+    const zone = dropZone(e);
+    e.dataTransfer.dropEffect = zone ? "copy" : "none";
+    markDrop(zone);
+  });
+  document.addEventListener("drop", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const zone = dropZone(e);
+    markDrop(null);
+    if (zone && openId != null) addImageFiles(e.dataTransfer.files);
+  });
+  // Ctrl+V: 카드가 열려 있고 클립보드에 사진이 있으면 올린다 (글자 붙여넣기는 그대로)
+  document.addEventListener("paste", (e) => {
+    if (openId == null || !e.clipboardData) return;
+    let files = Array.from(e.clipboardData.files || []);
+    if (!files.length) files = Array.from(e.clipboardData.items || []).filter((it) => it.kind === "file").map((it) => it.getAsFile()).filter(Boolean);
+    const imgs = files.filter(isImage);
+    if (!imgs.length) return;
+    e.preventDefault();
+    addImageFiles(imgs);
+  });
+
   // 이름 칸에서 Enter = 저장
   document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches && e.target.matches(".ch-label")) e.target.blur(); });
 
