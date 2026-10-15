@@ -172,7 +172,7 @@ async function genStart(row, segRows, version) {
   const res = await fetch("/api/trigger-generation", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scriptId: row.id, scriptContent: genToMarkdown(row, segRows), segments, settings, channel: "wicked-wiki", version }),
+    body: JSON.stringify({ scriptId: row.id, scriptContent: genToMarkdown(row, segRows), segments, settings, channel: "wizard-yt", version }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "알 수 없는 오류");

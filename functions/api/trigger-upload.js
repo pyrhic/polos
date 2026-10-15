@@ -54,7 +54,7 @@ export async function onRequestPost(context) {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/json",
-        "User-Agent": "wicked-wiki-trigger",
+        "User-Agent": "wizard-yt-trigger",
       },
       body: JSON.stringify({
         ref: "main",

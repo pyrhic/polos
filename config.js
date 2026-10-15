@@ -21,5 +21,5 @@ globalThis.POLOS_CONFIG = {
     { slot: "3", label: "OUTSTAGRAM", ready: false },
   ],
   REAUTH_DIR: "C:/Users/PC/youtube-automation",
-  WIKI_USER_AGENT: "WickedWiki/1.0 (https://polos-cxn.pages.dev)",
+  WIKI_USER_AGENT: "WizardYT/1.0 (https://polos-cxn.pages.dev)",
 };
