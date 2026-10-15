@@ -1247,10 +1247,7 @@
     if (host._sig !== sig && !host.dataset.dragging) {
       host._sig = sig;
       host.innerHTML = `
-        <div class="seg-cap-head">
-          <span>자막 ${st.lines.length}줄 · 탭: 그 줄 보기 · 끝: 길이</span>
-          ${anyCustom ? '<button type="button" class="seg-cap-reset">자동으로</button>' : ""}
-        </div>
+        ${anyCustom ? '<div class="seg-cap-head" style="justify-content:flex-end;"><button type="button" class="seg-cap-reset">자동으로</button></div>' : ""}
         <div class="seg-tl-row">
           <div class="seg-tl-col">
             <div class="seg-cap-track">
