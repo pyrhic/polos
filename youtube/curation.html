@@ -12,7 +12,7 @@
 <style>
   .cu-item { background:var(--card); border-radius:3px; padding:12px; margin-bottom:10px; }
   .cu-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-  .cu-no { background:var(--inset); color:var(--accent); font-weight:800; font-size:0.8rem; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .cu-no { background:var(--inset); color:var(--text); font-weight:800; font-size:0.8rem; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .cu-body { display:flex; gap:10px; }
   .cu-photo { width:96px; height:128px; border-radius:3px; background:var(--inset) center/cover no-repeat; flex-shrink:0; cursor:pointer; position:relative; border:2px solid transparent; }
   .cu-photo:hover { border-color:var(--accent); }
@@ -20,7 +20,7 @@
   .cu-fields { flex:1; min-width:0; }
   .cu-fields input { margin-bottom:6px; font-size:0.88rem; padding:7px 9px; }
   .cu-fields .k { font-size:0.7rem; color:var(--muted); margin:0 0 2px; }
-  .cu-mini { width:auto; padding:3px 9px; margin:0; font-size:0.72rem; background:var(--inset); color:var(--accent); text-transform:none; letter-spacing:0; }
+  .cu-mini { width:auto; padding:3px 9px; margin:0; font-size:0.72rem; background:var(--btn); color:var(--text); text-transform:none; letter-spacing:0; }
   .cu-mini.del { color:var(--danger); margin-left:auto; }
   .cu-card { background:var(--card); border-radius:3px; padding:14px; margin-bottom:12px; }
   .cu-card h2 { font-size:0.95rem; margin:0 0 8px; }
@@ -34,9 +34,11 @@
   .cu-list-item.pressing { border-color:var(--danger); background:var(--danger-bg); }
   .list-hint { color:var(--muted); font-size:0.72rem; text-align:center; margin:8px 0 0; }
   .cu-sum { background:var(--inset); border-radius:3px; padding:10px 14px; color:var(--accent); font-weight:700; font-size:0.9rem; margin:10px 0; }
-  .cu-main { background:var(--accent); color:var(--on-accent); padding:12px; font-size:0.95rem; }
-  .cu-main:hover { background:var(--accent-strong); }
-  .cu-main:disabled { background:var(--accent-dim); color:var(--accent); }
+  .cu-main { background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--text); padding:12px; font-size:0.95rem; }
+  .cu-main:hover { background:var(--hover); color:var(--on-accent); }
+  .cu-main:disabled { background:var(--line-strong); color:var(--muted-2); box-shadow:none; }
+  .cu-file { display:block; background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--btn-ring); text-align:center; padding:9px; border-radius:3px; font-size:0.85rem; cursor:pointer; margin-top:6px; transition:background 0.15s, color 0.15s; }
+  .cu-file:hover { background:var(--hover); color:var(--on-accent); }
   .cu-save { font-size:0.75rem; color:var(--muted); text-align:right; min-height:1em; }
   .cu-modal { display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.8); overflow-y:auto; padding:12px; }
   .cu-modal.open { display:block; }
@@ -63,7 +65,7 @@
     </div>
 
     <div id="editView" style="display:none;">
-      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;background:var(--btn);margin-bottom:12px;">← 큐레이션 목록</button>
+      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;margin-bottom:12px;">← 큐레이션 목록</button>
 
       <div class="cu-card">
         <label for="curTitle" style="margin-top:0;">제목 (영상 첫 화면에 들어갑니다)</label>
@@ -73,16 +75,16 @@
           <input type="number" id="curCount" min="3" max="30" value="10">
           <input type="text" id="curNote" maxlength="300" placeholder="AI에게 요청 (선택) 예: 아시아 위주로" style="flex:1;min-width:140px;">
         </div>
-        <button type="button" id="planBtn" style="margin-top:10px;background:var(--btn);">AI로 구성안 만들기</button>
+        <button type="button" id="planBtn" style="margin-top:10px;">AI로 구성안 만들기</button>
         <div class="cu-note" id="planMsg"></div>
       </div>
 
       <div class="cu-card" id="capCard" style="display:none;">
-        <button type="button" id="capBtn" style="background:var(--btn);">AI로 이름·설명 쓰기</button>
+        <button type="button" id="capBtn" style="">AI로 이름·설명 쓰기</button>
         <div class="cu-note" id="capMsg">사진 설명을 바탕으로 이름과 한 줄 설명을 써요. 비어 있는 칸만 채우고, 직접 쓴 건 그대로 둬요.</div>
       </div>
       <div id="items"></div>
-      <button type="button" id="addItemBtn" style="background:var(--btn);margin-bottom:12px;">+ 항목 추가</button>
+      <button type="button" id="addItemBtn" style="margin-bottom:12px;">+ 항목 추가</button>
 
       <div class="cu-card">
         <h2>영상 설정</h2>
@@ -110,7 +112,7 @@
         <div class="settings-note" style="margin:4px 0 0;color:var(--muted);font-size:0.75rem;">항목의 이름(장소, 나라)과 설명이 사진 아래에 작고 은은하게 나와요. 설명까지 읽으려면 사진 한 장당 4초 이상이 좋아요.</div>
         <label style="margin-top:12px;">배경음악 (사용이 허락된 음원만 올려주세요)</label>
         <div id="bgmArea"></div>
-        <label class="cu-file" style="display:block;background:var(--btn);color:var(--accent);box-shadow:inset 0 0 0 1px var(--line);text-align:center;padding:9px;border-radius:3px;font-size:0.85rem;cursor:pointer;margin-top:6px;">
+        <label class="cu-file">
           + 음악 파일 올리기<input type="file" id="bgmFile" accept="audio/*" style="display:none;">
         </label>
         <div class="cu-row" style="margin-top:8px;">

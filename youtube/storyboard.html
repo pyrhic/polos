@@ -19,7 +19,7 @@
   .seg-group { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:22px 2px 8px; padding-bottom:5px; border-bottom:1px solid var(--line); font-weight:800; color:var(--text); font-size:0.95rem; }
   .seg-group:first-child { margin-top:4px; }
   .seg-group .cnt { color:var(--muted); font-weight:600; font-size:0.78rem; white-space:nowrap; }
-  .seg-item .seg-no { background:var(--inset); color:var(--accent); font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .seg-item .seg-no { background:var(--inset); color:var(--text); font-weight:800; font-size:0.8rem; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .seg-duration { display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--muted); }
   .seg-duration-display { font-weight:700; color:#ffffff; }
   .seg-duration-edit, .seg-duration-save { width:auto; padding:4px 10px; font-size:0.7rem; margin:0; }
@@ -38,8 +38,8 @@
   .seg-stage-side .seg-direction { flex:0 0 auto; height:auto; line-height:normal; white-space:pre; overflow:hidden; border:none; border-radius:3px; }
   .seg-item .seg-script::placeholder { color:var(--muted-2); }
   .seg-thumb-empty { width:100%; height:50px; border-radius:3px; background:var(--inset); margin-bottom:8px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:0.8rem; text-align:center; padding:8px; }
-  .seg-icon-btn { width:26px; height:26px; padding:0; margin:0; border-radius:50%; background:var(--inset); color:var(--muted); font-size:0.95rem; line-height:1; flex-shrink:0; text-transform:none; }
-  .seg-icon-btn:hover { background:var(--accent); color:var(--on-accent); }
+  .seg-icon-btn { width:26px; height:26px; padding:0; margin:0; border-radius:50%; background:var(--btn); color:var(--muted); font-size:0.95rem; line-height:1; flex-shrink:0; text-transform:none; }
+  .seg-icon-btn:hover { background:var(--hover); color:var(--on-accent); }
   .seg-delete-btn { color:var(--danger); }
   .seg-delete-btn:hover { background:var(--danger); color:var(--on-accent); }
   .seg-save-state { font-size:0.68rem; font-weight:700; color:var(--point); min-width:0; }
@@ -73,9 +73,9 @@
   #posStage .pos-media { display:block; width:100%; height:100%; object-fit:fill; pointer-events:none; }
   #posStage .pos-win { position:absolute; border:2px solid var(--accent); box-shadow:0 0 0 999px rgba(0,0,0,.62); pointer-events:none; box-sizing:border-box; }
   .runtime-summary { background:var(--inset); border-radius:3px; padding:10px 14px; margin-top:14px; font-size:0.85rem; color:var(--accent); font-weight:700; }
-  .gen-main-btn { margin-top:10px; background:var(--accent); color:var(--on-accent); padding:12px; font-size:0.95rem; }
-  .gen-main-btn:hover { background:var(--accent-strong); }
-  .gen-main-btn:disabled { background:var(--accent-dim); color:var(--accent); }
+  .gen-main-btn { margin-top:10px; background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--text); padding:12px; font-size:0.95rem; }
+  .gen-main-btn:hover { background:var(--hover); color:var(--on-accent); }
+  .gen-main-btn:disabled { background:var(--line-strong); color:var(--muted-2); box-shadow:none; }
   .runtime-summary .note { color:var(--muted); font-weight:400; font-size:0.75rem; display:block; margin-top:2px; }
   .seg-pexels-loading { color:var(--muted); font-size:0.75rem; padding:4px; }
   .seg-pexels-grid { display:flex; gap:8px; overflow-x:auto; }
@@ -83,13 +83,13 @@
   .seg-pexels-thumb-wrap { position:relative; width:80px; height:100px; border-radius:3px; overflow:hidden; background:var(--card); cursor:pointer; }
   .seg-pexels-thumb-wrap img, .seg-pexels-thumb-wrap video { width:100%; height:100%; object-fit:cover; display:block; }
   /* 전체 설정 카드: 다른 박스와 구분되도록 하늘색 테두리 + 한 단계 밝은 면 */
-  .settings-card { background:var(--card-2); color:var(--text); border:1px solid var(--accent-strong); }
+  .settings-card { background:var(--card-2); color:var(--text); border:1px solid var(--line-strong); }
   .settings-card label { color:var(--muted); }
   .settings-card input, .settings-card select, .settings-card textarea { border:1px solid var(--line-strong); }
   .settings-card .settings-note { color:var(--muted); }
   .settings-card .bgm-row .settings-note { margin:0; }
-  .settings-card button { background:var(--btn); color:var(--accent); }
-  .settings-card button:hover { background:var(--accent); color:var(--on-accent); }
+  .settings-card button { background:var(--btn); color:var(--text); }
+  .settings-card button:hover { background:var(--hover); color:var(--on-accent); }
   .settings-card button:disabled { background:var(--line-strong); color:var(--muted-2); box-shadow:none; }
   .settings-card #settingsSaveBtn.dirty, .settings-card #soundSaveBtn.dirty { background:var(--point); color:var(--on-accent); box-shadow:none; }
   .settings-card #bgmRemove { background:var(--danger-bg); color:var(--danger); }
@@ -113,7 +113,7 @@
   .settings-card .tok { display:inline; text-transform:none; letter-spacing:0; text-align:left; line-height:1.45; background:none; box-shadow:none; color:var(--text); border:none; border-radius:0; padding:0; margin:0; width:auto; font-size:0.8rem; font-weight:800; cursor:pointer; }
   .settings-card .tok:hover { background:var(--accent-dim); color:var(--accent); }
   .settings-card .tok.on { background:var(--accent); color:var(--on-accent); }
-  .settings-card .tok-btn { border:1px solid var(--accent-strong); color:var(--accent); border-radius:10px; padding:0 7px; margin-left:4px; font-size:0.72rem; }
+  .settings-card .tok-btn { border:1px solid var(--accent-strong); color:var(--text); border-radius:10px; padding:0 7px; margin-left:4px; font-size:0.72rem; }
   .settings-card .tok-del { color:var(--danger); border-color:var(--danger); }
   .settings-card .sr-input { background:transparent; border:none; border-radius:0; padding:0; margin:0; font-size:0.8rem; font-weight:800; color:var(--text); width:100%; }
   .settings-card .sr-input::placeholder { color:var(--muted-2); font-weight:400; }
@@ -150,7 +150,8 @@
   .conti-item:hover, .conti-item:focus-visible { border-color:var(--accent); background:var(--card); color:#fff; }
   .conti-item .title { font-weight:800; font-size:1rem; margin-bottom:4px; }
   .conti-item .meta { color:var(--muted); font-size:0.8rem; }
-  #newDraft > summary { list-style:none; cursor:pointer; text-align:center; font-weight:800; background:var(--accent); color:var(--on-accent); border-radius:3px; padding:12px; margin:-16px -18px 0; }
+  #newDraft > summary { list-style:none; cursor:pointer; text-align:center; font-weight:800; background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--text); border-radius:3px; padding:12px; margin:-16px -18px 0; transition:background 0.15s, color 0.15s; }
+  #newDraft > summary:hover { background:var(--hover); color:var(--on-accent); }
   #newDraft > summary::-webkit-details-marker { display:none; }
   #newDraft[open] > summary { margin-bottom:6px; }
   #newDraft:not([open]) { padding:0; background:none; }
@@ -184,7 +185,7 @@
   .blank-pick { background:var(--inset); border-radius:3px; padding:10px; margin-bottom:8px; }
   .blank-pick-title { color:var(--text-2); font-size:0.8rem; margin-bottom:8px; text-align:center; line-height:1.45; }
   .blank-pick-row { display:flex; gap:6px; }
-  .blank-pick-row button { flex:1; margin:0; padding:8px 0; font-size:0.75rem; text-transform:none; letter-spacing:0; background:var(--btn); color:var(--text); display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .blank-pick-row button { flex:1; margin:0; padding:8px 0; font-size:0.75rem; text-transform:none; letter-spacing:0; color:var(--text); display:flex; flex-direction:column; align-items:center; gap:4px; }
   .blank-pick-row button i { display:block; width:28px; height:20px; border-radius:2px; border:1px solid var(--line); }
   .blank-pick-row button:disabled { opacity:0.4; }
   .seg-autofill-state { color:var(--muted); font-size:0.75rem; margin:-2px 0 8px; }
@@ -225,7 +226,7 @@
   /* 타임라인 한 줄: 구간 지정 팝업(.trim-bar/.trim-sel/.trim-h)과 같은 하늘색 테두리 + 하늘색 손잡이 */
   .seg-tl-area { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
   .seg-tl-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:0.68rem; margin-bottom:3px; min-height:20px; }
-  .seg-tl-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:var(--inset); color:var(--accent); text-transform:none; letter-spacing:0; flex-shrink:0; }
+  .seg-tl-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:var(--btn); color:var(--text); text-transform:none; letter-spacing:0; flex-shrink:0; }
   .seg-tl-row { display:flex; align-items:stretch; gap:6px; }
   .seg-tl-col { flex:1; min-width:0; }
   .seg-tl-ruler { position:relative; height:16px; touch-action:none; cursor:pointer; margin:0 8px; }
@@ -257,7 +258,7 @@
   .seg-cap-area { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; margin-top:6px; }
   .seg-cap-area:empty { display:none; }
   .seg-cap-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:0.68rem; margin-bottom:3px; min-height:20px; }
-  .seg-cap-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:var(--inset); color:var(--accent); text-transform:none; letter-spacing:0; flex-shrink:0; }
+  .seg-cap-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:var(--btn); color:var(--text); text-transform:none; letter-spacing:0; flex-shrink:0; }
   .seg-cap-track { position:relative; height:36px; margin:0 8px; background:var(--inset); border-radius:4px; }
   .seg-cap-blk { position:absolute; top:0; bottom:0; box-sizing:border-box; background:#0c2c42; border:1px solid var(--accent-strong); border-radius:4px; color:#d6effc; touch-action:pan-y; cursor:pointer; }
   .seg-cap-blk.set { background:#114a6e; }
@@ -279,7 +280,7 @@
   /* + 메뉴 */
   .seg-add-menu { display:none; position:absolute; right:0; z-index:20; width:220px; background:var(--card-2); border:1px solid var(--line); border-radius:6px; padding:6px; box-shadow:0 8px 24px rgba(0,0,0,0.6); }
   .seg-add-menu.open { display:block; }
-  .seg-add-menu > button { margin:0 0 4px; padding:10px 10px; font-size:0.8rem; text-align:left; text-transform:none; letter-spacing:0; background:var(--btn); }
+  .seg-add-menu > button { margin:0 0 4px; padding:10px 10px; font-size:0.8rem; text-align:left; text-transform:none; letter-spacing:0; }
   .seg-add-menu .blank-pick { margin:2px 0 4px; padding:6px; }
   .seg-add-menu .blank-pick-row button { font-size:0.68rem; padding:6px 0; }
   .seg-add-note { color:var(--muted-2); font-size:0.64rem; line-height:1.35; padding:2px 2px 0; }
@@ -287,14 +288,14 @@
   .seg-kw-row { display:flex; gap:4px; }
   .seg-kw-row { flex:0 0 auto; }
   .seg-kw-row .seg-keyword { flex:1; min-width:0; margin:0; padding:6px 8px; font-size:0.8rem; background:var(--input); color:var(--text); border:none; border-radius:3px; }
-  .seg-kw-search { flex:0 0 auto; width:auto; margin:0; padding:0 8px; font-size:0.62rem; font-weight:800; letter-spacing:0.04em; background:var(--btn); color:var(--accent); border:1px solid var(--line-strong); border-radius:3px; }
+  .seg-kw-search { flex:0 0 auto; width:auto; margin:0; padding:0 8px; font-size:0.62rem; font-weight:800; letter-spacing:0.04em; background:var(--btn); color:var(--text); border:1px solid var(--line-strong); border-radius:3px; }
   .pexels-pick-body .seg-pexels-grid { flex-wrap:wrap; overflow:visible; justify-content:flex-start; max-height:60vh; overflow-y:auto; }
   .seg-pexels-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:0.72rem; margin-bottom:6px; }
   .seg-pexels-close { width:auto; margin:0; padding:2px 8px; font-size:0.8rem; background:transparent; box-shadow:none; color:var(--muted); }
   .seg-tl-area.ro-on > :not(.seg-ro-wrap) { display:none; }
   /* 클립을 고르면 나오는 도구줄 */
   .seg-tools { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:8px 0 0; }
-  .seg-tools button { width:auto; margin:0; padding:6px 10px; font-size:0.72rem; background:var(--inset); color:var(--accent); text-transform:none; letter-spacing:0; }
+  .seg-tools button { width:auto; margin:0; padding:6px 10px; font-size:0.72rem; color:var(--text); text-transform:none; letter-spacing:0; }
   .seg-tools button.set { color:var(--on-accent); background:var(--accent); }
   .seg-tools button.del { color:var(--danger); }
   .seg-tools button.del:hover { background:var(--danger); color:var(--on-accent); }
@@ -341,9 +342,9 @@
     <select id="scriptSelect" style="display:none;"><option value="">불러오는 중...</option></select>
 
     <div id="detailView" style="display:none;">
-    <button type="button" id="backToList" style="width:auto;padding:6px 14px;font-size:0.8rem;background:var(--btn);margin-bottom:12px;">← 콘티 목록</button>
+    <button type="button" id="backToList" style="width:auto;padding:6px 14px;font-size:0.8rem;margin-bottom:12px;">← 콘티 목록</button>
     <div id="regenWrap" style="display:none;">
-      <button type="button" id="addMediaBtn" style="margin-top:10px;background:var(--btn);">기사 사진·영상 가져오기</button>
+      <button type="button" id="addMediaBtn" style="margin-top:10px;">기사 사진·영상 가져오기</button>
     </div>
     <div class="msg" id="msg"></div>
 
@@ -421,8 +422,8 @@
           · 자막을 끌면 위치, 두 손가락으로 크기, 두 번 탭하면 굵기가 바뀌고 모든 장면에 같이 적용돼요.
         </div>
         <div class="trim-actions">
-          <button type="button" id="pvGuideOk" style="flex:1;background:var(--accent);color:var(--on-accent);">확인</button>
-          <button type="button" id="pvGuideNever" style="flex:1;background:var(--btn);color:var(--accent);font-size:0.8rem;">다시 알림 보지 않기</button>
+          <button type="button" id="pvGuideOk" style="flex:1;box-shadow:inset 0 0 0 1px var(--text);">확인</button>
+          <button type="button" id="pvGuideNever" style="flex:1;font-size:0.8rem;">다시 알림 보지 않기</button>
         </div>
       </div>
     </div>
@@ -444,11 +445,11 @@
         <div class="cap-modal-val" id="trimInfo"></div>
         <div style="display:flex;gap:8px;">
           <button type="button" id="trimPreview">구간 미리보기</button>
-          <button type="button" id="trimReset" style="background:var(--btn);">처음부터</button>
+          <button type="button" id="trimReset" style="">처음부터</button>
         </div>
         <div class="trim-actions">
           <button type="button" id="trimDone" style="flex:2;">저장</button>
-          <button type="button" id="trimClose" style="flex:1;background:var(--btn);">닫기</button>
+          <button type="button" id="trimClose" style="flex:1;">닫기</button>
         </div>
       </div>
     </div>
@@ -463,8 +464,8 @@
         <div class="cap-modal-val" id="posInfo" style="font-size:0.78rem;"></div>
         <div class="trim-actions">
           <button type="button" id="posSave" style="flex:2;">저장</button>
-          <button type="button" id="posReset" style="flex:1;background:var(--btn);">가운데</button>
-          <button type="button" id="posClose" style="flex:1;background:var(--btn);">닫기</button>
+          <button type="button" id="posReset" style="flex:1;">가운데</button>
+          <button type="button" id="posClose" style="flex:1;">닫기</button>
         </div>
       </div>
     </div>
@@ -486,7 +487,7 @@
     </div>
 
     <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
-    <button type="button" id="addSegBtn" style="margin-top:6px;background:var(--btn);">+ 장면 추가</button>
+    <button type="button" id="addSegBtn" style="margin-top:6px;">+ 장면 추가</button>
     </div>
 
   </div>

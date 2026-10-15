@@ -56,7 +56,7 @@ function ytDefaultSlot(row) {
 
 function ytReauthHelpHtml() {
   const buttons = ytChannels().filter((c) => ytReauthCmd(c.slot)).map((c) =>
-    `<button type="button" class="yt-reauth-copy" data-slot="${escapeHtml(c.slot)}" style="margin-top:6px;background:var(--btn);">재로그인 명령 복사 (${escapeHtml(c.label)}${c.slot === "1" ? "" : " · 채널 선택 화면에서 그 채널을 고르세요"})</button>`
+    `<button type="button" class="yt-reauth-copy" data-slot="${escapeHtml(c.slot)}" style="margin-top:6px;">재로그인 명령 복사 (${escapeHtml(c.label)}${c.slot === "1" ? "" : " · 채널 선택 화면에서 그 채널을 고르세요"})</button>`
   ).join("");
   if (!buttons) {
     return `<div class="yt-reauth" style="margin-top:8px;padding:8px 10px;background:var(--inset);border-radius:3px;font-size:0.78rem;color:var(--muted);">
@@ -89,7 +89,7 @@ function uploadBlockHtml(o, row) {
     ? `<div class="msg err" style="display:block;font-size:0.8rem;">업로드 실패: ${escapeHtml(o.youtube_error || "알 수 없는 오류")}</div>${ytReauthHelpHtml()}` : "";
   return `<div class="yt-block" data-output-id="${o.id}" data-video-url="${escapeHtml(o.video_url)}" style="margin-top:8px;">
     ${errorNote}
-    <button type="button" class="yt-open-btn" style="background:var(--btn);">${o.youtube_status === "error" ? "다시 업로드" : "유튜브에 업로드"}</button>
+    <button type="button" class="yt-open-btn" style="">${o.youtube_status === "error" ? "다시 업로드" : "유튜브에 업로드"}</button>
     <div class="yt-form" style="display:none;margin-top:8px;">
       <label>올릴 채널</label>
       <select class="yt-channel">${ytChannels().map((c) => `<option value="${escapeHtml(c.slot)}"${c.slot === ytDefaultSlot(row) ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")}</select>
@@ -103,7 +103,7 @@ function uploadBlockHtml(o, row) {
       ${o.youtube_status === "error" ? "" : `<details style="margin:6px 0;"><summary style="color:var(--muted);font-size:0.78rem;cursor:pointer;">업로드가 실패하거나 유튜브 인증이 만료됐나요?</summary>${ytReauthHelpHtml()}</details>`}
       <div style="display:flex;gap:8px;">
         <button type="button" class="yt-start-btn" style="flex:2;">업로드 시작</button>
-        <button type="button" class="yt-cancel-btn" style="flex:1;background:var(--btn);">취소</button>
+        <button type="button" class="yt-cancel-btn" style="flex:1;">취소</button>
       </div>
     </div>
   </div>`;

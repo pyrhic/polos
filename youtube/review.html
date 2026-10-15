@@ -136,7 +136,7 @@
 
   function renderDetail(list, r, outputs) {
     list.innerHTML = `
-      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;background:var(--btn);margin-bottom:12px;">← 영상 목록</button>
+      <button type="button" id="backBtn" style="width:auto;padding:6px 14px;font-size:0.8rem;margin-bottom:12px;">← 영상 목록</button>
       <div class="card-box" data-id="${r.id}">
         <div class="title" style="font-weight:800;margin-bottom:6px;">${escapeHtml(videoName(r) || "(이름 없음)")}</div>
         <div class="s-meta" style="margin-bottom:6px;"><span class="status-tag status-${r.generation_status || "idle"}">${r.generation_status || "idle"}</span></div>
