@@ -23,9 +23,23 @@ function genCaptionLines(text) {
   return String(text || "").replace(/\r/g, "").replace(/[ \t]+\/[ \t]+/g, "\n")
     .split("\n").map((l) => l.trim()).filter(Boolean);
 }
-// 예상 목소리 길이(초) = max(0.6, 글자수 / 4.3 / (1 + tts_rate/100)). 글자수는 공백·**·/를 뺀 길이
+// [ ... ] = 목소리로는 읽고 화면 자막에서는 뺀다 (계약서 8절)
+// { ... } = 화면 자막에는 보이고 목소리로는 읽지 않는다 (계약서 8-2절). 짝이 맞는 기호만, 짝 없는 기호는 일반 글자
+const GEN_CAP_HIDE_RE = /\[([^\[\]]*)\]/g;
+const GEN_CAP_MUTE_RE = /\{([^{}]*)\}/g;
+// 읽는 글자: {..}는 통째로 빼고, [..]는 기호만 뗀다
+function genCaptionSpoken(line) {
+  return String(line || "").replace(GEN_CAP_MUTE_RE, " ").replace(GEN_CAP_HIDE_RE, "$1").replace(/\s+/g, " ").trim();
+}
+// 화면에 보이는 글자: [..]는 통째로 빼고, {..}는 기호만 뗀다 (전부 숨김이면 "")
+function genCaptionShown(line) {
+  return String(line || "").replace(GEN_CAP_HIDE_RE, " ").replace(GEN_CAP_MUTE_RE, "$1").replace(/\s+/g, " ").trim();
+}
+// 예상 목소리 길이(초) = max(0.6, 글자수 / 4.3 / (1 + tts_rate/100)). 글자수는 읽는 글자(공백·**·/·기호 제외, [ ] 안 포함, { } 안 제외).
+// 읽을 글자가 없는 줄(전부 { })은 보이는 글자수로 같은 식 — 자막이 너무 빨리 사라지지 않게
 function genCaptionEst(line, ttsRate) {
-  const len = String(line || "").replace(/\*\*/g, "").replace(/\//g, "").replace(/\s+/g, "").length;
+  const cnt = (t) => t.replace(/\*\*/g, "").replace(/\//g, "").replace(/\s+/g, "").length;
+  const len = cnt(genCaptionSpoken(line)) || cnt(genCaptionShown(line));
   const rate = 1 + (Number(ttsRate) || 0) / 100;
   return Math.max(0.6, len / 4.3 / (rate > 0 ? rate : 1));
 }

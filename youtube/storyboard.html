@@ -264,6 +264,10 @@
   .seg-cap-blk.on { background:var(--accent-strong); color:var(--on-accent); }
   .seg-cap-in { position:absolute; inset:0 10px 0 4px; overflow:hidden; display:flex; flex-direction:column; justify-content:center; pointer-events:none; line-height:1.15; }
   .seg-cap-in .t { font-size:0.62rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .seg-cap-in .t .hid { opacity:0.45; font-style:italic; }
+  .seg-cap-in .t .mute { color:#ffd76a; text-decoration:underline dotted; }
+  .seg-cap-blk.on .seg-cap-in .t .mute { color:inherit; }
+  .pv-cap-hid { opacity:0.4; font-size:0.6em; font-weight:400; }
   .seg-cap-in .s { font-size:0.56rem; color:#9fdcfa; white-space:nowrap; }
   .seg-cap-handle { position:absolute; top:-2px; bottom:-2px; right:-12px; width:24px; touch-action:none; cursor:ew-resize; z-index:3; display:flex; justify-content:center; align-items:center; }
   .seg-cap-handle::after { content:""; width:6px; height:70%; border-radius:3px; background:var(--accent-strong); box-shadow:0 0 0 2px var(--inset); }
@@ -1247,7 +1251,16 @@
   function capPlainText(line) {
     return String(line || "").replace(/\*\*/g, "");
   }
-  // 자막 한 줄을 화면용 HTML로 (**글자** → 노란 강조)
+  // 자막 트랙 블록 글자: [숨김]은 연한 기울임, {자막만}은 다른 색 점선 밑줄로(기호 없이) 보여 구분한다
+  function capTrackHtml(line) {
+    return String(line || "").split(/(\[[^\[\]]*\]|\{[^{}]*\})/).map((part) => {
+      const inner = escapeHtml(capPlainText(part.slice(1, -1)));
+      if (/^\[[^\[\]]*\]$/.test(part)) return inner ? `<span class="hid" title="읽기만 (자막 숨김)">${inner}</span>` : "";
+      if (/^\{[^{}]*\}$/.test(part)) return inner ? `<span class="mute" title="자막만 (읽지 않음)">${inner}</span>` : "";
+      return escapeHtml(capPlainText(part));
+    }).join("");
+  }
+  // 자막 한 줄을 화면용 HTML로 (**글자** → 노란 강조). [숨김]은 미리 빼고 넘긴다(genCaptionShown)
   function capLineHtml(line) {
     return String(line || "").split(/(\*\*[^*]+\*\*)/).map((part) =>
       /^\*\*[^*]+\*\*$/.test(part) ? `<span class="pv-emph">${escapeHtml(part.slice(2, -2))}</span>` : escapeHtml(part.replace(/\*\*/g, ""))
@@ -1272,7 +1285,7 @@
         <div class="seg-tl-row">
           <div class="seg-tl-col">
             <div class="seg-cap-track">
-              ${st.lines.map((l, i) => `<div class="seg-cap-blk${st.custom[i] ? " set" : ""}" data-i="${i}"><div class="seg-cap-in"><span class="t">${escapeHtml(capPlainText(l))}</span><span class="s"></span></div><div class="seg-cap-handle" data-i="${i}"></div></div>`).join("")}
+              ${st.lines.map((l, i) => `<div class="seg-cap-blk${st.custom[i] ? " set" : ""}" data-i="${i}"><div class="seg-cap-in"><span class="t">${capTrackHtml(l)}</span><span class="s"></span></div><div class="seg-cap-handle" data-i="${i}"></div></div>`).join("")}
               <div class="seg-cap-play"></div>
             </div>
           </div>
@@ -1438,7 +1451,7 @@
   function capSplitRunWidth(run, m) {
     const n = run.length;
     if (n <= 1) return n ? [run] : [];
-    const textOf = (ws) => ws.map((x) => x.p).join(" ");
+    const textOf = (ws) => ws.map((x) => x.p).filter(Boolean).join(" ");
     const total = m.width(textOf(run));
     for (let k = Math.max(1, Math.ceil(total / (m.avail * 1.06))); k <= n; k++) {
       const out = [];
@@ -1471,12 +1484,15 @@
   function capTokens(line, terms) {
     const raw = [];
     let acc = null;
-    String(line).split(/\s+/).filter(Boolean).forEach((w) => {
+    // [숨김]·{자막만} 구간은 한 덩어리 (안의 공백을 잠시 \u0001로 바꿔 쪼개지 않게)
+    const glued = String(line).replace(/\[[^\[\]]*\]|\{[^{}]*\}/g, (s) => s.replace(/\s/g, "\u0001"));
+    glued.split(/\s+/).filter(Boolean).forEach((w) => {
       acc = acc == null ? w : acc + " " + w;
       if (((acc.match(/\*\*/g) || []).length % 2) === 0) { raw.push(acc); acc = null; }
     });
     if (acc != null) raw.push(acc);
-    const toks = raw.map((w) => ({ w, p: w.replace(/\*\*/g, ""), solo: /\*\*/.test(w) }));
+    // p = 화면에 보이는 글자(폭 재기용, [숨김] 제외), w = 원문(대괄호 그대로)
+    const toks = raw.map((w0) => { const w = w0.replace(/\u0001/g, " "); return { w, p: capPlainText(genCaptionShown(w)), solo: /\*\*/.test(w) }; });
     if (!terms.length) return toks;
     const out = [];
     for (let i = 0; i < toks.length; ) {
@@ -1501,7 +1517,8 @@
     return out;
   }
   function capLineFits(m, line) {
-    return m ? capFits(m, capPlainText(line).trim()) : capPlainText(line).replace(/\s+/g, "").length <= 18;
+    const vis = capPlainText(genCaptionShown(line)).trim();   // [숨김] 글자는 화면에 없으니 폭에서 뺀다
+    return m ? capFits(m, vis) : vis.replace(/\s+/g, "").length <= 18;
   }
   // 긴 한 줄 → 여러 줄. 문장 끝(. ? ! 등)에서 먼저 끊고, 그래도 넘치면 단어 경계에서 고르게 나눈다
   function capSplitLine(line, m, terms) {
@@ -3227,7 +3244,11 @@
   // 자막 구간: 자막 한 줄 = 화면 한 번. 줄마다 정확한 시작·끝(초)을 자막 트랙과 같은 값으로 (영상 생성과 같은 규칙, 계약서 6절)
   function capGroups(el, seg) {
     const st = capStateOf(el, seg);
-    return st.lines.map((l, i) => ({ raw: l, text: capPlainText(l), s0: st.starts[i], s1: st.starts[i] + st.secs[i] }));
+    return st.lines.map((l, i) => ({ raw: l, text: capPlainText(genCaptionSpoken(l)), s0: st.starts[i], s1: st.starts[i] + st.secs[i] }));
+  }
+  // 정지 화면에 잡아 둘 줄: 처음으로 화면에 보이는 줄 (전부 [숨김]이면 첫 줄 → 자리 표시)
+  function pvFirstVisible(groups) {
+    return groups.find((g) => capPlainText(genCaptionShown(g.raw)).trim()) || groups[0] || null;
   }
 
   // ───── 카드 안 미리보기 ─────
@@ -3269,9 +3290,11 @@
     return { P, framed, size, wt };
   }
   // 자막 한 줄을 한 번에 보여준다. **강조** 부분만 노란색(강조 글꼴)
-  function pvCapShow(cap, g, size, wt) {
+  // [숨김] 부분은 빼고 보여준다. 줄 전체가 숨김이면 재생 중엔 비우고, 멈춘 화면(still)에선 잡을 수 있게 자리 표시만
+  function pvCapShow(cap, g, size, wt, still) {
     cap._g = g || null;
-    cap.innerHTML = g ? capLineHtml(g.raw) : "";
+    const shown = g && capPlainText(genCaptionShown(g.raw)).trim() ? genCaptionShown(g.raw) : "";
+    cap.innerHTML = shown ? capLineHtml(shown) : (g && still ? '<span class="pv-cap-hid">(자막 숨김)</span>' : "");
     cap.style.fontFamily = `${wt.family}, sans-serif`;
     cap.style.fontWeight = wt.weight;
     cap.style.color = "#fff";
@@ -3359,7 +3382,7 @@
       }
     }
     pvRefMark(P, p);
-    pvCapShow(P.cap, capGroups(el, seg)[0], size, wt);
+    pvCapShow(P.cap, pvFirstVisible(capGroups(el, seg)), size, wt, true);
     P.play.textContent = "▶";
     P.play.classList.remove("on");
     P.time.textContent = pvTimeText(0, secs);
@@ -3429,7 +3452,7 @@
     });
     ctx.P.play.textContent = "▶";
     ctx.P.play.classList.remove("on");
-    if (!ctx.P.cap._g && ctx.groups[0]) pvCapShow(ctx.P.cap, ctx.groups[0], ctx.size, ctx.wt);   // 멈췄는데 자막이 비었으면 첫 줄
+    if (ctx.groups.length) pvCapShow(ctx.P.cap, ctx.P.cap._g || pvFirstVisible(ctx.groups), ctx.size, ctx.wt, true);   // 멈췄는데 자막이 비었으면 첫 보이는 줄
   }
   function pvVideoAt(v, sec, play) {
     const go = () => {
@@ -3485,7 +3508,7 @@
     if (gi !== ctx.shown) {
       ctx.shown = gi;
       // 멈춘 화면에서 자막이 비면(끝난 뒤 등) 첫 줄을 보여 둔다 — 잡아서 위치·크기·굵기를 바꿀 수 있게
-      pvCapShow(ctx.P.cap, ctx.groups[gi] || (ctx.playing ? null : ctx.groups[0]), ctx.size, ctx.wt);
+      pvCapShow(ctx.P.cap, ctx.groups[gi] || (ctx.playing ? null : pvFirstVisible(ctx.groups)), ctx.size, ctx.wt, !ctx.playing);
       if (ctx.playing && gi >= 0) pvSpeak(ctx, gi);
     }
     ctx.t = Math.min(Math.max(0, t), ctx.secs);
@@ -3495,6 +3518,7 @@
   function pvSpeak(ctx, gi) {
     const g = ctx.groups[gi];
     if (!pvVoiceOn || !g || !("speechSynthesis" in window)) return;
+    if (!g.text.replace(/\s+/g, "")) { try { speechSynthesis.cancel(); } catch {} return; }   // 전부 {자막만}인 줄은 무음
     try {
       const u = new SpeechSynthesisUtterance(g.text);
       u.lang = "ko-KR";
@@ -3529,7 +3553,7 @@
         pvShow(ctx, ctx.secs, false);
         pvStop(ctx);
         ctx.t = ctx.secs;
-        pvCapShow(ctx.P.cap, ctx.groups[0] || null, ctx.size, ctx.wt);   // 끝난 화면에도 첫 줄(잡을 수 있게)
+        pvCapShow(ctx.P.cap, pvFirstVisible(ctx.groups), ctx.size, ctx.wt, true);   // 끝난 화면에도 첫 줄(잡을 수 있게)
         ctx.shown = -1;
         pvPlayhead(ctx);
       }
@@ -3598,7 +3622,7 @@
         if (framed !== pvActive.framed && !pvActive.playing) { pvRefreshCard(el.dataset.id); return; }
         const d = pvDecor(el);
         pvActive.size = d.size; pvActive.wt = d.wt;
-        pvCapShow(pvActive.P.cap, pvActive.P.cap._g, d.size, d.wt);   // 지금 줄 그대로 모양만 바꾼다 (목소리를 다시 읽지 않게)
+        pvCapShow(pvActive.P.cap, pvActive.P.cap._g, d.size, d.wt, !pvActive.playing);   // 지금 줄 그대로 모양만 바꾼다 (목소리를 다시 읽지 않게)
       } else {
         pvIdle(el, seg);
       }
