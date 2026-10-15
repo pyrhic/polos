@@ -64,7 +64,7 @@ ${KIND_RULE[kind]}
 - keyword: Pexels 검색용 영어 단어 2~4개 (사진이 없을 때 쓰는 분위기 영상 검색어). 실존 인물 이름·한국어 고유명사는 쓰지 말고 분위기/사물/장소를 묘사. 카드마다 다르게.
 - direction: 카메라 연출 하나, 반드시 다음 중에서: ${DIRECTIONS.map((d) => `"${d}"`).join(", ")} (같은 연출이 연속되지 않게)
 - image: 이 카드에 어울리는 사진 번호(위 목록). 적당한 사진이 없으면 -1. 같은 사진을 너무 반복해서 쓰지 말고, 첫 카드에는 인물 대표 사진이 있으면 쓴다.
-- name: 콘티 이름 (인물과 주제, 20자 이내). title1: ${KIND_NAME[kind]} 이름(또는 핵심 키워드) 공백 포함 12자 이내, title2: 이 이야기를 한 줄로 14자 이내. 둘 다 낚시·과장·물음표·느낌표 없이.
+- name: 콘티 이름 (인물과 주제, 20자 이내). title1: ${KIND_NAME[kind]} 이름(또는 핵심 키워드) 공백 포함 12자 이내, title2: 이 이야기를 한 줄로 14자 이내. 궁금증을 불러일으키는 낚시성 표현과 물음표·느낌표는 써도 되지만, 위키백과에 있는 사실만 쓰고 실존 인물을 조롱·비방하지 않는다.
 - mood: 문서 내용의 분위기를 판단해 영상 색감 분위기를 다음 id 중 하나로 고른다: "neutral"(기본), "mystery"(어둡고 긴장감 있는 미스터리 — 미제 사건·의문의 죽음·괴담·수수께끼 등), "bright"(밝고 경쾌 — 유쾌한 일화·발명·성공담 등), "calm"(차분하고 담담한 다큐 — 생애·역사·참사·과학 지식 등). 판단이 어렵거나 애매하면 "neutral".`;
 
     const requestBody = {
@@ -106,7 +106,8 @@ ${KIND_RULE[kind]}
     }
     if (!parsed) return json({ error: lastProblem + " (두 번 시도했어요). 잠시 뒤 다시 시도해주세요" }, 502);
 
-    const clean20 = (s) => String(s || "").replace(/[?!？！]/g, "").trim().slice(0, 20);
+    const clean20 = (s) => String(s || "").replace(/[?!？！]/g, "").trim().slice(0, 20);   // 콘티 이름용
+    const title20 = (s) => String(s || "").trim().slice(0, 20);   // 화면 제목은 물음표·느낌표 허용
     const segments = parsed.cards.filter((c) => c.script_text && c.script_text.trim()).map((c) => ({
       section: ["도입", "전개", "의미", "마무리"].includes(c.section) ? c.section : "전개",
       script_text: c.script_text.trim(), keyword: c.keyword || "", direction: DIRECTIONS.includes(c.direction) ? c.direction : "천천히 줌인",
@@ -118,7 +119,7 @@ ${KIND_RULE[kind]}
     const sources = [{ title: `위키백과 「${main.title}」 (${main.lang})`, url: main.url }];
     if (second) sources.push({ title: `위키백과 「${second.title}」 (${second.lang})`, url: second.url });
     return json({
-      name: clean20(parsed.name), title1: clean20(parsed.title1), title2: clean20(parsed.title2),
+      name: clean20(parsed.name), title1: title20(parsed.title1), title2: title20(parsed.title2),
       mood: normalizeMood(parsed.mood),   // 영상 분위기(색감 필터): 4개 외 값이거나 없으면 neutral
       segments, images, sources, credits: images.map(creditLine),
       targetChars, totalChars: segments.reduce((n, s) => n + s.script_text.replace(/\s+/g, "").length, 0),
