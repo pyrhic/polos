@@ -13,6 +13,9 @@
 <style>
   .seg-item { border:2px solid transparent; }
   .seg-item:focus-within { border-color:var(--accent); }
+  /* PC에서 파일을 끌어 올 때: 놓일 장면 카드에 하늘색 점선 + 안내 */
+  .seg-item.file-over { position:relative; border-color:var(--accent); border-style:dashed; }
+  .seg-item.file-over::after { content:"여기에 놓으면 이 장면 맨 뒤에 추가"; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:8; pointer-events:none; background:var(--accent); color:var(--on-accent); font-size:0.85rem; font-weight:800; padding:8px 14px; border-radius:3px; white-space:nowrap; }
   .seg-item .seg-head { display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px; margin-bottom:10px; }
   .seg-item .seg-duration { margin-left:auto; flex-shrink:0; }
   .seg-duration-edit, .seg-duration-save { white-space:nowrap; }
@@ -132,6 +135,7 @@
   .settings-card .tok-btn { border:1px solid var(--line-strong); color:var(--text); border-radius:10px; padding:0 7px; margin-left:4px; font-size:0.72rem; }
   .settings-card .tok-del { color:var(--danger); border-color:var(--danger); }
   .settings-card .sr-input { background:transparent; border:none; border-radius:0; padding:0; margin:0; font-size:0.8rem; font-weight:800; color:var(--text); width:100%; }
+  .ov-parts .ov-sep { color:var(--muted); font-weight:600; }
   .settings-card .sr-input::placeholder { color:var(--muted-2); font-weight:400; }
   .settings-card .sr-input:focus { outline:none; background:var(--input); }
   /* 카드 위 페이지 제목 = 콘티 이름 (누르면 그 자리에서 고침) */
@@ -383,7 +387,6 @@
         <div class="sr"><span class="k">제목 1줄</span><span class="v"><input class="sr-input" id="srT1" maxlength="20" placeholder="노란색, 10자 안팎"></span></div>
         <div class="sr"><span class="k">제목 2줄</span><span class="v"><input class="sr-input" id="srT2" maxlength="20" placeholder="흰색"></span></div>
         <div class="sr"><span class="k">출처 문구</span><span class="v"><input class="sr-input" id="srSrc" maxlength="60" placeholder="영상 아래 작은 글씨"></span></div>
-        <div class="sr"><span class="k">분위기</span><span class="v"><button type="button" class="tok" data-wheel="mood" id="tokMood"></button></span></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
         <button type="button" class="tok tok-btn" id="settingsSaveBtn" style="display:none;margin-left:0;">저장</button>
@@ -427,6 +430,15 @@
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
         <button type="button" class="tok tok-btn" id="soundSaveBtn" style="display:none;margin-left:0;">저장</button>
+      </div>
+    </div>
+
+    <!-- 개요: 전체 길이(장면 길이 합 = 전체 미리보기·생성 요청과 같은 기준), 구성(장면 구분 묶음, 누르면 그 장면으로), 분위기(고르면 바로 저장) -->
+    <div class="card-box settings-card" id="overviewCard" style="display:none;margin-top:14px;">
+      <div class="sr-list">
+        <div class="sr"><span class="k">전체 길이</span><span class="v" id="ovTotal"></span></div>
+        <div class="sr" style="align-items:start;"><span class="k">구성</span><span class="v ov-parts" id="ovParts"></span></div>
+        <div class="sr"><span class="k">분위기</span><span class="v"><button type="button" class="tok" data-wheel="mood" id="tokMood"></button></span></div>
       </div>
     </div>
 
@@ -523,7 +535,6 @@
 
     <div class="runtime-summary" id="fullPvBox" style="display:none;">
       <button type="button" id="fullPvBtn" class="gen-main-btn">전체 미리보기</button>
-      <div class="note" id="runtimeText" style="text-align:center;margin-top:6px;"></div>
     </div>
     <div class="runtime-summary" id="runtimeSummary" style="display:none;">
       <button type="button" id="genBtn" class="gen-main-btn">영상 생성</button>
@@ -1729,7 +1740,7 @@
   function updateRuntimeSummary() {
     const box = document.getElementById("runtimeSummary");
     const cards = Array.from(document.querySelectorAll(".seg-item"));
-    if (!cards.length) { box.style.display = "none"; $("fullPvBox").style.display = "none"; return; }
+    if (!cards.length) { box.style.display = "none"; $("fullPvBox").style.display = "none"; updateOverview([], 0); return; }
 
     const perCard = cards.map((el) => ({
       el, seconds: effectiveSeconds(el, segments.find((s) => String(s.id) === el.dataset.id)),
@@ -1750,8 +1761,24 @@
 
     box.style.display = "block";
     $("fullPvBox").style.display = "block";
-    refreshGroupHeaders();
-    $("runtimeText").textContent = `약 ${Math.round(total)}초`;
+    updateOverview(refreshGroupHeaders(), total);
+  }
+
+  // ───── 개요 박스: 전체 길이 + 구성(묶음 머리글과 같은 묶음) ─────
+  function fmtDur(secs) {
+    const r = Math.round(secs);
+    return r < 60 ? `${r}초` : `${Math.floor(r / 60)}분` + (r % 60 ? ` ${r % 60}초` : "");
+  }
+  let ovRuns = [];
+  function updateOverview(runs, total) {
+    ovRuns = runs;
+    $("ovTotal").textContent = `약 ${fmtDur(total)}`;
+    // "이름 [카드 n개] 00초" (카드 1개면 개수 생략), 구독/좋아요 묶음은 "구독 카드"
+    $("ovParts").innerHTML = runs.length ? runs.map((r, i) => {
+      const label = r.part === SUBSCRIBE_PART ? "구독 카드"
+        : `${r.part}${r.els.length > 1 ? ` 카드 ${r.els.length}개` : ""} ${fmtDur(r.secs)}`;
+      return `<button type="button" class="tok" data-run="${i}">${escapeHtml(label)}</button>`;
+    }).join(' <span class="ov-sep">/</span> ') : "-";
   }
 
   // ───── 전체 설정 카드 (자막 크기 / 배경음악 / 분위기 / 화면 전환) ─────
@@ -1789,7 +1816,8 @@
   // main = 첫 카드(제목·출처·분위기·메모), sound = 음향 카드, cap = 미리보기 자막 조작(자동 저장), name = 카드 머리 이름(바로 저장).
   // 저장할 때는 마지막으로 저장된 video_settings 위에 그 부분의 키만 덮어쓴다(다른 카드의 아직 저장 안 한 값은 섞이지 않는다).
   const PART_KEYS = {
-    main: ["title1", "title2", "source_text", "mood"],   // 분위기 메모(mood_note)는 화면에서 없앴다. 예전 값은 저장된 그대로 둔다
+    main: ["title1", "title2", "source_text"],   // 분위기 메모(mood_note)는 화면에서 없앴다. 예전 값은 저장된 그대로 둔다
+    mood: ["mood"],   // 개요 박스의 분위기: 고르면 바로(잠깐 모아서) 이 키만 저장
     sound: ["tts_voice", "tts_rate", "tts_pitch", "bgm_path", "bgm_volume"],
     cap: ["caption_font_size", "caption_weight", "caption_position_pct"],
     name: ["name"],
@@ -1797,7 +1825,7 @@
   const PART_BTN = { main: "settingsSaveBtn", sound: "soundSaveBtn" };
   const dirtyParts = new Set();
   const savingParts = new Set();
-  const partEdits = { main: 0, sound: 0, cap: 0, name: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
+  const partEdits = { main: 0, sound: 0, cap: 0, name: 0, mood: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
   const justSavedParts = new Set();
   let saveChain = Promise.resolve();   // 저장은 하나씩 차례로(앞 저장 결과 위에 다음 저장을 덮어쓰도록)
 
@@ -1806,10 +1834,14 @@
     return dirtyParts.has("main") || dirtyParts.has("sound");
   }
   // 자막 조작은 잠시 뒤 자동 저장된다. 그 전에 나가거나 영상을 만들면 바로 저장한다
-  function capPending() { return dirtyParts.has("cap"); }
+  // 분위기도 고르면 자동 저장이라 같은 취급(나가기·영상 생성 전에 바로 저장)
+  function capPending() { return dirtyParts.has("cap") || dirtyParts.has("mood"); }
   function flushCapSave() {
     clearTimeout(capSaveTimer);
-    return capPending() ? savePart("cap") : saveChain;
+    clearTimeout(moodSaveTimer);
+    if (dirtyParts.has("cap")) savePart("cap");
+    if (dirtyParts.has("mood")) savePart("mood");
+    return saveChain;
   }
   function cardsDirty() {
     return !!document.querySelector(".seg-item[data-dirty]");
@@ -1989,7 +2021,7 @@
   function loadSettingsCard(scriptId) {
     const card = $("settingsCard");
     const row = scripts.find((r) => String(r.id) === String(scriptId));
-    if (!row) { card.style.display = "none"; $("contiNameWrap").style.display = "none"; $("soundCard").style.display = "none"; return; }
+    if (!row) { card.style.display = "none"; $("contiNameWrap").style.display = "none"; $("soundCard").style.display = "none"; $("overviewCard").style.display = "none"; return; }
     currentSettings = { ...DEFAULT_SETTINGS, ...(row.video_settings || {}) };
     savedBgmPath = currentSettings.bgm_path || null;
     // 이름을 따로 안 정했으면 카드 머리에는 대본 후킹 앞부분을 보여 준다(contiDisplayName). 저장값은 그대로 둔다
@@ -2019,6 +2051,7 @@
     card.style.display = "block";
     $("contiNameWrap").style.display = "block";
     $("soundCard").style.display = "block";
+    $("overviewCard").style.display = "block";
     closeWheel();
     stopBgmPlayer();
     renderBgm();
@@ -2092,7 +2125,7 @@
         }
         return true;
       } catch (err) {
-        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름" }[part];
+        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름", mood: "분위기" }[part];
         showMsg(`${what} 저장 실패: ${err.message}`, false);
         if (same()) dirtyParts.add(part);
         return false;
@@ -2213,7 +2246,23 @@
     $("bgmVolVal").textContent = $("bgmVol").value + "%";
     markPartDirty("sound");
   });
-  $("moodSel").addEventListener("change", () => { currentSettings.mood = $("moodSel").value; markPartDirty("main"); });
+  // 분위기는 휠에서 고르면 바로 저장한다(휠을 굴리는 동안 여러 번 바뀌므로 잠깐 모아서 mood 키만 PATCH)
+  let moodSaveTimer = 0;
+  function moodScheduleSave() {
+    clearTimeout(moodSaveTimer);
+    moodSaveTimer = setTimeout(() => {
+      if (!$("scriptSelect").value || !dirtyParts.has("mood")) return;
+      if (savingParts.has("mood")) { moodScheduleSave(); return; }
+      savePart("mood");
+    }, 500);
+  }
+  $("moodSel").addEventListener("change", () => { currentSettings.mood = $("moodSel").value; markPartDirty("mood"); moodScheduleSave(); });
+  // 개요 박스 "구성": 묶음을 누르면 그 묶음 머리글로 스크롤
+  $("ovParts").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-run]");
+    const r = b && ovRuns[Number(b.dataset.run)];
+    if (r && document.body.contains(r.head)) r.head.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   $("bgmFile").addEventListener("change", (e) => { if (e.target.files[0]) uploadBgm(e.target.files[0]); e.target.value = ""; });
   $("settingsSaveBtn").addEventListener("click", () => { if (!savingParts.has("main")) savePart("main"); });
   $("soundSaveBtn").addEventListener("click", () => { if (!savingParts.has("sound")) savePart("sound"); });
@@ -2566,9 +2615,11 @@
   }
 
   // 이어지는 같은 구분의 카드들을 묶어서 "트렌드 요약 · 카드 2개 · 약 14초" 머리글을 카드 사이에 넣는다
+  // 묶음 목록 [{ part, els, secs, head }]을 돌려준다 (개요 박스의 "구성"이 같은 묶음을 쓴다)
   function refreshGroupHeaders() {
     const list = document.getElementById("segList");
     list.querySelectorAll(".seg-group").forEach((el) => el.remove());
+    const runs = [];
     let prev = null, run = [];
     const flush = () => {
       if (!run.length || !prev) { run = []; return; }
@@ -2577,6 +2628,7 @@
       h.className = "seg-group";
       h.innerHTML = `<span>${escapeHtml(prev)}</span><span class="cnt">카드 ${run.length}개 · 약 ${secs.toFixed(0)}초</span>`;
       run[0].before(h);
+      runs.push({ part: prev, els: run, secs, head: h });
       run = [];
     };
     list.querySelectorAll(".seg-item").forEach((el) => {
@@ -2585,6 +2637,7 @@
       run.push(el);
     });
     flush();
+    return runs;
   }
 
   // 옛 콘티용 보충 버튼들: 이미 기사 사진을 가져왔거나(또는 기사 주소가 없거나), 이미 내 의견 카드가 있으면 숨긴다
@@ -3520,7 +3573,7 @@
     const groups = capGroups(el, seg);
     P.info.innerHTML = pvInfoHtml(seg, plan, secs);
     return { el, id: String(seg.id), P, secs, cuts, cutEnds, groups, size, wt, framed,
-      t: 0, playing: false, cutIdx: -1, shown: -2, raf: 0, t0: 0, speaking: false };
+      t: 0, playing: false, cutIdx: -1, shown: -2, raf: 0, t0: 0 };
   }
   function pvActivate(el) {
     if (pvActive && pvActive.el === el) return pvActive;
@@ -3547,8 +3600,7 @@
     if (!ctx) return;
     cancelAnimationFrame(ctx.raf);
     ctx.playing = false;
-    ctx.speaking = false;
-    try { window.speechSynthesis.cancel(); } catch {}
+    if (!ctx.full) spStop();
     ctx.cuts.forEach((c) => {
       if (c.video) c.node.pause();
       else if (c.node.getAnimations) c.node.getAnimations().forEach((a) => a.pause());
@@ -3603,7 +3655,7 @@
         }
       }
     }
-    // 자막: 그 줄의 구간(자막 트랙과 같은 시작·끝) 동안 그 줄 전체를 보여준다. 재생 중 줄이 바뀌면 휴대폰 목소리도 그 줄을 읽는다
+    // 자막: 그 줄의 구간(자막 트랙과 같은 시작·끝) 동안 그 줄 전체를 보여준다. 목소리는 자막 줄과 따로 이어 읽는다(spStart/spTick)
     let gi = -1;
     if (t < ctx.secs || !ctx.playing) {
       const tt = Math.max(0, Math.min(t, ctx.secs - 0.001));   // 첫 프레임 시각이 시작 시각보다 살짝 앞설 수 있다
@@ -3613,36 +3665,118 @@
       ctx.shown = gi;
       // 멈춘 화면에서 자막이 비면(끝난 뒤 등) 첫 줄을 보여 둔다 — 잡아서 위치·크기·굵기를 바꿀 수 있게
       pvCapShow(ctx.P.cap, ctx.groups[gi] || (ctx.playing ? null : pvFirstVisible(ctx.groups)), ctx.size, ctx.wt, !ctx.playing);
-      if (ctx.playing && gi >= 0) pvSpeak(ctx, gi);
     }
+    if (ctx.playing && !ctx.full) spTick(Math.min(Math.max(0, t), ctx.secs));
     ctx.t = Math.min(Math.max(0, t), ctx.secs);
     pvPlayhead(ctx);
   }
-  // 음성: 휴대폰 목소리 (실제 영상의 목소리와 다르다). 자막 줄마다 그 줄이 시작될 때 따로 읽는다
-  function pvSpeak(ctx, gi) {
-    const g = ctx.groups[gi];
-    if (!pvVoiceOn || !g || !("speechSynthesis" in window)) return;
-    if (!g.text.replace(/\s+/g, "")) { try { speechSynthesis.cancel(); } catch {} return; }   // 전부 {자막만}인 줄은 무음
+  // ───── 음성: 휴대폰 목소리 (실제 영상의 목소리와 다르다) ─────
+  // 영상처럼 줄을 끊지 않고 이어 읽는다(계약서 11절). 읽는 글자 = 줄의 spoken([ ] 안 포함, { }·쉼 표시 제외).
+  // 쉼(-)이나 { } 전용 줄에서만 말(utterance)을 나누고, 그 쉼 길이만큼 기다렸다가 다음 말을 읽는다.
+  // 너무 긴 말은 브라우저 한계 때문에 문장 끝에서 나눠 차례로 읽는다. 자막은 지금처럼 시각 기준이라 조금 어긋날 수 있다.
+  // items: [{ raw, s0, s1 }] (시간축 초). 카드 미리보기는 그 장면 줄들, 전체 미리보기는 모든 장면 줄을 이어 붙인 것
+  const SP_MAX = 220;
+  const sp = { gen: 0, on: false, chunks: [], i: 0, busy: false, readyAt: 0 };
+  function spSplitLong(t) {
+    if (t.length <= SP_MAX) return [t];
+    const out = [];
+    let cur = "";
+    t.split(/(?<=[.!?。…])\s+/).forEach((sent) => {
+      while (sent.length > SP_MAX) {   // 한 문장이 너무 길면 띄어쓰기에서 자른다
+        let cut = sent.lastIndexOf(" ", SP_MAX);
+        if (cut < SP_MAX / 2) cut = SP_MAX;
+        if (cur) { out.push(cur); cur = ""; }
+        out.push(sent.slice(0, cut).trim());
+        sent = sent.slice(cut).trim();
+      }
+      if (cur && (cur + " " + sent).length > SP_MAX) { out.push(cur); cur = sent; }
+      else cur = cur ? cur + " " + sent : sent;
+    });
+    if (cur) out.push(cur);
+    return out.filter(Boolean);
+  }
+  // 말 목록 [{ text, at, wait }]: at = 시간축에서 이 말이 시작될 시각(줄 시작이 아니면 -1), wait = 앞 말이 끝난 뒤 쉴 초
+  function spBuild(items, k, fromT) {
+    const chunks = [];
+    let cur = "", at = fromT, wait = 0, pend = 0;
+    const flush = () => {
+      const t = cur.replace(/\s+/g, " ").trim();
+      if (t) spSplitLong(t).forEach((piece, j) => chunks.push({ text: piece, at: j ? -1 : at, wait: j ? 0 : wait }));
+      if (t) { pend = 0; }
+      cur = ""; at = -1;
+    };
+    const add = (txt, lineAt) => {
+      txt = capPlainText(txt);
+      if (!txt.replace(/\s+/g, "")) return;
+      if (!cur.trim()) { at = lineAt; wait = pend; }
+      cur += " " + txt;
+    };
+    for (let i = k; i < items.length; i++) {
+      const g = items[i];
+      const lineAt = i === k ? fromT : g.s0;
+      if (genCaptionIsMuteOnly(g.raw)) { flush(); pend += Math.max(0, g.s1 - Math.max(g.s0, lineAt)); continue; }
+      // { }는 빼고 [ ]는 기호만 떼고, 쉼 표시(-)에서 나눈다
+      const spoken = String(g.raw || "").replace(GEN_CAP_MUTE_RE, " ").replace(GEN_CAP_HIDE_RE, "$1");
+      let last = 0, first = true;
+      spoken.replace(GEN_CAP_PAUSE_RE, (m, a, d, off) => {
+        add(spoken.slice(last, off + a.length), first ? lineAt : -1);
+        first = false;
+        flush();
+        pend += d.length * GEN_CAP_PAUSE_SEC;
+        last = off + m.length;
+        return m;
+      });
+      add(spoken.slice(last), first ? lineAt : -1);
+    }
+    flush();
+    return chunks;
+  }
+  function spStop() {
+    sp.gen++;
+    sp.on = false; sp.busy = false; sp.chunks = []; sp.i = 0;
+    try { window.speechSynthesis.cancel(); } catch {}
+  }
+  // fromT초부터 이어 읽기 시작 (그 시각이 들어 있는 줄의 처음부터)
+  function spStart(items, fromT) {
+    spStop();
+    if (!pvVoiceOn || !("speechSynthesis" in window)) return;
+    const k = items.findIndex((g) => fromT < g.s1 - 0.001);
+    if (k < 0) return;
+    sp.chunks = spBuild(items, k, fromT);
+    sp.i = 0; sp.readyAt = 0; sp.on = sp.chunks.length > 0;
+  }
+  // 재생 중 매 화면마다: 앞 말이 끝났고 쉼도 지났고 시간축이 그 말의 줄에 왔으면 다음 말을 읽는다
+  function spTick(t) {
+    if (!sp.on || sp.busy || sp.i >= sp.chunks.length) return;
+    const c = sp.chunks[sp.i];
+    if (performance.now() < sp.readyAt) return;
+    if (c.at >= 0 && t < c.at - 0.05) return;
+    const gen = sp.gen;
     try {
-      const u = new SpeechSynthesisUtterance(g.text);
+      const u = new SpeechSynthesisUtterance(c.text);
       u.lang = "ko-KR";
       const ko = (speechSynthesis.getVoices() || []).find((v) => /^ko/i.test(v.lang));
       if (ko) u.voice = ko;
       u.rate = Math.max(0.5, Math.min(2, 1 + (Number(currentSettings.tts_rate) || 0) / 100));
       u.pitch = Math.max(0.5, Math.min(2, 1 + (Number(currentSettings.tts_pitch) || 0) / 100));
-      u.onstart = () => { if (pvActive === ctx) ctx.speaking = true; };
-      u.onend = u.onerror = () => { ctx.speaking = false; };
-      speechSynthesis.cancel();
+      u.onend = u.onerror = () => {
+        if (gen !== sp.gen) return;   // 멈추거나 옮긴 뒤에 끝난 옛 말
+        sp.busy = false;
+        sp.i++;
+        const n = sp.chunks[sp.i];
+        sp.readyAt = performance.now() + (n ? n.wait * 1000 : 0);
+      };
+      sp.busy = true;
       speechSynthesis.speak(u);
-    } catch {}
+    } catch { sp.on = false; }
   }
   function pvPlay(el) {
     const ctx = pvActivate(el);
     if (!ctx) return;
     if (ctx.t >= ctx.secs - 0.05) ctx.t = 0;
     ctx.playing = true;
-    ctx.speaking = false;
-    ctx.shown = -2;   // 재생을 시작한 그 줄부터 읽게
+    ctx.shown = -2;
+    spStart(ctx.groups, ctx.t);   // 재생을 시작한 그 줄부터 장면 끝까지 이어 읽는다
     ctx.P.play.textContent = "❚❚";
     ctx.P.play.classList.add("on");
     ctx.t0 = performance.now() - ctx.t * 1000;
@@ -3687,15 +3821,15 @@
     $("pvGuideNever").onclick = () => close(true);
     m.classList.add("open");
   }
-  // 그 시점으로 이동 (재생 중이면 거기서 이어서, 목소리는 멈춘다)
+  // 그 시점으로 이동 (재생 중이면 거기서 이어서, 목소리는 끊고 그 줄부터 다시 이어 읽는다)
   function pvSeek(el, t) {
     const ctx = pvActivate(el);
     if (!ctx) return;
     t = Math.max(0, Math.min(ctx.secs, t));
     if (ctx.playing) {
       ctx.t0 = performance.now() - t * 1000;
-      if (ctx.speaking) { try { speechSynthesis.cancel(); } catch {} ctx.speaking = false; }
-      ctx.shown = -2;   // 옮긴 자리의 줄부터 다시 읽는다
+      ctx.shown = -2;
+      spStart(ctx.groups, t);   // 옮긴 자리의 줄부터 다시 읽는다
     }
     pvShow(ctx, t, true);
   }
@@ -3863,7 +3997,7 @@
   // ───── 전체 미리보기: 모든 장면을 순서대로 한 무대에서 이어 재생 ─────
   // 장면 길이 = effectiveSeconds(영상 생성의 weight_seconds와 같은 값). 지금 장면만 카드 엔진(pvBuild/pvShow)으로 무대에 만든다.
   // 시계는 전체 시각 하나(fpv.t0)이고, 장면이 바뀌는 순간 그 장면을 새로 만들어 이어 붙인다.
-  const fpv = { open: false, scenes: [], total: 0, si: -1, ctx: null, playing: false, t: 0, t0: 0, raf: 0 };
+  const fpv = { open: false, scenes: [], items: [], total: 0, si: -1, ctx: null, playing: false, t: 0, t0: 0, raf: 0 };
   function fpvParts() {
     const st = $("fpvStage");
     return {
@@ -3918,9 +4052,10 @@
     const local = T - fpv.scenes[si].s0;
     if (si !== fpv.si || !fpv.ctx) fpvEnter(si, local);
     else {
-      if (fpv.playing) { try { speechSynthesis.cancel(); } catch {} fpv.ctx.shown = -2; }   // 옮긴 자리의 줄부터 다시 읽는다
+      if (fpv.playing) fpv.ctx.shown = -2;
       pvShow(fpv.ctx, local, true);
     }
+    if (fpv.playing) spStart(fpv.items, T);   // 옮긴 자리의 줄부터 다시 이어 읽는다
     fpvUi();
   }
   function fpvTick(now) {
@@ -3938,6 +4073,7 @@
     const si = fpvSceneAt(T);
     if (si !== fpv.si) fpvEnter(si, T - fpv.scenes[si].s0);
     else pvShow(fpv.ctx, T - fpv.scenes[si].s0, false);
+    spTick(T);   // 목소리는 장면 경계에서도 끊지 않고 전체 시간축으로 이어 읽는다
     fpvUi();
     fpv.raf = requestAnimationFrame(fpvTick);
   }
@@ -3950,6 +4086,7 @@
     const local = fpv.t - fpv.scenes[si].s0;
     if (si !== fpv.si || !fpv.ctx) fpvEnter(si, local);
     else { fpv.ctx.playing = true; fpv.ctx.shown = -2; pvShow(fpv.ctx, local, true); }
+    spStart(fpv.items, fpv.t);
     fpvUi();
     cancelAnimationFrame(fpv.raf);
     fpv.raf = requestAnimationFrame(fpvTick);
@@ -3958,6 +4095,7 @@
     fpv.playing = false;
     cancelAnimationFrame(fpv.raf);
     if (fpv.ctx) pvStop(fpv.ctx);
+    spStop();
     fpvUi();
   }
   function fpvToggle() {
@@ -3979,6 +4117,9 @@
       acc += secs;
     });
     fpv.total = acc;
+    // 목소리용: 모든 장면의 자막 줄을 전체 시간축으로 이어 붙인다
+    fpv.items = [];
+    fpv.scenes.forEach((sc) => capGroups(sc.el, sc.seg).forEach((g) => fpv.items.push({ raw: g.raw, s0: sc.s0 + g.s0, s1: sc.s0 + g.s1 })));
     if (!fpv.scenes.length) { showMsg("미리볼 장면이 없어요.", false); return; }
     fpv.open = true;
     fpv.playing = false;
@@ -4004,7 +4145,7 @@
     fpvPause();
     fpv.open = false;
     fpv.ctx = null; fpv.si = -1;
-    try { speechSynthesis.cancel(); } catch {}
+    spStop();
     $("fpvStage").querySelector(".pv-layer").innerHTML = "";   // 영상 요소를 치워 내려받기를 멈춘다
     const m = $("fpv");
     m.classList.remove("open");
@@ -4395,7 +4536,7 @@
     try {
       await flushDirtyCards();
       await flushCapSave();
-      if (capPending()) throw new Error("자막 설정 저장이 끝나지 않았습니다. 잠시 후 다시 눌러주세요.");
+      if (capPending()) throw new Error("자막·분위기 설정 저장이 끝나지 않았습니다. 잠시 후 다시 눌러주세요.");
       if (cardsDirty()) throw new Error("장면 저장이 끝나지 않았습니다. 잠시 후 다시 눌러주세요.");
       // 콘티에서 보이는 것 = 생성되는 영상: 자동 배치가 끝나기 전이거나 빈 장면이 있으면 생성하지 않는다
       if (autofillPending()) throw new Error("Pexels 자동 배치가 아직 진행 중입니다. 끝난 뒤 다시 눌러주세요.");
@@ -4446,6 +4587,43 @@
       showMsg("장면 추가 실패: " + err.message, false);
     }
   });
+
+  // ───── PC: 사진·영상 파일을 장면 카드에 끌어다 놓기 (붙여넣기와 같은 업로드 경로, 맨 뒤에 추가) ─────
+  // 파일을 끄는 경우(dataTransfer.types에 "Files")에만 반응하므로 클립 순서 바꾸기·자막 끌기 같은 포인터 조작과 겹치지 않는다.
+  // 카드 밖에 떨어뜨려도 브라우저가 파일을 열어 버리지 않게 기본 동작은 늘 막는다.
+  const dragHasFiles = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+  const dropCardOf = (e) => (e.target && e.target.closest ? e.target.closest(".seg-item") : null);
+  let fileOverCard = null;
+  function setFileOverCard(el) {
+    if (fileOverCard === el) return;
+    if (fileOverCard) fileOverCard.classList.remove("file-over");
+    fileOverCard = el;
+    if (el) el.classList.add("file-over");
+  }
+  document.addEventListener("dragover", (e) => {
+    if (!dragHasFiles(e)) return;
+    e.preventDefault();
+    const card = dropCardOf(e);
+    e.dataTransfer.dropEffect = card ? "copy" : "none";
+    setFileOverCard(card);
+  });
+  document.addEventListener("dragleave", (e) => {
+    if (!dragHasFiles(e) || !fileOverCard) return;
+    if (!e.relatedTarget || !fileOverCard.contains(e.relatedTarget)) setFileOverCard(null);   // 카드 밖(또는 창 밖)으로 나감
+  });
+  document.addEventListener("drop", (e) => {
+    if (!dragHasFiles(e)) return;
+    e.preventDefault();
+    const card = dropCardOf(e);
+    setFileOverCard(null);
+    if (!card) return;
+    const all = Array.from(e.dataTransfer.files || []);
+    const ok = all.filter((f) => /^(image|video)\//.test(f.type));
+    if (!ok.length) { showMsg("사진·영상 파일만 올릴 수 있어요.", false); return; }
+    if (ok.length < all.length) showMsg(`사진·영상이 아닌 파일 ${all.length - ok.length}개는 빼고 올려요.`, false);
+    uploadSegmentAssets(card.dataset.id, ok);
+  });
+  document.addEventListener("dragend", () => setFileOverCard(null));
 
   document.addEventListener("paste", (e) => {
     const items = e.clipboardData && e.clipboardData.items;
