@@ -207,6 +207,10 @@
   .seg-stage .cap-lines.cap-adj { cursor:grabbing; box-shadow:0 0 0 3px rgba(124,255,74,0.45); }
   .seg-stage .pv-layer { position:absolute; inset:0; overflow:hidden; background:#000; }
   .seg-stage .pv-cut { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+  /* Pexels 참고 영상 표시 (계약서 7절): 영상 칸 왼쪽 위. 1080폭 기준 글자 30px·모서리 24px 안쪽 → 무대(270폭)에선 0.25배.
+     영상 칸은 framed라 top:105px부터. 자막 직접 조작을 막지 않게 pointer-events:none */
+  .seg-stage .pv-ref { display:none; position:absolute; left:6px; top:111px; z-index:1; max-width:calc(100% - 12px); padding:1.5px 3px; border-radius:1.5px; background:rgba(0,0,0,0.55); color:#fff; font-size:7.5px; line-height:1.3; font-weight:500; white-space:nowrap; overflow:hidden; pointer-events:none; }
+  .seg-stage-ro .pv-ref { display:block; position:absolute; left:3px; top:3px; z-index:1; padding:1px 2px; border-radius:1px; background:rgba(0,0,0,0.55); color:#fff; font-size:4px; line-height:1.3; white-space:nowrap; pointer-events:none; }
   .seg-stage .pv-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:14px; text-align:center; color:#a89bb5; font-size:0.95rem; line-height:1.5; background:#17101f; }
   .seg-stage-side { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
   /* 멈춰 있을 때만 화면 가운데 반투명 ▶ (누르는 건 화면 자체가 받는다) */
@@ -531,6 +535,12 @@
   }
   function assetUrl(path) {
     return isExternalUrl(path) ? path : publicUrl(path);
+  }
+  // Pexels 소재 (호스트가 pexels.com으로 끝남, 사진·영상 모두) → 미리보기에 "참고 영상" 표시 (계약서 7절. 주소만 보고 판단)
+  const PV_REF_TEXT = "실제 인물과 관련없는 참고 영상입니다.";
+  function isPexels(path) {
+    if (!path || !isExternalUrl(path)) return false;
+    try { const h = new URL(path).hostname.toLowerCase(); return h === "pexels.com" || h.endsWith(".pexels.com"); } catch { return false; }
   }
 
   // 빈 화면 토큰: asset_paths 안에 일반 소재처럼 들어간다 (영상 생성 때 ffmpeg가 직접 만든다. docs/storyboard-contract.md 1절)
@@ -1113,7 +1123,7 @@
       : isImage(p) ? `<img class="ro-big" src="${escapeAttr(assetUrl(p))}" alt="" draggable="false" style="object-position:${clipFocusPos(seg, p)};">`
       : thumbNow(p) ? `<img class="ro-big" src="${escapeAttr(thumbNow(p))}" alt="" draggable="false">`
       : `<video class="ro-big" src="${escapeAttr(assetUrl(p))}#t=0.1" muted playsinline preload="metadata"></video>`;
-    ro.innerHTML = `${big}<div class="ro-hint">${g.idx + 1}번 클립<br>순서를 바꾸려면 끌어다 놓으세요</div>`;
+    ro.innerHTML = `${big}${isPexels(p) ? `<div class="pv-ref">${PV_REF_TEXT}</div>` : ""}<div class="ro-hint">${g.idx + 1}번 클립<br>순서를 바꾸려면 끌어다 놓으세요</div>`;
     ro.classList.add("on");
   }
   function moveReorder(el, g, x) {
@@ -2506,6 +2516,7 @@
             <div class="seg-stage-box">
               <div class="cap-preview seg-stage" title="눌러서 재생 / 멈춤">
                 <div class="pv-layer"></div>
+                <div class="pv-ref">실제 인물과 관련없는 참고 영상입니다.</div>
                 <div class="cap-t1"></div>
                 <div class="cap-t2"></div>
                 <div class="cap-src"></div>
@@ -3254,7 +3265,7 @@
     return {
       stage: st, media: st.querySelector(".pv-layer"),
       t1: st.querySelector(".cap-t1"), t2: st.querySelector(".cap-t2"), src: st.querySelector(".cap-src"),
-      lines: st.querySelector(".cap-lines"), cap: st.querySelector(".cap-normal"),
+      lines: st.querySelector(".cap-lines"), cap: st.querySelector(".cap-normal"), ref: st.querySelector(".pv-ref"),
       play: el.querySelector(".seg-play"), time: el.querySelector(".seg-pv-time"), info: el.querySelector(".seg-pv-info"),
     };
   }
@@ -3289,6 +3300,10 @@
     cap.style.fontWeight = wt.weight;
     cap.style.color = "#fff";
     cap.style.fontSize = (size * 0.25) + "px";
+  }
+  // 지금 보이는 클립이 Pexels면 영상 칸 왼쪽 위에 참고 표시, 아니면 숨김
+  function pvRefMark(P, p) {
+    if (P.ref) P.ref.style.display = p != null && isPexels(p) ? "block" : "none";
   }
   // 클립 하나의 화면 요소. light=true면 정지 화면용(영상은 썸네일 그림으로 대신)
   function pvCutNode(seg, p, framed, light) {
@@ -3367,6 +3382,7 @@
         }
       }
     }
+    pvRefMark(P, p);
     pvCapShow(P.cap, capGroups(el, seg)[0], size, wt);
     P.play.textContent = "▶";
     P.play.classList.remove("on");
@@ -3393,11 +3409,12 @@
     paths.forEach((p, k) => {
       const node = pvCutNode(seg, p, framed, false);
       P.media.appendChild(node);
-      cuts.push({ node, video: isVideo(p), blank: isBlank(p), mode: pvMode(direction, k), len: plan[k].alloc, t0: acc });
+      cuts.push({ node, video: isVideo(p), blank: isBlank(p), pexels: isPexels(p), mode: pvMode(direction, k), len: plan[k].alloc, t0: acc });
       acc += plan[k].alloc;
       cutEnds.push(acc);
     });
     if (!paths.length) P.media.appendChild(pvEmptyNode(el, seg));
+    P.ref.style.display = "none";   // pvShow가 지금 클립에 맞춰 켠다
     const groups = capGroups(el, seg);
     P.info.innerHTML = pvInfoHtml(seg, plan, secs);
     return { el, id: String(seg.id), P, secs, cuts, cutEnds, groups, size, wt, framed,
@@ -3471,6 +3488,7 @@
           if (i !== ci && c.video) c.node.pause();
         });
         const c = cuts[ci];
+        ctx.P.ref.style.display = c.pexels ? "block" : "none";   // 그 클립이 보이는 동안 내내 (계약서 7절)
         const off = seek ? Math.max(0, tt - c.t0) : 0;
         if (c.video) {
           pvVideoAt(c.node, (Number(c.node.dataset.start) || 0) + off, ctx.playing);
