@@ -55,22 +55,31 @@ function genCaptionEst(line, ttsRate) {
   const rate = 1 + (Number(ttsRate) || 0) / 100;
   return Math.max(0.6, len / 4.3 / (rate > 0 ? rate : 1)) + genCaptionPauseCount(line) * GEN_CAP_PAUSE_SEC;
 }
-// 줄별 길이: 정한 값(asset_trims.__cap_secs[i])이 있으면 그 값(단, 예상 길이보다 짧을 수 없다), 없거나 null이면 예상 길이(est) 그대로 (계약서 9절: +0.3 여유 없음)
+// 읽을 글자가 없는 줄(전부 { } 자막만)인지. 이런 줄만 길이를 직접 정할 수 있다 (계약서 11절)
+function genCaptionIsMuteOnly(line) {
+  return genCaptionSpoken(line).replace(/\*\*/g, "").replace(/\//g, "").replace(/\s+/g, "").length === 0;
+}
+// 그 줄에 쓸 정한 값: { } 전용 줄의 숫자만. 읽는 줄의 옛 저장값(__cap_secs)은 무시한다 (계약서 11절)
+function genCaptionSetValue(line, arr, i) {
+  const v = Number(arr[i]);
+  return arr[i] != null && v > 0 && genCaptionIsMuteOnly(line) ? v : null;
+}
+// 줄별 길이: { } 전용 줄에 정한 값이 있으면 그 값(단, 예상 길이보다 짧을 수 없다), 그 밖에는 예상 길이(est, 쉼 포함) 그대로
 // 콘티 화면(자막 트랙·장면 길이·미리보기)이 이 값을 쓴다
 function genCaptionSecs(lines, capSecs, ttsRate) {
   const arr = Array.isArray(capSecs) ? capSecs : [];
   return lines.map((l, i) => {
     const est = genCaptionEst(l, ttsRate);
-    const v = Number(arr[i]);
-    return arr[i] != null && v > 0 ? Math.max(est, v) : est;
+    const v = genCaptionSetValue(l, arr, i);
+    return v != null ? Math.max(est, v) : est;
   });
 }
-// 생성 요청용 줄별 길이 (계약서 9절): 직접 정한 줄만 숫자(최소 est 보정), 자동 줄은 null — 파이프라인이 자연 길이로 읽는다
+// 생성 요청용 줄별 길이 (계약서 11절): { } 전용 줄에 정한 값만 숫자(최소 est 보정), 읽는 줄은 늘 null — 파이프라인이 자연 길이로 읽는다
 function genCaptionSecsForRequest(lines, capSecs, ttsRate) {
   const arr = Array.isArray(capSecs) ? capSecs : [];
   return lines.map((l, i) => {
-    const v = Number(arr[i]);
-    return arr[i] != null && v > 0 ? Number(Math.max(genCaptionEst(l, ttsRate), v).toFixed(2)) : null;
+    const v = genCaptionSetValue(l, arr, i);
+    return v != null ? Number(Math.max(genCaptionEst(l, ttsRate), v).toFixed(2)) : null;
   });
 }
 
@@ -116,7 +125,7 @@ function genBuildSegments(segRows, videoSettings) {
   return [...segRows].sort((a, b) => a.order_no - b.order_no).map((s) => {
     const trims = s.asset_trims || {};
     const weights = trims.__weights || {};
-    // 자막 줄과 줄별 길이 (계약서 9절). 직접 정한 줄만 숫자, 자동 줄은 null. weight_seconds는 콘티 화면 예상 합계(자동 줄 = est)
+    // 자막 줄과 줄별 길이 (계약서 11절). { } 전용 줄에 정한 값만 숫자, 읽는 줄은 null. weight_seconds는 콘티 화면 예상 합계(그 밖의 줄 = est)
     const capLines = lineMode ? genCaptionLines(s.script_text) : [];
     const capSecs = genCaptionSecsForRequest(capLines, trims.__cap_secs, vs.tts_rate);
     const capSum = Number(genCaptionSecs(capLines, trims.__cap_secs, vs.tts_rate).reduce((a, b) => a + b, 0).toFixed(2));
