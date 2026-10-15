@@ -17,7 +17,7 @@ export async function onRequestPost(context) {
   if (!pat) return json({ error: "GITHUB_PAT 환경변수가 설정되지 않았습니다" }, 500);
 
   try {
-    const { outputId, videoUrl, title, description, tags, channelSlot } = await request.json();
+    const { outputId, videoUrl, title, description, tags, channelSlot, reupload } = await request.json();
     const slot = String(channelSlot || "1");
     const channel = isValidSlot(slot) && (await loadChannels()).find((c) => c.slot === slot);
     if (!channel) return json({ error: "올릴 채널 번호가 올바르지 않습니다" }, 400);
@@ -39,12 +39,15 @@ export async function onRequestPost(context) {
       "Content-Type": "application/json",
     };
 
-    // 이미 올라갔거나 올리는 중이면 중복 업로드 방지
+    // 올리는 중이면 중복 업로드 방지. 이미 올라간 영상은 "다시 업로드"(reupload: true)를 명시했을 때만 새 영상으로 한 번 더 올린다.
     const cur = await fetch(`${SUPABASE_URL}/rest/v1/youtube_outputs?select=youtube_status&id=eq.${encodeURIComponent(outputId)}`, { headers: supaHeaders });
     const rows = await cur.json();
     if (!cur.ok || !rows.length) return json({ error: "해당 영상을 찾을 수 없습니다" }, 404);
-    if (rows[0].youtube_status === "uploading" || rows[0].youtube_status === "done") {
-      return json({ error: "이미 업로드 중이거나 업로드된 영상입니다" }, 409);
+    if (rows[0].youtube_status === "uploading") {
+      return json({ error: "이미 업로드 중인 영상입니다" }, 409);
+    }
+    if (rows[0].youtube_status === "done" && reupload !== true) {
+      return json({ error: "이미 업로드된 영상입니다 (다시 올리려면 \"다시 업로드\"를 쓰세요)" }, 409);
     }
 
     const ghRes = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`, {

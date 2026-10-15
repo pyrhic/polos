@@ -78,37 +78,84 @@ function ytTitleFor(row, o) {
   return (t || videoName(row)).slice(0, 100);
 }
 
+// 지난번 업로드 때 쓴 제목·설명·태그·채널 (콘티 video_settings.youtube_last[버전]). 없으면 null.
+// youtube_outputs 표에는 JSON 칸이 없어서, 콘티(youtube_scripts)의 video_settings에 버전별로 둔다.
+function ytLastFor(row, o) {
+  const v = ((row.video_settings || {}).youtube_last || {})[o.version];
+  return v && typeof v === "object" ? v : null;
+}
+// 이 버전의 예전 업로드 기록 (다시 올리기 전에 남겨 둔 영상 id). 지금 링크와 같은 id는 뺀다.
+function ytHistoryFor(row, o) {
+  const h = (row.video_settings || {}).youtube_history;
+  return (Array.isArray(h) ? h : []).filter((x) => x && String(x.version) === String(o.version) && x.video_id && x.video_id !== o.youtube_video_id);
+}
+
+function ytHistoryHtml(row, o) {
+  const h = ytHistoryFor(row, o);
+  if (!h.length) return "";
+  return `<details class="yt-history" style="margin-top:4px;"><summary style="color:var(--muted);font-size:0.75rem;cursor:pointer;">이전 업로드 ${h.length}개</summary>
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;line-height:1.7;">
+      ${h.map((x) => `<div><a class="accent" href="https://youtu.be/${escapeHtml(x.video_id)}" target="_blank" rel="noopener">youtu.be/${escapeHtml(x.video_id)} ↗</a>${x.uploaded_at ? ` · ${escapeHtml(String(x.uploaded_at).slice(0, 10))}` : ""}</div>`).join("")}
+      <div>필요 없으면 유튜브 스튜디오에서 직접 지우세요.</div>
+    </div>
+  </details>`;
+}
+
 function uploadBlockHtml(o, row) {
-  if (o.youtube_status === "done" && o.youtube_video_id) {
-    return `<div class="yt-block" style="margin-top:8px;font-size:0.85rem;">
-      <a class="accent" href="https://youtu.be/${escapeHtml(o.youtube_video_id)}" target="_blank" rel="noopener">유튜브에서 보기 ↗ (비공개로 업로드됨)</a>
-    </div>`;
-  }
   if (o.youtube_status === "uploading") {
     return `<div class="yt-block" style="margin-top:8px;font-size:0.85rem;color:var(--accent);">유튜브 업로드 중... (몇 분 걸릴 수 있어요)</div>`;
   }
+  const done = o.youtube_status === "done" && o.youtube_video_id;
+  const last = ytLastFor(row, o) || {};
+  const slot = last.channel_slot != null && ytChannels().some((c) => c.slot === String(last.channel_slot)) ? String(last.channel_slot) : ytDefaultSlot(row);
+  const doneNote = done
+    ? `<div style="font-size:0.85rem;"><span style="font-weight:700;">업로드 완료</span> · <a class="accent" href="https://youtu.be/${escapeHtml(o.youtube_video_id)}" target="_blank" rel="noopener">유튜브에서 보기 ↗ (비공개로 업로드됨)</a></div>` : "";
   const errorNote = o.youtube_status === "error"
     ? `<div class="msg err" style="display:block;font-size:0.8rem;">업로드 실패: ${escapeHtml(o.youtube_error || "알 수 없는 오류")}</div>${ytReauthHelpHtml()}` : "";
-  return `<div class="yt-block" data-output-id="${o.id}" data-video-url="${escapeHtml(o.video_url)}" style="margin-top:8px;">
+  // 이미 유튜브에 올라간 영상 id가 있으면(완료, 또는 재업로드가 실패해 옛 id가 남은 경우) "다시 업로드"는 새 영상을 하나 더 올리는 것
+  const reupload = !!o.youtube_video_id;
+  return `<div class="yt-block" data-output-id="${o.id}" data-video-url="${escapeHtml(o.video_url)}" data-script-id="${escapeHtml(row.id)}" data-version="${escapeHtml(o.version)}" data-video-id="${escapeHtml(o.youtube_video_id || "")}" data-reupload="${reupload ? "1" : ""}" style="margin-top:8px;">
+    ${doneNote}
     ${errorNote}
-    <button type="button" class="yt-open-btn" style="">${o.youtube_status === "error" ? "다시 업로드" : "유튜브에 업로드"}</button>
+    ${ytHistoryHtml(row, o)}
+    <button type="button" class="yt-open-btn" style="${done ? "margin-top:6px;" : ""}">${o.youtube_status === "error" || done ? "다시 업로드" : "유튜브에 업로드"}</button>
     <div class="yt-form" style="display:none;margin-top:8px;">
       <label>올릴 채널</label>
-      <select class="yt-channel">${ytChannels().map((c) => `<option value="${escapeHtml(c.slot)}"${c.slot === ytDefaultSlot(row) ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")}</select>
+      <select class="yt-channel">${ytChannels().map((c) => `<option value="${escapeHtml(c.slot)}"${c.slot === slot ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")}</select>
       <label>제목 (100자 이내)</label>
-      <input type="text" class="yt-title" maxlength="100" value="${escapeHtml(ytTitleFor(row, o))}">
+      <input type="text" class="yt-title" maxlength="100" value="${escapeHtml(last.title != null ? String(last.title).slice(0, 100) : ytTitleFor(row, o))}">
       <label>설명</label>
-      <textarea class="yt-desc" style="min-height:140px;">${escapeHtml(ytDefaultDescription(row))}</textarea>
+      <textarea class="yt-desc" style="min-height:140px;">${escapeHtml(last.description != null ? last.description : ytDefaultDescription(row))}</textarea>
       <label>태그 (콤마로 구분, 선택)</label>
-      <input type="text" class="yt-tags" placeholder="예: 미스터리, 이슈">
-      <div style="color:var(--muted);font-size:0.75rem;margin:6px 0;">비공개로 올라갑니다. 공개 전환은 유튜브 스튜디오에서 직접 하세요.</div>
+      <input type="text" class="yt-tags" placeholder="예: 미스터리, 이슈" value="${escapeHtml(last.tags || "")}">
+      <div style="color:var(--muted);font-size:0.75rem;margin:6px 0;">비공개로 올라갑니다. 공개 전환은 유튜브 스튜디오에서 직접 하세요.${reupload ? " 다시 올리면 새 영상이 하나 더 생기고, 이 버전의 링크는 새 영상으로 바뀝니다." : ""}</div>
       ${o.youtube_status === "error" ? "" : `<details style="margin:6px 0;"><summary style="color:var(--muted);font-size:0.78rem;cursor:pointer;">업로드가 실패하거나 유튜브 인증이 만료됐나요?</summary>${ytReauthHelpHtml()}</details>`}
       <div style="display:flex;gap:8px;">
-        <button type="button" class="yt-start-btn" style="flex:2;">업로드 시작</button>
+        <button type="button" class="yt-start-btn" style="flex:2;">${reupload ? "다시 업로드 시작" : "업로드 시작"}</button>
         <button type="button" class="yt-cancel-btn" style="flex:1;">취소</button>
       </div>
     </div>
   </div>`;
+}
+
+// 콘티 video_settings에 이번 업로드 입력값(youtube_last[버전])을 남기고, 다시 올리는 경우 지금 영상 id를 youtube_history에 보존한다.
+// video_settings는 통째로 바뀌는 JSON 칸이라, 방금 읽은 최신 값에 이 두 키만 얹어서 PATCH한다.
+async function ytSaveUploadMeta(scriptId, version, last, prevVideoId) {
+  const cfg = globalThis.POLOS_CONFIG || {};
+  const headers = { apikey: cfg.SUPABASE_ANON_KEY, Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`, "Content-Type": "application/json" };
+  const url = `${cfg.SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${encodeURIComponent(scriptId)}`;
+  const res = await fetch(`${url}&select=video_settings`, { headers });
+  const rows = await res.json();
+  if (!res.ok || !rows.length) throw new Error("콘티 정보를 읽지 못했습니다");
+  const vs = rows[0].video_settings || {};
+  const prevLast = (vs.youtube_last || {})[version] || {};
+  const history = Array.isArray(vs.youtube_history) ? vs.youtube_history.slice() : [];
+  if (prevVideoId && !history.some((x) => x && x.video_id === prevVideoId)) {
+    history.push({ version: Number(version), video_id: prevVideoId, uploaded_at: prevLast.uploaded_at || null, replaced_at: new Date().toISOString() });
+  }
+  const next = { ...vs, youtube_last: { ...(vs.youtube_last || {}), [version]: { ...last, uploaded_at: new Date().toISOString() } }, youtube_history: history };
+  const pres = await fetch(url, { method: "PATCH", headers, body: JSON.stringify({ video_settings: next }) });
+  if (!pres.ok) throw new Error("업로드 기록을 저장하지 못했습니다");
 }
 
 function bindUploadBlocks(reload) {
@@ -136,11 +183,24 @@ function bindUploadBlocks(reload) {
       if (!title) { alert("제목을 입력하세요."); return; }
       const chSel = block.querySelector(".yt-channel");
       const chLabel = chSel.options[chSel.selectedIndex].textContent;
-      if (!confirm(`이 영상을 "${chLabel}" 채널에 (비공개로) 업로드할까요?`)) return;
+      const reupload = block.dataset.reupload === "1";
+      const ask = reupload
+        ? `유튜브는 이미 올린 영상 파일을 바꿀 수 없어서, 새 영상으로 하나 더 올라가요(비공개). 이전 영상은 유튜브 스튜디오에서 직접 지우세요. 계속할까요?\n\n(올릴 채널: ${chLabel})`
+        : `이 영상을 "${chLabel}" 채널에 (비공개로) 업로드할까요?`;
+      if (!confirm(ask)) return;
       try { localStorage.setItem("ytSlot", chSel.value); } catch {}
+      const label = e.target.textContent;
       e.target.disabled = true;
       e.target.textContent = "요청 중...";
       try {
+        // 다시 올리면 이 버전의 링크가 새 영상으로 바뀌므로, 지금 영상 id를 먼저 기록해 둔다 (기록 못 하면 다시 올리지 않는다)
+        try {
+          await ytSaveUploadMeta(block.dataset.scriptId, block.dataset.version,
+            { title, description: block.querySelector(".yt-desc").value, tags: block.querySelector(".yt-tags").value, channel_slot: chSel.value },
+            reupload ? block.dataset.videoId : "");
+        } catch (err) {
+          if (reupload) throw err;   // 처음 올릴 때는 입력값 기록이 실패해도 업로드는 진행
+        }
         const res = await fetch("/api/trigger-upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -151,6 +211,7 @@ function bindUploadBlocks(reload) {
             description: block.querySelector(".yt-desc").value,
             tags: block.querySelector(".yt-tags").value,
             channelSlot: block.querySelector(".yt-channel").value,
+            reupload,
           }),
         });
         const data = await res.json();
@@ -159,7 +220,7 @@ function bindUploadBlocks(reload) {
       } catch (err) {
         alert("업로드 실패: " + err.message);
         e.target.disabled = false;
-        e.target.textContent = "업로드 시작";
+        e.target.textContent = label;
       }
     });
   });
