@@ -306,7 +306,7 @@
         category: { person: "위키 인물", event: "위키 사건", thing: "위키 지식" }[ideasData.kind] || "위키 인물", hook: texts[0], story: texts.slice(1).join("\n"), closing: "",
         fact_sources: sourceLines.join("\n"), status: "approved",
         slug: `${new Date().toISOString().slice(0, 10)}_wiki-${slugOf(ideasData.person.name_ko)}-${Date.now() % 10000}`,
-        video_settings: { ...(userDefaults || {}), name: (d.name || idea.title).slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과" },
+        video_settings: { ...(userDefaults || {}), name: (d.name || idea.title).slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과", ...(d.mood ? { mood: d.mood } : {}) },
       }),
     });
     if (!sRes.ok) throw new Error(await sRes.text());

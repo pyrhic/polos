@@ -15,6 +15,9 @@ const KIND_RULE = {
   thing: "- 처음 듣는 사람도 이해하도록 쉬운 말로 풀되, 용어는 한 번에 하나씩 소개한다. 비유는 사실을 바꾸지 않는 선에서만 쓰고, 문서에 없는 원리·수치를 덧붙이지 않는다.",
 };
 const SUBSCRIBE_TEXT = "내 알고리즘 밖의 이야기가 궁금하다면 구독 좋아요 해주시면 나도 좋아요";
+// 영상 분위기(색감 필터) id — storyboard.html의 MOODS, youtube-automation 04_assemble.py의 MOOD_FILTERS와 같은 목록
+const MOOD_IDS = ["neutral", "mystery", "bright", "calm"];
+const normalizeMood = (m) => { const v = String(m || "").trim().toLowerCase(); return MOOD_IDS.includes(v) ? v : "neutral"; };
 const DIRECTIONS = ["천천히 줌인", "줌아웃", "좌에서 우로 패닝", "우에서 좌로 패닝", "틸트업", "틸트다운"];
 
 export async function onRequestPost(context) {
@@ -61,7 +64,8 @@ ${KIND_RULE[kind]}
 - keyword: Pexels 검색용 영어 단어 2~4개 (사진이 없을 때 쓰는 분위기 영상 검색어). 실존 인물 이름·한국어 고유명사는 쓰지 말고 분위기/사물/장소를 묘사. 카드마다 다르게.
 - direction: 카메라 연출 하나, 반드시 다음 중에서: ${DIRECTIONS.map((d) => `"${d}"`).join(", ")} (같은 연출이 연속되지 않게)
 - image: 이 카드에 어울리는 사진 번호(위 목록). 적당한 사진이 없으면 -1. 같은 사진을 너무 반복해서 쓰지 말고, 첫 카드에는 인물 대표 사진이 있으면 쓴다.
-- name: 콘티 이름 (인물과 주제, 20자 이내). title1: ${KIND_NAME[kind]} 이름(또는 핵심 키워드) 공백 포함 12자 이내, title2: 이 이야기를 한 줄로 14자 이내. 둘 다 낚시·과장·물음표·느낌표 없이.`;
+- name: 콘티 이름 (인물과 주제, 20자 이내). title1: ${KIND_NAME[kind]} 이름(또는 핵심 키워드) 공백 포함 12자 이내, title2: 이 이야기를 한 줄로 14자 이내. 둘 다 낚시·과장·물음표·느낌표 없이.
+- mood: 문서 내용의 분위기를 판단해 영상 색감 분위기를 다음 id 중 하나로 고른다: "neutral"(기본), "mystery"(어둡고 긴장감 있는 미스터리 — 미제 사건·의문의 죽음·괴담·수수께끼 등), "bright"(밝고 경쾌 — 유쾌한 일화·발명·성공담 등), "calm"(차분하고 담담한 다큐 — 생애·역사·참사·과학 지식 등). 판단이 어렵거나 애매하면 "neutral".`;
 
     const requestBody = {
       contents: [{ parts: [{ text: prompt }] }],
@@ -82,8 +86,9 @@ ${KIND_RULE[kind]}
                 required: ["section", "script_text", "keyword", "direction", "image"],
               },
             },
+            mood: { type: "STRING", enum: MOOD_IDS },
           },
-          required: ["name", "title1", "title2", "cards"],
+          required: ["name", "title1", "title2", "cards", "mood"],
         },
       },
     };
@@ -114,6 +119,7 @@ ${KIND_RULE[kind]}
     if (second) sources.push({ title: `위키백과 「${second.title}」 (${second.lang})`, url: second.url });
     return json({
       name: clean20(parsed.name), title1: clean20(parsed.title1), title2: clean20(parsed.title2),
+      mood: normalizeMood(parsed.mood),   // 영상 분위기(색감 필터): 4개 외 값이거나 없으면 neutral
       segments, images, sources, credits: images.map(creditLine),
       targetChars, totalChars: segments.reduce((n, s) => n + s.script_text.replace(/\s+/g, "").length, 0),
     }, 200);

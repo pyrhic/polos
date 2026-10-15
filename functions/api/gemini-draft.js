@@ -24,6 +24,10 @@ const researchUsable = (text) => !!text && text.trim().length > 0;
 // 트렌드 화면의 나라 선택 목록과 같은 코드(KR이면 국내). 모르는 코드는 국내처럼 처리한다
 const COUNTRY_NAMES = { US: "미국", JP: "일본", GB: "영국", DE: "독일", FR: "프랑스", IN: "인도", BR: "브라질", AU: "호주", CA: "캐나다", TW: "대만" };
 
+// 영상 분위기(색감 필터) id — storyboard.html의 MOODS, youtube-automation 04_assemble.py의 MOOD_FILTERS와 같은 목록
+const MOOD_IDS = ["neutral", "mystery", "bright", "calm"];
+const normalizeMood = (m) => { const v = String(m || "").trim().toLowerCase(); return MOOD_IDS.includes(v) ? v : "neutral"; };
+
 const SUBSCRIBE_TEXT = "내 알고리즘 밖의 이야기가 궁금하다면 구독 좋아요 해주시면 나도 좋아요";
 
 function buildPrompt(topic, articles, researchText, note, traffic, country) {
@@ -71,7 +75,8 @@ ${summaryRule}
 - keyword: Pexels 스톡 영상 검색용 영어 단어 2~4개. 실존 인물 이름이나 한국어 고유명사는 쓰지 말고 카드 내용의 분위기/사물/상황을 묘사. 카드마다 다르게
 - direction: 카메라 연출 한 가지, 반드시 다음 중에서: "천천히 줌인", "줌아웃", "좌에서 우로 패닝", "우에서 좌로 패닝", "틸트업", "틸트다운" (같은 연출이 연속되지 않게)
 - name: 이 콘티의 이름, 주제를 20자 이내로 요약
-- title1, title2: "제목 + 영상 + 출처" 화면 구성에서 영상 위에 크게 나오는 제목 두 줄이다. title1은 노란 글씨로, 이슈의 핵심 키워드나 사건을 공백 포함 12자 이내로(예: "대법원장 격려금 논란"). title2는 흰 글씨로, title1을 보충해 무엇이 쟁점인지 공백 포함 14자 이내로. 둘 다 기사에 있는 사실만 쓰고, 낚시·과장·평가·조롱 표현과 물음표·느낌표는 쓰지 않는다`;
+- title1, title2: "제목 + 영상 + 출처" 화면 구성에서 영상 위에 크게 나오는 제목 두 줄이다. title1은 노란 글씨로, 이슈의 핵심 키워드나 사건을 공백 포함 12자 이내로(예: "대법원장 격려금 논란"). title2는 흰 글씨로, title1을 보충해 무엇이 쟁점인지 공백 포함 14자 이내로. 둘 다 기사에 있는 사실만 쓰고, 낚시·과장·평가·조롱 표현과 물음표·느낌표는 쓰지 않는다
+- mood: 기사 내용의 분위기를 판단해 영상 색감 분위기를 다음 id 중 하나로 고른다: "neutral"(기본·일반 소식), "mystery"(어둡고 긴장감 있는 미스터리 — 미제 사건·의문사·수사 중인 사건 등), "bright"(밝고 경쾌 — 축제·수상·스포츠 승리·좋은 소식 등), "calm"(차분하고 담담한 다큐 — 사고·재난·추모·역사·사회 문제 등). 판단이 어렵거나 애매하면 "neutral"`;
 }
 
 export async function onRequestPost(context) {
@@ -114,8 +119,9 @@ export async function onRequestPost(context) {
             issue: { type: "ARRAY", minItems: 3, maxItems: 5, items: CARD_SCHEMA },
             perspectives: { type: "ARRAY", maxItems: 2, items: CARD_SCHEMA },
             closing: { type: "ARRAY", minItems: 1, maxItems: 1, items: CARD_SCHEMA },
+            mood: { type: "STRING", enum: MOOD_IDS },
           },
-          required: ["name", "trend_summary", "issue", "perspectives", "closing"],
+          required: ["name", "trend_summary", "issue", "perspectives", "closing", "mood"],
         },
       },
     };
@@ -146,6 +152,8 @@ export async function onRequestPost(context) {
     // 화면 제목 두 줄 (입력칸 글자 수 제한 안으로)
     parsed.title1 = String(parsed.title1 || "").replace(/[?!？！]/g, "").trim().slice(0, 20);
     parsed.title2 = String(parsed.title2 || "").replace(/[?!？！]/g, "").trim().slice(0, 20);
+    // 영상 분위기(색감 필터): 정해진 4개 외 값이거나 없으면 기본(neutral)
+    parsed.mood = normalizeMood(parsed.mood);
     delete parsed.trend_summary; delete parsed.issue; delete parsed.perspectives; delete parsed.closing;
 
     parsed.country = country || null;
