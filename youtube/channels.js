@@ -348,21 +348,54 @@
   }
 
   // 복제한 카드끼리는 같은 사진 파일을 함께 쓰므로, 다른 카드가 안 쓰는 사진만 스토리지에서 지운다
-  async function removeUnusedFiles(paths, exceptId) {
+  // keep: 이미 만든 콘티가 쓰고 있어서 남겨야 하는 경로
+  async function removeUnusedFiles(paths, exceptId, keep = new Set()) {
     const used = new Set(cards.filter((c) => String(c.id) !== String(exceptId)).flatMap((c) => c.image_paths));
     for (const p of paths) {
-      if (used.has(p) || /^https?:/.test(p)) continue;
+      if (used.has(p) || keep.has(p) || /^https?:/.test(p)) continue;
       await fetch(`${SB}/storage/v1/object/${BUCKET}/${p}`, { method: "DELETE", headers }).catch(() => {});
     }
+  }
+
+  // 이미 만든 콘티가 이 사진들을 쓰는지 센다. asset_paths는 jsonb 배열이라 cs.["경로"]로 포함 여부를 묻는다.
+  // 반환: { usedPaths: Set(쓰이는 경로), sceneIds: Set, scriptIds: Set }. 요청이 실패하면 throw.
+  async function findSceneUsage(paths) {
+    const usedPaths = new Set(), sceneIds = new Set(), scriptIds = new Set();
+    const targets = paths.filter((p) => p && !/^https?:/.test(p));
+    const results = await Promise.all(targets.map((p) =>
+      rest(`youtube_segments?select=id,script_id&asset_paths=cs.${encodeURIComponent(JSON.stringify([p]))}`, { headers })));
+    results.forEach((rows, i) => {
+      if (!Array.isArray(rows) || !rows.length) return;
+      usedPaths.add(targets[i]);
+      for (const r of rows) { sceneIds.add(String(r.id)); scriptIds.add(String(r.script_id)); }
+    });
+    return { usedPaths, sceneIds, scriptIds };
   }
 
   async function deleteCard(id) {
     const k = cards.find((c) => String(c.id) === String(id));
     if (k.is_default) { alert("기본 카드는 지울 수 없어요. 다른 카드를 먼저 \"기본으로\" 지정하세요."); return; }
-    if (!confirm(`"${k.name}" 카드를 삭제할까요?`)) return;
+    // 이 카드로 만든 콘티(video_settings.subscribe_card_id)와 이 카드 사진을 쓰는 장면을 센다
+    let usage = null;
+    try {
+      const [scripts, scenes] = await Promise.all([
+        rest(`youtube_scripts?select=id&video_settings->>subscribe_card_id=eq.${encodeURIComponent(k.id)}`, { headers }),
+        findSceneUsage(k.image_paths),
+      ]);
+      const scriptIds = new Set([...(scripts || []).map((r) => String(r.id)), ...scenes.scriptIds]);
+      usage = { scriptCount: scriptIds.size, usedPaths: scenes.usedPaths };
+    } catch (err) {
+      usage = null;
+    }
+    if (!usage) {
+      if (!confirm("사용 중인지 확인하지 못했어요. 그래도 지울까요?")) return;
+    } else if (usage.scriptCount > 0) {
+      if (!confirm(`이 카드로 만든 콘티가 ${usage.scriptCount}개 있어요. 카드를 지워도 이미 만든 콘티의 구독 장면은 그대로 남아요(사진 파일도 남겨요). 지울까요?`)) return;
+    } else if (!confirm(`"${k.name}" 카드를 삭제할까요?`)) return;
     await rest(`youtube_subscribe_cards?id=eq.${k.id}`, { method: "DELETE", headers });
     cards = cards.filter((c) => c !== k);
-    await removeUnusedFiles(k.image_paths, k.id);
+    // 확인 실패 시엔 어떤 사진이 쓰이는지 모르니 스토리지 파일은 하나도 지우지 않는다
+    if (usage) await removeUnusedFiles(k.image_paths, k.id, usage.usedPaths);
     if (String(openId) === String(id)) { openId = null; draft = null; }
     render();
     showMsg("카드를 삭제했습니다.", true);
@@ -422,10 +455,18 @@
     const k = cards.find((c) => String(c.id) === String(openId));
     const paths = [...k.image_paths];
     if (act === "ph-del") {
-      if (!confirm(`${i + 1}번 사진을 삭제할까요?`)) return;
+      const target = paths[i];
+      let usage = null;
+      try { usage = await findSceneUsage([target]); } catch (err) { usage = null; }
+      if (!usage) {
+        if (!confirm("사용 중인지 확인하지 못했어요. 그래도 지울까요?")) return;
+      } else if (usage.scriptIds.size > 0) {
+        if (!confirm(`이 사진을 쓰는 콘티가 ${usage.scriptIds.size}개 있어요. 지우면 이 카드에서만 빠지고, 이미 만든 콘티의 사진은 그대로 남아요. 다음에 만드는 콘티부터 이 사진이 안 쓰여요. 지울까요?`)) return;
+      } else if (!confirm(`${i + 1}번 사진을 삭제할까요?`)) return;
       const [gone] = paths.splice(i, 1);
       await saveImages(k, paths);
-      await removeUnusedFiles([gone], null);
+      // 콘티가 쓰는 사진(또는 확인 실패)이면 카드 목록에서만 빼고 스토리지 파일은 남긴다(콘티 사진이 깨지지 않게)
+      if (usage && !usage.usedPaths.has(gone)) await removeUnusedFiles([gone], null);
     } else {
       const j = act === "ph-left" ? i - 1 : i + 1;
       if (j < 0 || j >= paths.length) return;
