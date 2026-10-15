@@ -240,6 +240,9 @@
   .seg-cap-reset { width:auto; margin:0; padding:2px 8px; font-size:0.65rem; background:#0f0a14; color:#ffd93d; text-transform:none; letter-spacing:0; flex-shrink:0; }
   .seg-cap-spacer { flex:0 0 36px; }
   .seg-cap-track { position:relative; height:36px; margin:0 8px; background:#0f0a14; border-radius:4px; }
+  .seg-cap-edit { display:none; margin:6px 0 4px; }
+  .seg-cap-edit.open { display:block; }
+  .seg-cap-edit .seg-script { margin:0; }
   .seg-cap-blk { position:absolute; top:0; bottom:0; box-sizing:border-box; background:#5c4a12; border:1px solid #ffd93d; border-radius:4px; color:#fff3c4; touch-action:pan-y; cursor:pointer; }
   .seg-cap-blk.set { background:#7a5f0c; }
   .seg-cap-blk.on { background:#a07c10; }
@@ -1347,7 +1350,31 @@
       const st = capStateOf(el, seg);
       const i = Number(b.dataset.i);
       if (st.starts[i] != null) pvSeek(el, st.starts[i] + 0.02);   // 미리보기가 그 줄 시작으로
+      capEditToggle(el, i);
     });
+  }
+
+  // 자막 블록을 누르면 아래로 자막 입력칸이 펼쳐지고 그 줄이 선택된다. 펼친 채 같은 줄을 다시 누르면 접힌다.
+  function capEditToggle(el, i) {
+    const box = el.querySelector(".seg-cap-edit");
+    const ta = el.querySelector(".seg-script");
+    if (!box || !ta) return;
+    if (box.classList.contains("open") && box.dataset.line === String(i)) {
+      box.classList.remove("open");
+      delete box.dataset.line;
+      ta.blur();
+      return;
+    }
+    box.classList.add("open");
+    box.dataset.line = String(i);
+    autoGrow(ta);
+    // i번째 자막 줄(빈 줄 제외)의 위치를 찾아 그 줄을 선택한다
+    let pos = 0, n = -1;
+    for (const line of ta.value.split("\n")) {
+      if (line.trim() && ++n === i) { ta.focus({ preventScroll: true }); ta.setSelectionRange(pos, pos + line.length); break; }
+      pos += line.length + 1;
+    }
+    box.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   // 장면이 길어서 사진 하나가 오래 머물면 지루하다. 콘티를 열 때 모자란 컷을 키워드로 Pexels 영상으로 자동 배치하지만
@@ -2272,6 +2299,9 @@
           </div>
           <div class="seg-tl-area"></div>
           <div class="seg-cap-area"></div>
+          <div class="seg-cap-edit${normalizeScript(seg.script_text).trim() ? "" : " open"}">
+            <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
+          </div>
           <div class="seg-add-menu">
             <button type="button" class="seg-add-file">📁 내 사진/영상 (여러 개)</button>
             <button type="button" class="seg-add-pexels">🔎 Pexels에서 찾기</button>
@@ -2283,8 +2313,6 @@
           <div class="seg-pexels-preview"></div>
         </div>
         <div class="seg-media-hint" style="display:none;color:#ffd93d;font-size:0.78rem;margin:2px 0 8px;"></div>
-        <div style="margin:14px 0 6px;color:#a89bb5;font-size:0.9rem;font-weight:600;">자막</div>
-        <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
         <label>ACTION <span style="font-weight:400;font-size:0.75rem;text-transform:none;letter-spacing:0;">— 사진의 카메라 연출 (줌인 · 줌아웃 · 패닝 · 틸트업)</span></label>
         <textarea class="seg-direction" placeholder="예: 천천히 줌인">${escapeHtml(seg.direction)}</textarea>
         <input type="hidden" class="seg-section" value="${escapeAttr(seg.section)}">
