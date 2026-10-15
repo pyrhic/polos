@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Channels — wizard-yt</title>
+<link rel="stylesheet" href="/youtube/style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@300;500&display=swap">
+<style>
+  /* 채널 카드 */
+  .ch-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .ch-slot { flex:0 0 auto; background:var(--inset); color:var(--muted); font-size:0.72rem; font-weight:800; padding:4px 8px; border-radius:10px; white-space:nowrap; }
+  .ch-label { flex:1; min-width:0; font-weight:800; font-size:1.05rem; padding:8px 10px; }
+  .ch-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
+  .ch-row > .k { color:var(--muted); font-size:0.82rem; font-weight:600; flex:0 0 auto; }
+  .ch-row > .v { flex:1; min-width:0; display:flex; justify-content:flex-end; align-items:center; gap:8px; }
+  .ch-row select { width:auto; max-width:100%; padding:6px 8px; font-size:0.85rem; }
+  .ch-saved { color:var(--accent); font-size:0.72rem; min-height:1em; }
+  .ch-saved.err { color:var(--danger); }
+  /* 켬/끔 스위치 */
+  .sw { position:relative; display:inline-flex; align-items:center; gap:8px; margin:0; cursor:pointer; color:var(--text-2); font-size:0.82rem; font-weight:600; }
+  .sw input { position:absolute; opacity:0; width:1px; height:1px; }
+  .sw i { position:relative; width:40px; height:22px; border-radius:11px; background:var(--line-strong); transition:background .15s; flex:0 0 auto; }
+  .sw i::after { content:""; position:absolute; left:3px; top:3px; width:16px; height:16px; border-radius:50%; background:var(--text-2); transition:left .15s, background .15s; }
+  .sw input:checked + i { background:var(--accent-strong); }
+  .sw input:checked + i::after { left:21px; background:#fff; }
+  .sw input:focus-visible + i { outline:2px solid var(--accent); outline-offset:2px; }
+  .ch-note { color:var(--muted); font-size:0.72rem; line-height:1.45; }
+  .conn { display:flex; flex-direction:column; gap:6px; padding:8px 0; border-top:1px solid var(--line); }
+  .conn-top { display:flex; align-items:center; gap:8px; }
+  .conn-top .k { color:var(--muted); font-size:0.82rem; font-weight:600; flex:1; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:800; white-space:nowrap; }
+  .tag-none { background:var(--line); color:var(--text-2); }
+  .tag-ok, .tag-checking { background:var(--accent-dim); color:var(--accent); }
+  .tag-error { background:var(--danger-bg); color:var(--danger); }
+  .conn-msg { color:var(--muted); font-size:0.75rem; line-height:1.45; word-break:break-all; }
+  .btn-sm { width:auto; padding:7px 12px; font-size:0.75rem; margin:0; flex:0 0 auto; }
+  /* 구독 카드 목록 */
+  .sc-title { display:flex; align-items:center; justify-content:space-between; margin:12px 0 6px; padding-top:10px; border-top:1px solid var(--line); }
+  .sc-title .k { color:var(--text-2); font-size:0.85rem; font-weight:800; }
+  .sc-item { background:var(--card-2); border:1px solid var(--line); border-radius:3px; margin-bottom:8px; }
+  .sc-item.open { border-color:var(--accent); }
+  .sc-bar { display:flex; align-items:center; gap:8px; padding:10px 10px; cursor:pointer; }
+  .sc-star { flex:0 0 auto; width:18px; text-align:center; color:var(--muted-2); font-size:0.95rem; }
+  .sc-star.on { color:var(--point); }
+  .sc-name { flex:1; min-width:0; font-weight:700; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sc-meta { flex:0 0 auto; color:var(--muted); font-size:0.7rem; }
+  .sc-dirty { color:var(--point); font-size:0.7rem; font-weight:800; }
+  .sc-tools { display:flex; flex-wrap:wrap; gap:6px; padding:0 10px 10px; }
+  .sc-tools button { flex:1 1 auto; width:auto; padding:7px 6px; font-size:0.72rem; margin:0; }
+  .sc-tools button.danger { color:var(--danger); }
+  .sc-tools button.danger:hover { background:var(--danger); color:var(--on-accent); }
+  .sc-tools button.danger:disabled { color:var(--muted-2); background:var(--line-strong); }
+  /* 구독 카드 디자인 */
+  .sc-edit { padding:0 10px 12px; border-top:1px solid var(--line); }
+  .sc-edit label { margin-top:12px; font-size:0.82rem; }
+  .sc-edit textarea { min-height:90px; font-size:0.92rem; line-height:1.5; }
+  .sc-hint { color:var(--muted); font-size:0.72rem; line-height:1.5; margin-top:4px; }
+  .sc-hint b { color:var(--text-2); }
+  .ph-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; }
+  .ph { position:relative; aspect-ratio:9/16; background:var(--inset) center/cover no-repeat; border-radius:3px; overflow:hidden; }
+  .ph .no { position:absolute; left:3px; top:3px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.65rem; font-weight:800; padding:1px 5px; border-radius:2px; }
+  .ph .ph-tools { position:absolute; left:0; right:0; bottom:0; display:flex; background:rgba(0,0,0,0.7); }
+  .ph .ph-tools button { flex:1; width:auto; margin:0; padding:6px 0; font-size:0.75rem; background:transparent; box-shadow:none; border-radius:0; color:#fff; }
+  .ph .ph-tools button:hover { background:var(--accent); color:var(--on-accent); }
+  .ph .ph-tools button.del:hover { background:var(--danger); }
+  .ph .ph-tools button:disabled { background:transparent; color:var(--muted-2); }
+  .ph-add { aspect-ratio:9/16; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:1px dashed var(--line-strong); border-radius:3px; color:var(--accent); font-size:0.75rem; font-weight:700; cursor:pointer; margin:0; text-align:center; }
+  .ph-add:hover { border-color:var(--accent); }
+  .ph-add input { display:none; }
+  .ph-add .plus { font-size:1.4rem; line-height:1; }
+  .sc-edit select { font-size:0.92rem; }
+  .sc-save-row { display:flex; gap:8px; margin-top:14px; }
+  .sc-save-row button { margin:0; }
+  .sc-save.dirty { background:var(--point); color:var(--on-accent); box-shadow:none; }
+  .sc-msg { font-size:0.75rem; margin-top:6px; min-height:1em; color:var(--accent); }
+  .sc-msg.err { color:var(--danger); }
+  /* 미리보기: 영상 1080x1920을 1/6(180x320)로. framed = 위 제목 칸(0~70) / 영상 칸(70~283) / 아래 출처 칸 */
+  .pv-wrap { display:flex; gap:10px; align-items:flex-start; margin-top:6px; }
+  .pv { position:relative; flex:0 0 180px; width:180px; height:320px; background:#000; border-radius:4px; overflow:hidden; cursor:pointer; user-select:none; -webkit-user-select:none; }
+  .pv-t { position:absolute; left:4px; right:4px; text-align:center; font-family:'Black Han Sans',sans-serif; font-size:15px; line-height:1.2; opacity:.55; }
+  .pv-t1 { top:20px; color:#ffff00; }
+  .pv-t2 { top:41px; color:#fff; }
+  .pv-media { position:absolute; left:0; right:0; top:70px; height:213px; overflow:hidden; background:#222; }
+  .pv-photo { position:absolute; left:0; top:0; width:100%; height:100%; background:center/cover no-repeat; will-change:transform; }
+  .pv-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:#888; font-size:0.72rem; padding:10px; line-height:1.45; }
+  .pv-src { position:absolute; left:4px; right:4px; bottom:18px; text-align:center; font-family:'IBM Plex Sans KR',sans-serif; font-weight:300; font-size:8px; color:#d0d0d0; opacity:.6; }
+  .pv-cap { position:absolute; left:4px; right:4px; top:225px; text-align:center; line-height:1.25; z-index:2; font-family:'IBM Plex Sans KR',sans-serif; font-weight:500; font-size:13px; color:#fff;
+    text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000; }
+  .pv-cap .em { font-family:'Black Han Sans',sans-serif; font-weight:400; color:#ffff00; }
+  .pv-cap .hid { color:#aaa; font-size:10px; font-style:italic; text-shadow:none; background:rgba(0,0,0,.55); padding:1px 4px; border-radius:2px; }
+  .pv-side { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .pv-nav { display:flex; gap:6px; align-items:center; }
+  .pv-nav button { width:auto; flex:1; margin:0; padding:7px 0; font-size:0.8rem; }
+  .pv-count { flex:0 0 auto; color:var(--text-2); font-size:0.78rem; font-weight:700; min-width:38px; text-align:center; }
+  .pv-lines { list-style:none; margin:0; padding:0; font-size:0.72rem; line-height:1.4; color:var(--muted); max-height:200px; overflow-y:auto; }
+  .pv-lines li { padding:3px 5px; border-radius:2px; cursor:pointer; word-break:break-all; }
+  .pv-lines li.on { background:var(--accent-dim); color:var(--accent); }
+  .pv-lines .ln-hid { font-style:italic; opacity:.6; }
+  .pv-lines .ln-mute { text-decoration:underline dotted var(--point); text-underline-offset:2px; }
+  /* 방향별 카메라 연출 (미리보기용, 5초 왕복) */
+  .dir-zin  { animation:dirZin 5s ease-in-out infinite alternate; }
+  .dir-zout { animation:dirZout 5s ease-in-out infinite alternate; }
+  .dir-lr   { width:140%; left:0; animation:dirLR 5s ease-in-out infinite alternate; }
+  .dir-rl   { width:140%; left:0; animation:dirRL 5s ease-in-out infinite alternate; }
+  .dir-tu   { height:140%; top:0; animation:dirTU 5s ease-in-out infinite alternate; }
+  .dir-td   { height:140%; top:0; animation:dirTD 5s ease-in-out infinite alternate; }
+  @keyframes dirZin  { from { transform:scale(1); } to { transform:scale(1.2); } }
+  @keyframes dirZout { from { transform:scale(1.2); } to { transform:scale(1); } }
+  @keyframes dirLR   { from { transform:translateX(0); } to { transform:translateX(-28.57%); } }
+  @keyframes dirRL   { from { transform:translateX(-28.57%); } to { transform:translateX(0); } }
+  @keyframes dirTU   { from { transform:translateY(-28.57%); } to { transform:translateY(0); } }
+  @keyframes dirTD   { from { transform:translateY(0); } to { transform:translateY(-28.57%); } }
+  @media (prefers-reduced-motion: reduce) { .pv-photo { animation:none !important; } }
+  .add-note { color:var(--muted); font-size:0.75rem; line-height:1.5; background:var(--card); border-radius:3px; padding:12px 14px; margin-bottom:30px; }
+  .add-note b { color:var(--text-2); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/youtube/index.html">← wizard-yt</a>
+    <h1 style="font-size:1.4rem;margin-bottom:0.4rem;">Channels</h1>
+    <div style="color:var(--muted);font-size:0.8rem;margin-bottom:1.2rem;line-height:1.5;">채널 이름·콘티 출처·사용 상태를 바꾸고, 채널마다 영상 끝에 붙는 구독 카드를 디자인합니다.</div>
+    <div id="msg" class="msg"></div>
+    <div id="list"><div class="empty">불러오는 중...</div></div>
+    <div class="add-note">
+      <b>채널 추가는 여기서 하지 않습니다.</b> 업로드 번호(slot)는 GitHub 비밀값과 짝입니다 (1번 = YOUTUBE_OAUTH_TOKEN, N번 = YOUTUBE_OAUTH_TOKEN_N).
+      새 채널은 PC에서 그 번호로 유튜브 로그인 허가증을 먼저 등록한 뒤, Supabase 표 <b>youtube_channels</b>에 한 줄을 추가하세요.
+      이 화면에는 비밀값이 저장되지도 보이지도 않고, 연결 "상태"만 보입니다.
+    </div>
+  </div>
+
+<script src="/config.js"></script>
+<script src="/youtube/channels.js"></script>
+<script src="/hub-nav.js"></script>
+</body>
+</html>
