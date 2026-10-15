@@ -311,6 +311,16 @@
   .seg-kw-search { flex:0 0 auto; width:auto; margin:0; padding:0 8px; font-size:0.62rem; font-weight:800; letter-spacing:0.04em; background:var(--btn); color:var(--text); border:1px solid var(--line-strong); border-radius:3px; }
   .pexels-pick-body .seg-pexels-grid { flex-wrap:wrap; overflow:visible; justify-content:flex-start; max-height:60vh; overflow-y:auto; }
   .seg-pexels-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:0.72rem; margin-bottom:6px; }
+  .seg-side-lab-row { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .seg-card-load { width:auto; margin:0; padding:2px 7px; font-size:0.64rem; font-weight:700; text-transform:none; letter-spacing:0; color:var(--text); background:var(--btn); box-shadow:none; white-space:nowrap; flex-shrink:0; }
+  .cardpick-list { max-height:62vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+  .cardpick-item { display:flex; align-items:center; gap:10px; width:100%; margin:0; padding:8px; text-align:left; text-transform:none; letter-spacing:0; color:var(--text); background:var(--btn); box-shadow:none; min-width:0; }
+  .cardpick-thumb { width:44px; height:44px; flex-shrink:0; border-radius:4px; background:var(--bg) center/cover no-repeat; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:0.6rem; overflow:hidden; }
+  .cardpick-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .cardpick-txt { min-width:0; flex:1; }
+  .cardpick-name { font-size:0.82rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cardpick-name .def { color:var(--accent); font-weight:800; margin-left:4px; }
+  .cardpick-line { font-size:0.72rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
   .seg-pexels-close { width:auto; margin:0; padding:2px 8px; font-size:0.8rem; background:transparent; box-shadow:none; color:var(--muted); }
   .seg-tl-area.ro-on > :not(.seg-ro-wrap) { display:none; }
   /* 클립을 고르면 나오는 도구줄 */
@@ -445,6 +455,10 @@
     <div class="cap-modal" id="pexelsPickModal">
       <div class="cap-modal-box" style="max-width:360px;"><div id="pexelsPickBody" class="pexels-pick-body"></div></div>
     </div>
+    <!-- 채널 카드 고르기 팝업: 이 콘티 채널의 카드 목록. 고르면 채널 카드 장면에 적용(없으면 맨 끝에 장면 추가) -->
+    <div class="cap-modal" id="cardPickModal">
+      <div class="cap-modal-box" style="max-width:360px;"><div id="cardPickBody"></div></div>
+    </div>
     <!-- 전체 미리보기: 모든 장면을 이어서 9:16 무대 하나에 재생 (카드 미리보기 엔진 재사용) -->
     <div class="fpv" id="fpv" aria-hidden="true">
       <div class="fpv-box" id="fpvBox">
@@ -543,6 +557,7 @@
 
     <div id="segList" style="margin-top:20px;"><div class="empty">대본을 먼저 선택하세요.</div></div>
     <button type="button" id="addSegBtn" style="margin-top:6px;">+ 장면 추가</button>
+    <button type="button" id="addCardSegBtn" style="margin-top:6px;display:none;">+ 채널 카드 추가</button>
     </div>
 
   </div>
@@ -1821,11 +1836,12 @@
     sound: ["tts_voice", "tts_rate", "tts_pitch", "bgm_path", "bgm_volume"],
     cap: ["caption_font_size", "caption_weight", "caption_position_pct"],
     name: ["name"],
+    card: ["subscribe_card_id", "channel_slot"],   // 채널 카드 불러오기: 고른 카드와 그 채널만
   };
   const PART_BTN = { main: "settingsSaveBtn", sound: "soundSaveBtn" };
   const dirtyParts = new Set();
   const savingParts = new Set();
-  const partEdits = { main: 0, sound: 0, cap: 0, name: 0, mood: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
+  const partEdits = { main: 0, sound: 0, cap: 0, name: 0, mood: 0, card: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
   const justSavedParts = new Set();
   let saveChain = Promise.resolve();   // 저장은 하나씩 차례로(앞 저장 결과 위에 다음 저장을 덮어쓰도록)
 
@@ -2125,7 +2141,7 @@
         }
         return true;
       } catch (err) {
-        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름", mood: "분위기" }[part];
+        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름", mood: "분위기", card: "채널 카드 설정" }[part];
         showMsg(`${what} 저장 실패: ${err.message}`, false);
         if (same()) dirtyParts.add(part);
         return false;
@@ -2369,12 +2385,13 @@
     }
   }
   // 카드 사진 중 한 장: 그 카드로 이미 만든 콘티 수 기준으로 돌아가며 (못 세면 무작위). 사진이 없으면 빈 배열
-  async function pickCardPhoto(card) {
+  // excludeId: 이미 있는 콘티에 불러올 때 그 콘티 자신은 세지 않는다 (새 콘티 만들 때와 같은 순번이 되게)
+  async function pickCardPhoto(card, excludeId) {
     const list = card.image_paths || [];
     if (!list.length) return [];
     let n = Math.floor(Math.random() * list.length);
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id&video_settings->>subscribe_card_id=eq.${card.id}`, { headers });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id&video_settings->>subscribe_card_id=eq.${card.id}${excludeId != null ? `&id=neq.${excludeId}` : ""}`, { headers });
       if (r.ok) n = (await r.json()).length;
     } catch { /* 무작위 */ }
     return [list[n % list.length]];
@@ -2646,6 +2663,8 @@
     const hasArticleUrls = !!row && (row.fact_sources || "").split("\n").some((l) => /^https?:\/\/\S+$/.test(l.trim()));
     const hasNewsMedia = segments.some((sg) => Object.keys(sg.asset_notes || {}).length > 0);
     $("addMediaBtn").style.display = hasArticleUrls && !hasNewsMedia && segments.length ? "block" : "none";
+    // 채널 카드 장면이 없는 옛 콘티: 맨 끝에 채널 카드 장면을 붙이는 버튼
+    $("addCardSegBtn").style.display = row && !segments.some(isSubscribeSeg) ? "block" : "none";
   }
 
   function render() {
@@ -2688,7 +2707,9 @@
             <div class="seg-stage-side">
               <div class="seg-pv-time">00:00 / 00:00</div>
               <div class="seg-pv-info"></div>
-              <div class="seg-side-lab">SCRIPT</div>
+              ${isSubscribeSeg(seg)
+                ? '<div class="seg-side-lab seg-side-lab-row"><span>SCRIPT</span><button type="button" class="seg-card-load" title="채널 화면에서 만든 채널 카드로 이 장면을 바꿔요">채널 카드 불러오기</button></div>'
+                : '<div class="seg-side-lab">SCRIPT</div>'}
               <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
               <div class="seg-side-lab">ACTION</div>
               <textarea class="seg-direction" rows="1" wrap="off" placeholder="예: 천천히 줌인">${escapeHtml(oneLine(seg.direction))}</textarea>
@@ -2801,6 +2822,8 @@
       bindTimelineGestures(el);
       bindCapGestures(el);
       el.querySelector(".seg-revert-btn").addEventListener("click", () => { clearTimeout(el._autoTimer); revertSegmentCard(id, el); });
+      const cardLoadBtn = el.querySelector(".seg-card-load");
+      if (cardLoadBtn) cardLoadBtn.addEventListener("click", () => openCardPick(id));
       el.querySelector(".seg-delete-btn").addEventListener("click", () => { clearTimeout(el._autoTimer); deleteSegmentCard(id, el); });
 
       const durDisplay = el.querySelector(".seg-duration-display");
@@ -5021,6 +5044,140 @@
       showMsg("장면 추가 실패: " + err.message, false);
     }
   });
+
+  // ───── 채널 카드 불러오기: 이미 있는 콘티의 채널 카드 장면(구독/좋아요)을 채널 화면에서 만든 카드로 바꾼다 ─────
+  // 채널은 콘티에 저장된 channel_slot, 없으면 출처 규칙(위키 콘티 → source=wiki 채널, 그 밖 → trend 채널).
+  // 채널 카드 장면이 없는 옛 콘티는 같은 팝업으로 맨 끝에 채널 카드 장면을 새로 붙인다 (segId = null).
+  let cardPickCards = [];
+  function closeCardPick() {
+    $("cardPickModal").classList.remove("open");
+    $("cardPickBody").innerHTML = "";
+    cardPickCards = [];
+  }
+  $("cardPickModal").addEventListener("click", (e) => { if (e.target.id === "cardPickModal") closeCardPick(); });
+  async function contiChannel(row) {
+    const vs = row.video_settings || {};
+    const q = vs.channel_slot != null
+      ? `slot=eq.${encodeURIComponent(vs.channel_slot)}`
+      : `source=eq.${/^위키/.test(row.category || "") ? "wiki" : "trend"}&order=sort_order.asc,slot.asc&limit=1`;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_channels?select=slot,label&${q}`, { headers });
+    if (!res.ok) throw new Error("채널 표를 읽지 못함");
+    const ch = (await res.json())[0];
+    if (ch) return ch;
+    if (vs.channel_slot != null) return { slot: vs.channel_slot, label: `채널 ${vs.channel_slot}` };
+    throw new Error("이 콘티의 채널이 정해지지 않음");
+  }
+  async function openCardPick(segId) {
+    const scriptId = $("scriptSelect").value;
+    const row = scripts.find((r) => String(r.id) === String(scriptId));
+    if (!row) return;
+    const body = $("cardPickBody");
+    const head = (title) => `<div class="seg-pexels-head"><span>${escapeHtml(title)}</span><button type="button" class="seg-pexels-close" title="닫기">✕</button></div>`;
+    const setBody = (title, html) => {
+      body.innerHTML = head(title) + html;
+      body.querySelector(".seg-pexels-close").addEventListener("click", closeCardPick);
+    };
+    $("cardPickModal").classList.add("open");
+    setBody("채널 카드", '<div class="empty" style="margin:16px 0;">불러오는 중...</div>');
+    try {
+      const ch = await contiChannel(row);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards?select=*&channel_slot=eq.${ch.slot}&order=sort_order.asc,id.asc`, { headers });
+      if (!res.ok) throw new Error("채널 카드 표를 읽지 못함");
+      if (String($("scriptSelect").value) !== String(scriptId)) return;   // 그 사이 다른 콘티로 넘어갔다
+      cardPickCards = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
+      const curId = (row.video_settings || {}).subscribe_card_id;
+      const title = `${ch.label} 채널 카드 · ${segId ? "고르면 이 장면에 적용" : "고르면 맨 끝에 추가"}`;
+      if (!cardPickCards.length) {
+        setBody(title, `<div class="empty" style="margin:16px 0;">${escapeHtml(ch.label)} 채널에 채널 카드가 없어요. 채널 화면에서 먼저 만들어 주세요.</div>`);
+        return;
+      }
+      setBody(title, `<div class="cardpick-list">${cardPickCards.map((c, i) => {
+        const first = (normalizeScript(c.script_text || "").split("\n").find((l) => l.trim()) || "(문구 없음)").trim();
+        const img = c.image_paths[0];
+        return `<button type="button" class="cardpick-item" data-i="${i}">
+          <span class="cardpick-thumb">${img ? `<img src="${escapeAttr(assetUrl(img))}" alt="" loading="lazy" onerror="this.remove()">` : "사진 없음"}</span>
+          <span class="cardpick-txt">
+            <span class="cardpick-name" style="display:block;">${escapeHtml(c.name || "(이름 없음)")}${c.is_default ? '<span class="def">★기본</span>' : ""}${String(c.id) === String(curId) ? ' <span style="color:var(--muted);font-weight:700;">· 지금 카드</span>' : ""}</span>
+            <span class="cardpick-line" style="display:block;">${escapeHtml(first)}</span>
+            <span class="cardpick-line" style="display:block;">사진 ${c.image_paths.length}장${c.direction ? " · " + escapeHtml(oneLine(c.direction)) : ""}</span>
+          </span>
+        </button>`;
+      }).join("")}</div>`);
+      body.querySelectorAll(".cardpick-item").forEach((b) => b.addEventListener("click", () => {
+        const card = cardPickCards[Number(b.dataset.i)];
+        if (card) applyCardToConti(scriptId, segId, card);
+      }));
+    } catch (err) {
+      setBody("채널 카드", `<div class="empty" style="margin:16px 0;">채널 카드를 불러오지 못했어요 (${escapeHtml(err.message)})</div>`);
+    }
+  }
+  async function applyCardToConti(scriptId, segId, card) {
+    const seg = segId ? segments.find((s) => String(s.id) === String(segId)) : null;
+    if (segId && !seg) { closeCardPick(); return; }
+    if (seg && !confirm("지금 채널 카드 장면의 문구와 사진이 바뀌어요. 바꿀까요?")) return;
+    closeCardPick();
+    try {
+      // 다른 카드에서 고치던 내용은 먼저 저장한다 (다시 그릴 때 잃지 않게). 바꿀 장면의 고치던 내용은 카드 값으로 덮인다
+      const el = seg ? document.querySelector(`.seg-item[data-id="${seg.id}"]`) : null;
+      if (el) { clearTimeout(el._autoTimer); delete el.dataset.dirty; el._trimsDraft = null; }
+      await flushDirtyCards();
+      const photo = await pickCardPhoto(card, scriptId);
+      if (seg) {
+        const oldPaths = seg.asset_paths || [];
+        const paths = photo.length ? photo : oldPaths;   // 카드 사진이 없으면 지금 소재 그대로
+        // 자막 줄 길이·직접 정한 줄 표시는 새 문구에 맞지 않으므로 비운다. 빠진 소재의 구간/위치/비중 기록도 지운다
+        const trims = { ...(seg.asset_trims || {}) };
+        delete trims.__cap_secs;
+        delete trims.__cap_manual;
+        const dropped = oldPaths.filter((p) => !paths.includes(p));
+        dropped.forEach((p) => {
+          delete trims[p];
+          ["__focus", "__weights", "__pexels"].forEach((key) => {
+            if (!trims[key] || trims[key][p] === undefined) return;
+            const { [p]: _x, ...rest } = trims[key];
+            if (Object.keys(rest).length) trims[key] = rest; else delete trims[key];
+          });
+        });
+        const fields = { script_text: card.script_text || "", direction: card.direction || "", asset_paths: paths, asset_trims: trims };
+        const notes = seg.asset_notes || {};
+        if (dropped.some((p) => notes[p] !== undefined)) {
+          fields.asset_notes = Object.fromEntries(Object.entries(notes).filter(([k]) => !dropped.includes(k)));
+        }
+        await saveFields(seg.id, fields);
+        // 이 콘티만 쓰던 파일은 스토리지에서도 지운다 (채널 카드 사진 subscribe/...는 여러 콘티가 같이 써서 둔다)
+        for (const p of dropped) {
+          if (isOwnStoragePath(p)) { try { await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${p}`, { method: "DELETE", headers }); } catch { /* 파일 정리는 실패해도 넘어간다 */ } }
+        }
+      } else {
+        const nextOrder = segments.length ? Math.max(...segments.map((s) => s.order_no)) + 1 : 1;
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({
+            script_id: Number(scriptId), order_no: nextOrder,
+            section: SUBSCRIBE_PART, script_text: card.script_text || "", keyword: "", direction: card.direction || "", asset_paths: photo,
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+      }
+      if (String($("scriptSelect").value) !== String(scriptId)) return;
+      // 콘티 설정에는 고른 카드와 그 채널만 덮어쓴다 (savePart 규칙)
+      currentSettings.subscribe_card_id = card.id;
+      currentSettings.channel_slot = card.channel_slot;
+      partEdits.card++;
+      const saved = savePart("card");
+      await refreshSegments(scriptId);
+      capAutoSplitOnOpen(scriptId);   // 새 문구에서 화면 폭을 넘는 줄은 자동으로 나눈다
+      const target = seg ? document.querySelector(`.seg-item[data-id="${seg.id}"]`)
+        : Array.from(document.querySelectorAll(".seg-item")).reverse().find((x) => isSubscribeSeg(segOfEl(x) || {}));
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (await saved) showMsg(`"${card.name}" 채널 카드를 ${seg ? "적용" : "추가"}했습니다.`, true);
+    } catch (err) {
+      showMsg(`채널 카드 ${seg ? "적용" : "추가"} 실패: ${err.message}`, false);
+      refreshSegments(scriptId).catch(() => {});
+    }
+  }
+  $("addCardSegBtn").addEventListener("click", () => openCardPick(null));
 
   // ───── PC: 사진·영상 파일을 장면 카드에 끌어다 놓기 (붙여넣기와 같은 업로드 경로, 맨 뒤에 추가) ─────
   // 파일을 끄는 경우(dataTransfer.types에 "Files")에만 반응하므로 클립 순서 바꾸기·자막 끌기 같은 포인터 조작과 겹치지 않는다.
