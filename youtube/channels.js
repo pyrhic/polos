@@ -116,7 +116,9 @@
     return `<div class="sc-item${open ? " open" : ""}" data-card="${k.id}">
       <div class="sc-bar" data-act="toggle" data-card="${k.id}" role="button" tabindex="0" aria-expanded="${open}">
         <span class="sc-star${k.is_default ? " on" : ""}" title="${k.is_default ? "기본 카드" : ""}">${k.is_default ? "★" : "☆"}</span>
-        <span class="sc-name">${esc(open ? draft.name : k.name)}</span>
+        ${open
+          ? `<input type="text" class="sc-name-in" maxlength="40" value="${esc(k.name)}" data-card="${k.id}" aria-label="카드 이름" title="눌러서 이름 바꾸기 (Enter로 저장)">`
+          : `<span class="sc-name">${esc(k.name)}</span>`}
         ${dirty ? `<span class="sc-dirty">저장 안 됨</span>` : `<span class="sc-meta">사진 ${k.image_paths.length}장</span>`}
         <span class="sc-meta">${open ? "▲" : "▼"}</span>
       </div>
@@ -133,8 +135,6 @@
       </div>
       ${k.is_default ? `<div class="sc-hint" style="padding:0 10px;margin-top:-4px;">기본 카드는 지울 수 없어요. 다른 카드를 "기본으로" 지정한 뒤 지우세요.</div>` : ""}
       <div class="sc-edit">
-        <label>카드 이름</label>
-        <input type="text" class="f-name" maxlength="40" value="${esc(draft.name)}">
         <label>자막 문구</label>
         <textarea class="f-script" placeholder="내 알고리즘 밖의 이야기가 궁금하다면&#10;구독 좋아요 해주시면 **나도 좋아요**">${esc(draft.script_text)}</textarea>
         <div class="sc-hint">줄바꿈 = 자막 한 줄 · <b>[ ]</b> 안은 읽기만 하고 자막엔 숨김 · <b>{ }</b> 안은 자막에만 보이고 읽지 않음 · <b>**글자**</b> = 노란 강조</div>
@@ -224,7 +224,6 @@
     save.textContent = d ? "저장" : "저장됨";
     $('[data-act="revert"]', box).disabled = !d;
     const bar = $(".sc-bar", box);
-    $(".sc-name", bar).textContent = draft.name;
     const meta = bar.querySelector(".sc-dirty, .sc-meta");
     const k = cards.find((c) => String(c.id) === String(openId));
     meta.outerHTML = d ? `<span class="sc-dirty">저장 안 됨</span>` : `<span class="sc-meta">사진 ${k.image_paths.length}장</span>`;
@@ -413,6 +412,36 @@
     cardMsg("저장했습니다.", true);
   }
 
+  // ───── 카드 이름: 펼친 카드의 ★ 줄에서 바로 바꾸고, Enter나 바깥을 누르면 이름만 바로 저장 (Esc는 취소) ─────
+  async function saveCardName(input) {
+    const k = cards.find((c) => String(c.id) === String(input.dataset.card));
+    if (!k) return;
+    const name = input.value.trim();
+    if (!name) { input.value = k.name; showMsg("카드 이름을 입력하세요.", false); return; }
+    if (name === k.name) return;
+    const body = { name, updated_at: nowIso() };
+    await patch("youtube_subscribe_cards", `id=eq.${k.id}`, body);
+    Object.assign(k, body);
+    if (draft && String(openId) === String(k.id)) draft.name = name;
+    cardMsg("이름을 바꿨습니다.", true);
+  }
+  document.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (!t.matches || !t.matches(".sc-name-in")) return;
+    if (e.key === "Enter") { e.preventDefault(); t.blur(); }
+    else if (e.key === "Escape") {
+      const k = cards.find((c) => String(c.id) === String(t.dataset.card));
+      if (k) t.value = k.name;
+      t.dataset.cancel = "1"; t.blur();
+    }
+  });
+  document.addEventListener("focusout", (e) => {
+    const t = e.target;
+    if (!t.matches || !t.matches(".sc-name-in")) return;
+    if (t.dataset.cancel) { delete t.dataset.cancel; return; }
+    guarded(() => saveCardName(t));
+  });
+
   async function saveImages(k, paths) {
     const body = { image_paths: paths, updated_at: nowIso() };
     await patch("youtube_subscribe_cards", `id=eq.${k.id}`, body);
@@ -489,7 +518,7 @@
     const t = e.target.closest("[data-act]");
     if (t && t.closest("#list")) {
       const act = t.dataset.act;
-      if (act === "toggle") return openCard(t.dataset.card);
+      if (act === "toggle") { if (e.target.closest(".sc-name-in")) return; return openCard(t.dataset.card); }
       if (act === "check") return checkChannel(t.dataset.slot, t);
       if (act === "new") return guarded(async () => {
         if (openId != null && isDirty() && !confirm("저장하지 않은 채널 카드 수정이 있어요. 버리고 새 카드를 만들까요?")) return;
@@ -531,6 +560,7 @@
     if (li) { pvIndex = Number(li.dataset.i); updatePreview(); }
   });
   document.addEventListener("keydown", (e) => {
+    if (e.target.matches && e.target.matches(".sc-name-in")) return;   // 이름 칸에서 Enter·스페이스는 카드 접기가 아니라 입력
     const bar = e.target.closest && e.target.closest(".sc-bar");
     if (bar && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openCard(bar.dataset.card); }
   });

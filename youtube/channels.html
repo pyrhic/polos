@@ -47,6 +47,8 @@
   .sc-bar { display:flex; align-items:center; gap:8px; padding:10px 10px; cursor:pointer; }
   .sc-star { flex:0 0 auto; width:18px; text-align:center; color:var(--muted-2); font-size:0.95rem; }
   .sc-star.on { color:var(--point); }
+  .sc-name-in { flex:1; min-width:0; margin:0; padding:4px 6px; font-weight:700; font-size:0.9rem; background:transparent; color:var(--text); border:none; border-bottom:1px dashed var(--line-strong); border-radius:0; cursor:text; }
+  .sc-name-in:focus { outline:none; border-bottom:1px solid var(--accent); background:var(--input); }
   .sc-name { flex:1; min-width:0; font-weight:700; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .sc-meta { flex:0 0 auto; color:var(--muted); font-size:0.7rem; }
   .sc-dirty { color:var(--point); font-size:0.7rem; font-weight:800; }
