@@ -88,7 +88,6 @@
     top: 44%;
     left: 0;
     transform: translateY(-50%);
-    transition: top 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
     display: flex;
     width: 100%;
     padding: 0 15%;
@@ -102,10 +101,6 @@
   }
   .logo-scroll::-webkit-scrollbar { display: none; }
   .logo-scroll.dragging { cursor: grabbing; scroll-snap-type: none; }
-  /* 메뉴가 펼쳐진 동안엔 캐러셀을 잠가서 로고 위치가 그대로 유지되게 함 */
-  .logo-scroll.locked { overflow-x: hidden; cursor: default; }
-  /* 로고 선택시 위쪽 고정 위치로 살짝 올라감 - 아래에 메뉴 붙을 공간을 넉넉히 확보 */
-  .logo-scroll.docked { top: 20%; }
   .logo-item {
     flex: 0 0 70%;
     scroll-snap-align: center;
@@ -150,75 +145,6 @@
     user-select: none;
   }
 
-  /* 선택된 로고 아래에 뜨는 메뉴 - 로고는 그 자리에 그대로 있고 이 버튼들만 아래에서 페이드인 */
-  .menu-links {
-    position: absolute;
-    top: calc(50% + 140px);
-    left: 0;
-    right: 0;
-    width: min(460px, calc(100vw - 40px));
-    margin: 0 auto;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    transition: top 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
-  }
-  .menu-links.docked { top: calc(20% + 140px); }
-  .menu-link {
-    display: block;
-    text-align: center;
-    padding: 14px 20px;
-    background: #000000;
-    box-shadow: inset 0 0 0 1px #444444;
-    color: #ffffff;
-    text-decoration: none;
-    border-radius: 3px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    opacity: 0;
-    transform: translateY(14px);
-    animation: menuFadeIn 0.4s ease forwards;
-    animation-delay: calc(var(--i) * 90ms);
-  }
-  .menu-link:hover {
-    background: #a8dcf6;
-    color: #000000;
-  }
-  @keyframes menuFadeIn {
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* 홈버튼(설치) - 스킴밐스 로고, 설명 없음. 맨 아래 고정, 캐러셀/메뉴 화면에서 노출 */
-  #installBtn {
-    position: fixed;
-    bottom: 14px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    background: none;
-    border: none;
-    padding: 6px;
-    cursor: pointer;
-    z-index: 20;
-    opacity: 0;
-    pointer-events: none;
-    transition: transform 0.12s ease, opacity 0.3s ease;
-  }
-  #installBtn.visible { opacity: 1; pointer-events: auto; }
-  #installBtn:active { transform: translateX(-50%) scale(0.94); }
-  #installBtn img { width: 64px; height: auto; display: block; }
-  #installBtn .copyright {
-    font-size: 0.6rem;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: #9a9a9a;
-    white-space: nowrap;
-  }
 </style>
 </head>
 <body>
@@ -249,14 +175,8 @@
         </div>
         <div class="logo-item spacer" aria-hidden="true"></div>
       </div>
-      <div class="menu-links" id="menuLinks"></div>
     </div>
   </div>
-
-  <button type="button" id="installBtn">
-    <img src="/skimmmiks/logo.png" alt="">
-    <span class="copyright">All copy rights reserved @SKIMMMIKS</span>
-  </button>
 
 <script>
   const QUOTES = [
@@ -271,130 +191,23 @@
   document.getElementById("quoteText").textContent = q.text;
   document.getElementById("quoteSource").textContent = q.source;
 
-  const IDENTITIES = {
-    skimmmiks: {
-      links: [
-        { label: "Q&A", href: "/skimmmiks/qa.html" },
-        { label: "Lessons", href: "https://map.naver.com/p/entry/place/1613482741?placePath=%2Fhome%3Fentry%3Dplt&searchType=place&lng=128.6832774&lat=38.0540714&c=15.00,0,0,2,dh", external: true },
-        { label: "Skim Jam", href: "/skimmmiks/jam.html" },
-        { label: "Skim Session", href: "https://www.instagram.com/skimmmiks/", external: true },
-      ],
-    },
-    todo: {
-      links: [
-        { label: "오늘 업무 입력", href: "/todo/daily-log.html" },
-        { label: "주간보고서", href: "/todo/reports.html" },
-        { label: "투두리스트", href: "/todo/todo.html" },
-      ],
-    },
-    trading: {
-      links: [
-        { label: "오늘 트레이딩 입력", href: "/trading/log.html" },
-        { label: "주간 리포트", href: "/trading/weekly.html" },
-        { label: "투두리스트", href: "/trading/todo.html" },
-        { label: "내 자산현황", href: "/trading/assets.html" },
-        { label: "Billionaire Ambition", href: "/trading/ambition.html" },
-      ],
-    },
-    youtube: {
-      links: [
-        { label: "Search", href: "/youtube/search.html" },
-        { label: "Scenes", href: "/youtube/storyboard.html" },
-        { label: "Studio", href: "/youtube/review.html" },
-        { label: "Channels", href: "/youtube/channels.html" },
-      ],
-    },
-  };
-
   const screens = document.getElementById("screens");
   const logoScroll = document.getElementById("logoScroll");
   const logoItems = [...document.querySelectorAll(".logo-item")];
-  const installBtn = document.getElementById("installBtn");
-  const menuLinks = document.getElementById("menuLinks");
 
-  // level: 0=문구, 1=캐러셀(로고 선택 여부는 expanded로 별도 관리)
+  // level: 0=문구, 1=캐러셀
   let level = 0;
   let centeredId = null;
-  let expanded = false;
-  let selectedId = null;
-  let dimTimer = null;
 
   function setLevel(n) {
     level = n;
     screens.classList.toggle("at-carousel", level === 1);
-    installBtn.classList.toggle("visible", level >= 1);
-  }
-
-  // 선택 안 된 나머지 로고들만 서서히 사라지게/다시 보이게 함 - 선택된 로고 자체는 절대 안 건드림(그 자리 그대로 유지)
-  function setDimmed(dim) {
-    logoItems.forEach((item) => {
-      if (item.dataset.id === selectedId) return;
-      item.style.transition = "opacity 0.35s ease";
-      if (dim) {
-        item.style.opacity = "0";
-        item.style.pointerEvents = "none";
-      } else {
-        item.style.pointerEvents = "";
-      }
-    });
-    if (!dim) updateCoverflow(); // 위치 기준 투명도(코버플로우 효과)로 복원
-    clearTimeout(dimTimer);
-    dimTimer = setTimeout(() => {
-      logoItems.forEach((item) => { item.style.transition = ""; });
-    }, 400);
-  }
-
-  function renderMenuLinks(links) {
-    menuLinks.innerHTML = links
-      .map(
-        (l, i) =>
-          `<a class="menu-link" style="--i:${i}" href="${l.href}"${l.external ? ' target="_blank"' : ""}>${l.label}</a>`
-      )
-      .join("");
-  }
-
-  // 로고가 위쪽 고정 위치로 올라가 자리잡은 다음(450ms), 그 아래로 메뉴 버튼들이 이어서 페이드인됨
-  function expandMenu(id) {
-    const data = IDENTITIES[id];
-    if (!data) return;
-    selectedId = id;
-    expanded = true;
-    logoScroll.classList.add("locked");
-    logoScroll.classList.add("docked");
-    menuLinks.classList.add("docked");
-    setDimmed(true);
-    const linksPromise = Promise.resolve(data.links);
-    setTimeout(async () => {
-      if (selectedId !== id) return; // 그 사이 접혔으면 무시
-      const links = await linksPromise;
-      if (selectedId !== id) return; // 기다리는 동안 접혔을 수도 있으니 한번 더 확인
-      renderMenuLinks(links);
-    }, 450);
-  }
-
-  // 반대 순서: 메뉴 버튼들이 먼저 사라진 다음, 로고가 원래 가운데 위치로 내려옴
-  function collapseMenu() {
-    expanded = false;
-    [...menuLinks.children].forEach((el) => {
-      el.style.transition = "opacity 0.25s ease";
-      el.style.opacity = "0";
-    });
-    setTimeout(() => {
-      menuLinks.innerHTML = "";
-      menuLinks.classList.remove("docked");
-      logoScroll.classList.remove("docked");
-      logoScroll.classList.remove("locked");
-      setDimmed(false);
-    }, 250);
   }
 
   document.getElementById("chevronUp").addEventListener("click", () => setLevel(1));
-  document.getElementById("chevronDown").addEventListener("click", () => {
-    if (expanded) collapseMenu();
-    else setLevel(0);
-  });
+  document.getElementById("chevronDown").addEventListener("click", () => setLevel(0));
 
-  // 세로 스와이프: 문구 → 캐러셀 (그 안에서 로고를 위로 스와이프하면 메뉴 펼침, 아래로 스와이프하면 접힘/복귀)
+  // 세로 스와이프: 위로 = 문구 → 캐러셀, 아래로 = 캐러셀 → 문구
   let startX = null;
   let startY = null;
   document.addEventListener("touchstart", (e) => {
@@ -409,13 +222,8 @@
     startX = null;
 
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 60) {
-      if (dy < 0) {
-        if (level === 0) setLevel(1);
-        else if (level === 1 && !expanded && centeredId) expandMenu(centeredId);
-      } else {
-        if (level === 1 && expanded) collapseMenu();
-        else if (level === 1 && !expanded) setLevel(0);
-      }
+      if (dy < 0 && level === 0) setLevel(1);
+      else if (dy > 0 && level === 1) setLevel(0);
     }
   }, { passive: true });
 
@@ -439,11 +247,7 @@
       // 로고 박스 폭이 이제 화면폭 기준이라 칸 폭보다 넓어질 수 있어(옆 항목과 살짝 겹침) -
       // 가운데에 가까운 항목이 항상 위로 쌓이게 해서 자연스럽게 덮이도록 함
       item.style.zIndex = Math.round((1 - Math.abs(clamped)) * 100);
-      // 메뉴가 펼쳐진 동안엔 선택 안 된 로고들의 투명도(0)를 건드리지 않음 - 리사이즈 등으로
-      // updateCoverflow가 다시 불려도 숨겨둔 옆 로고들이 되살아나 보이면 안 되기 때문
-      if (!expanded || item.dataset.id === selectedId) {
-        item.style.opacity = opacity;
-      }
+      item.style.opacity = opacity;
       if (item.dataset.id && Math.abs(dist) < Math.abs(best.dist)) {
         best = { id: item.dataset.id, dist };
       }
@@ -473,11 +277,15 @@
     const target = item.offsetLeft - (logoScroll.clientWidth - item.clientWidth) / 2;
     logoScroll.scrollTo({ left: target, behavior: smooth ? "smooth" : "instant" });
   }
-  const initialIndex = logoItems.findIndex((it) => it.dataset.id === "todo");
+  // 섹션 화면 하단 스킴밐스 로고로 돌아오면(/?carousel=todo 등) 문구 화면을 건너뛰고
+  // 캐러셀을 바로 열고, 방금 있던 섹션 로고를 가운데에 둠
+  const params = new URLSearchParams(location.search);
+  const fromCarousel = params.has("carousel");
+  let initialIndex = logoItems.findIndex((it) => it.dataset.id === (params.get("carousel") || "todo"));
+  if (initialIndex === -1) initialIndex = logoItems.findIndex((it) => it.dataset.id === "todo");
   window.addEventListener("resize", () => {
     layoutCoverflow();
-    const idx = expanded ? logoItems.findIndex((it) => it.dataset.id === selectedId) : initialIndex;
-    centerOn(idx, false);
+    centerOn(initialIndex, false);
     updateCoverflow();
   });
 
@@ -485,9 +293,16 @@
   centerOn(initialIndex, false);
   updateCoverflow();
 
+  if (fromCarousel) {
+    screens.style.transition = "none"; // 올라가는 애니메이션 없이 바로 캐러셀
+    setLevel(1);
+    screens.offsetHeight; // 위치를 먼저 반영시킨 뒤 애니메이션 원래대로
+    screens.style.transition = "";
+    history.replaceState(null, "", "/"); // 주소는 깔끔하게
+  }
+
   // PC 마우스 휠(세로 휠)을 가로 스크롤로 변환
   logoScroll.addEventListener("wheel", (e) => {
-    if (expanded) return;
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
       logoScroll.scrollLeft += e.deltaY;
       e.preventDefault();
@@ -502,7 +317,6 @@
   let justDragged = false;
 
   logoScroll.addEventListener("mousedown", (e) => {
-    if (expanded) return;
     dragging = true;
     dragMoved = 0;
     dragStartX = e.pageX;
@@ -523,7 +337,7 @@
   });
 
   // 클릭(마우스)/탭(터치) 둘 다 여기서 처리 - 드래그 직후엔 무시.
-  // 이미 가운데 있는(선택된) 로고를 누르면 메뉴가 펼쳐지고(다시 누르면 접힘),
+  // 가운데 있는 로고를 누르면 그 섹션 메인 화면으로 이동,
   // 옆에 살짝 보이는(아직 안 골라진) 로고를 누르면 스와이프하듯 그 로고를 가운데로 이동만 함
   logoScroll.addEventListener("click", (e) => {
     if (justDragged) {
@@ -533,12 +347,8 @@
     }
     const item = e.target.closest(".logo-item");
     if (!item || !item.dataset.id) return;
-    if (expanded) {
-      if (item.dataset.id === selectedId) collapseMenu();
-      return;
-    }
     if (item.dataset.id === centeredId) {
-      expandMenu(item.dataset.id);
+      location.href = "/" + item.dataset.id + "/";
     } else {
       centerOn(logoItems.indexOf(item), true);
     }
@@ -547,26 +357,7 @@
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js");
   }
-
-  let deferredPrompt = null;
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-  });
-
-  installBtn.addEventListener("click", async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt = null;
-    } else if (window.matchMedia("(display-mode: standalone)").matches) {
-      alert("이미 앱으로 설치되어 있습니다.");
-    } else if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-      alert("아이폰에서는: 하단 공유 버튼(□↑) → \"홈 화면에 추가\"를 눌러주세요.");
-    } else {
-      alert("이 브라우저에서는 자동 설치를 지원하지 않아요. 브라우저 메뉴에서 \"앱 설치\" 또는 \"홈 화면에 추가\"를 찾아주세요.");
-    }
-  });
 </script>
+<script src="/app-menu.js"></script>
 </body>
 </html>
