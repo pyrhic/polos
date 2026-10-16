@@ -192,11 +192,11 @@ const ContiCreateModal = (() => {
       ? channels.map((c) => `<option value="${esc(c.slot)}"${c.slot === slot ? " selected" : ""}>${esc(c.label)}${c.ready ? "" : " (준비 중)"}</option>`).join("")
       : '<option value="">채널 없음</option>';
   }
-  // 빈 콘티의 종류(category): 위키 채널이면 "위키 인물"(업로드 설명에 위키백과 출처·라이선스 문구), 그 밖(트렌드·Pexels 채널)은 "뉴스/이슈".
+  // 빈 콘티의 종류(category): 위키 채널이면 "위키"(업로드 설명에 위키백과 출처·라이선스 문구), 그 밖(트렌드·Pexels 채널)은 "뉴스/이슈".
   // "Pexels" 종류는 Scenes 목록에서 빠지는 Pexels 슬라이드쇼 전용이라 여기서는 쓰지 않는다 (채널은 channel_slot으로 정해진다)
   function categoryFor(slot) {
     const ch = channelOf(slot);
-    return ch && ch.source === "wiki" ? "위키 인물" : "뉴스/이슈";
+    return ch && ch.source === "wiki" ? "위키" : "뉴스/이슈";
   }
 
   // 고른 채널의 채널 카드 (기본 카드 ★를 미리 고른다). 채널을 바꾸면 다시 부른다

@@ -354,7 +354,7 @@
       const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : (channelSlot != null ? { channel_slot: channelSlot } : {});
       for (const idea of picked) {
         const row = await ContiJob.createPlaceholder({
-          category: { person: "위키 인물", event: "위키 사건", thing: "위키 지식" }[ideasData.kind] || "위키 인물",
+          category: "위키",   // 인물·사건·지식 구분 없이 "위키" (옛 콘티의 "위키 인물" 등도 "위키"로 시작해서 같은 규칙을 탄다)
           name: idea.title,
           slug: `${new Date().toISOString().slice(0, 10)}_wiki-${slugOf(ideasData.person.name_ko)}-${Date.now() % 10000}${jobs.length}`,
           video_settings: { ...(userDefaults || {}), ...cardSettings },
