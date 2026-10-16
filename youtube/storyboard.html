@@ -2581,7 +2581,7 @@
         body: JSON.stringify(segs.map((s, i) => ({
           script_id: created.id, order_no: i + 1,
           section: s.section, script_text: s.script_text, keyword: s.keyword, direction: s.direction,
-          ...(s.asset_paths && s.asset_paths.length ? { asset_paths: s.asset_paths } : {}),   // 구독 카드 사진
+          asset_paths: (s.asset_paths && s.asset_paths.length) ? s.asset_paths : [],   // 구독 카드 사진 (여러 행을 한 번에 넣을 땐 모든 행의 칸 이름이 같아야 한다)
         }))),
       });
       if (!segRes.ok) throw new Error(await segRes.text());

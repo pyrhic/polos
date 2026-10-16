@@ -381,7 +381,7 @@
     const script = (await sRes.json())[0];
     const gRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
       method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
-      body: JSON.stringify(d.segments.map((s, i) => ({ script_id: script.id, order_no: i + 1, section: s.section, script_text: s.script_text, keyword: s.keyword, direction: s.direction, ...(s.asset_paths && s.asset_paths.length ? { asset_paths: s.asset_paths } : {}) }))),
+      body: JSON.stringify(d.segments.map((s, i) => ({ script_id: script.id, order_no: i + 1, section: s.section, script_text: s.script_text, keyword: s.keyword, direction: s.direction, asset_paths: (s.asset_paths && s.asset_paths.length) ? s.asset_paths : [] }))),
     });
     if (!gRes.ok) throw new Error(await gRes.text());
     const segs = (await gRes.json()).sort((a, b) => a.order_no - b.order_no);
