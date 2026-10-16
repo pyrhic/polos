@@ -45,18 +45,18 @@
   .sc-item { background:var(--card-2); border:1px solid var(--line); border-radius:3px; margin-bottom:8px; }
   .sc-item.open { border-color:var(--accent); }
   .sc-bar { display:flex; align-items:center; gap:8px; padding:10px 10px; cursor:pointer; }
-  .sc-star { flex:0 0 auto; width:18px; text-align:center; color:var(--muted-2); font-size:0.95rem; }
+  /* ★ = 기본 카드 표시이자 버튼 (☆를 누르면 기본 카드로), × = 카드 삭제 */
+  .sc-star, .sc-x { flex:0 0 auto; width:30px; height:30px; margin:-6px 0; padding:0; display:inline-flex; align-items:center; justify-content:center; background:transparent; box-shadow:none; border-radius:50%; color:var(--muted-2); font-size:1rem; line-height:1; text-transform:none; letter-spacing:0; }
+  .sc-star { margin-left:-6px; }
   .sc-star.on { color:var(--point); }
+  .sc-star:hover { background:var(--inset); color:var(--point); }
+  .sc-x { margin-right:-6px; font-size:1.15rem; }
+  .sc-x:hover { background:var(--danger); color:var(--on-accent); }
   .sc-name-in { flex:1; min-width:0; margin:0; padding:4px 6px; font-weight:700; font-size:0.9rem; background:transparent; color:var(--text); border:none; border-bottom:1px dashed var(--line-strong); border-radius:0; cursor:text; }
   .sc-name-in:focus { outline:none; border-bottom:1px solid var(--accent); background:var(--input); }
   .sc-name { flex:1; min-width:0; font-weight:700; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .sc-meta { flex:0 0 auto; color:var(--muted); font-size:0.7rem; }
   .sc-dirty { color:var(--point); font-size:0.7rem; font-weight:800; }
-  .sc-tools { display:flex; flex-wrap:wrap; gap:6px; padding:0 10px 10px; }
-  .sc-tools button { flex:1 1 auto; width:auto; padding:7px 6px; font-size:0.72rem; margin:0; }
-  .sc-tools button.danger { color:var(--danger); }
-  .sc-tools button.danger:hover { background:var(--danger); color:var(--on-accent); }
-  .sc-tools button.danger:disabled { color:var(--muted-2); background:var(--line-strong); }
   /* 구독 카드 디자인 */
   .sc-edit { padding:0 10px 12px; border-top:1px solid var(--line); }
   .sc-edit label { margin-top:12px; font-size:0.82rem; }
@@ -65,8 +65,10 @@
   .sc-hint b { color:var(--text-2); }
   .ph-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; position:relative; }
   .ph-grid.drop-on { outline:2px dashed #38bdf8; outline-offset:4px; border-radius:3px; }
-  .ph-grid.drop-on::after { content:"놓으면 사진 추가"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(56,189,248,0.18); color:#0284c7; font-weight:700; font-size:0.9rem; border-radius:3px; pointer-events:none; z-index:2; }
+  .ph-grid.drop-on::after { content:"놓으면 추가"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(56,189,248,0.18); color:#0284c7; font-weight:700; font-size:0.9rem; border-radius:3px; pointer-events:none; z-index:2; }
   .ph { position:relative; aspect-ratio:9/16; background:var(--inset) center/cover no-repeat; border-radius:3px; overflow:hidden; }
+  .ph video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+  .ph .vid { position:absolute; right:3px; top:3px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.6rem; font-weight:800; padding:1px 5px; border-radius:2px; }
   .ph .no { position:absolute; left:3px; top:3px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.65rem; font-weight:800; padding:1px 5px; border-radius:2px; }
   .ph .ph-tools { position:absolute; left:0; right:0; bottom:0; display:flex; background:rgba(0,0,0,0.7); }
   .ph .ph-tools button { flex:1; width:auto; margin:0; padding:6px 0; font-size:0.75rem; background:transparent; box-shadow:none; border-radius:0; color:#fff; }
@@ -85,24 +87,26 @@
   .sc-msg { font-size:0.75rem; margin-top:6px; min-height:1em; color:var(--accent); }
   .sc-msg.err { color:var(--danger); }
   /* 미리보기: 영상 1080x1920을 1/6(180x320)로. framed = 위 제목 칸(0~70) / 영상 칸(70~283) / 아래 출처 칸 */
-  .pv-wrap { display:flex; gap:10px; align-items:flex-start; margin-top:6px; }
-  .pv { position:relative; flex:0 0 180px; width:180px; height:320px; background:#000; border-radius:4px; overflow:hidden; cursor:pointer; user-select:none; -webkit-user-select:none; }
+  .sc-pv-btn { margin:10px 0 0; }
+  .pv-wrap { display:flex; flex-direction:column; gap:10px; align-items:center; }
+  .pv { position:relative; flex:0 0 auto; width:180px; height:320px; background:#000; border-radius:4px; overflow:hidden; cursor:pointer; user-select:none; -webkit-user-select:none; }
   .pv-t { position:absolute; left:4px; right:4px; text-align:center; font-family:'Black Han Sans',sans-serif; font-size:15px; line-height:1.2; opacity:.55; }
   .pv-t1 { top:20px; color:#ffff00; }
   .pv-t2 { top:41px; color:#fff; }
   .pv-media { position:absolute; left:0; right:0; top:70px; height:213px; overflow:hidden; background:#222; }
   .pv-photo { position:absolute; left:0; top:0; width:100%; height:100%; background:center/cover no-repeat; will-change:transform; }
+  video.pv-photo { object-fit:cover; display:block; }
   .pv-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:#888; font-size:0.72rem; padding:10px; line-height:1.45; }
   .pv-src { position:absolute; left:4px; right:4px; bottom:18px; text-align:center; font-family:'IBM Plex Sans KR',sans-serif; font-weight:300; font-size:8px; color:#d0d0d0; opacity:.6; }
   .pv-cap { position:absolute; left:4px; right:4px; top:225px; text-align:center; line-height:1.25; z-index:2; font-family:'IBM Plex Sans KR',sans-serif; font-weight:500; font-size:13px; color:#fff;
     text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000; }
   .pv-cap .em { font-family:'Black Han Sans',sans-serif; font-weight:400; color:#ffff00; }
   .pv-cap .hid { color:#aaa; font-size:10px; font-style:italic; text-shadow:none; background:rgba(0,0,0,.55); padding:1px 4px; border-radius:2px; }
-  .pv-side { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .pv-side { width:100%; min-width:0; display:flex; flex-direction:column; gap:6px; }
   .pv-nav { display:flex; gap:6px; align-items:center; }
   .pv-nav button { width:auto; flex:1; margin:0; padding:7px 0; font-size:0.8rem; }
   .pv-count { flex:0 0 auto; color:var(--text-2); font-size:0.78rem; font-weight:700; min-width:38px; text-align:center; }
-  .pv-lines { list-style:none; margin:0; padding:0; font-size:0.72rem; line-height:1.4; color:var(--muted); max-height:200px; overflow-y:auto; }
+  .pv-lines { list-style:none; margin:0; padding:0; font-size:0.72rem; line-height:1.4; color:var(--muted); max-height:140px; overflow-y:auto; }
   .pv-lines li { padding:3px 5px; border-radius:2px; cursor:pointer; word-break:break-all; }
   .pv-lines li.on { background:var(--accent-dim); color:var(--accent); }
   .pv-lines .ln-hid { font-style:italic; opacity:.6; }
@@ -121,6 +125,19 @@
   @keyframes dirTU   { from { transform:translateY(-28.57%); } to { transform:translateY(0); } }
   @keyframes dirTD   { from { transform:translateY(0); } to { transform:translateY(-28.57%); } }
   @media (prefers-reduced-motion: reduce) { .pv-photo { animation:none !important; } }
+  /* 팝업 (미리보기 · 안내) — ✕ / 바깥 누르기 / Esc로 닫기 */
+  .ch-modal { display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.78); align-items:center; justify-content:center; padding:12px; overflow-y:auto; }
+  .ch-modal.open { display:flex; }
+  .ch-modal-box { position:relative; background:var(--card); border-radius:6px; padding:14px; width:100%; max-width:340px; margin:auto; }
+  .ch-modal-title { font-weight:800; font-size:0.92rem; color:var(--text); margin:0 30px 8px 0; }
+  .ch-modal-text { color:var(--text-2); font-size:0.82rem; line-height:1.6; }
+  .ch-modal-x { position:absolute; right:8px; top:8px; width:32px; height:32px; margin:0; padding:0; background:transparent; box-shadow:none; color:var(--muted); font-size:1rem; }
+  .ch-modal-ok { margin:14px 0 0; }
+  .pv-media-nav { display:flex; gap:6px; align-items:center; justify-content:center; font-size:0.75rem; color:var(--text-2); }
+  .pv-media-nav button { width:auto; margin:0; padding:5px 10px; font-size:0.75rem; }
+  /* 짧은 알림 (화면 아래) */
+  .ch-toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:60; width:max-content; max-width:calc(100vw - 32px); box-sizing:border-box; background:var(--text); color:var(--bg); font-size:0.82rem; font-weight:700; padding:10px 16px; border-radius:20px; box-shadow:0 4px 16px rgba(0,0,0,0.3); opacity:0; pointer-events:none; transition:opacity .2s; text-align:center; }
+  .ch-toast.on { opacity:1; }
   .add-note { color:var(--muted); font-size:0.75rem; line-height:1.5; background:var(--card); border-radius:3px; padding:12px 14px; margin-bottom:30px; }
   .add-note b { color:var(--text-2); }
 </style>
@@ -138,6 +155,23 @@
       이 화면에는 비밀값이 저장되지도 보이지도 않고, 연결 "상태"만 보입니다.
     </div>
   </div>
+
+  <div class="ch-modal" id="pvModal" role="dialog" aria-modal="true" aria-label="채널 카드 미리보기">
+    <div class="ch-modal-box">
+      <button type="button" class="ch-modal-x" data-close="pvModal" aria-label="닫기">✕</button>
+      <div class="ch-modal-title" id="pvModalTitle">미리보기</div>
+      <div id="pvModalBody"></div>
+    </div>
+  </div>
+  <div class="ch-modal" id="infoModal" role="dialog" aria-modal="true">
+    <div class="ch-modal-box">
+      <button type="button" class="ch-modal-x" data-close="infoModal" aria-label="닫기">✕</button>
+      <div class="ch-modal-title" id="infoModalTitle"></div>
+      <div class="ch-modal-text" id="infoModalText"></div>
+      <button type="button" class="ch-modal-ok" data-close="infoModal">확인</button>
+    </div>
+  </div>
+  <div class="ch-toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/config.js"></script>
 <script src="/youtube/channels.js"></script>

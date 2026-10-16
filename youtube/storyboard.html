@@ -198,6 +198,7 @@
   #settingsSaveBtn.dirty { background:var(--point); color:var(--on-accent); }
   .seg-pexels-pick { width:80px; margin-top:4px; padding:5px 0; font-size:0.7rem; }
   .seg-pexels-dur { position:absolute; bottom:2px; right:4px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.6rem; padding:1px 4px; border-radius:2px; }
+  .seg-pexels-used { position:absolute; top:2px; left:4px; background:rgba(0,0,0,0.7); color:#ffd36b; font-size:0.6rem; padding:1px 4px; border-radius:2px; }
   /* 빈 화면 클립 (검정 / 흰색 / 화면조정) */
   .blank-black { background:#000 !important; }
   .blank-white { background:#fff !important; }
@@ -315,7 +316,12 @@
   .cardpick-list { max-height:42vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
   .cardpick-item { display:flex; align-items:center; gap:10px; width:100%; margin:0; padding:8px; text-align:left; text-transform:none; letter-spacing:0; color:var(--text); background:var(--btn); box-shadow:none; min-width:0; }
   .cardpick-thumb { width:44px; height:44px; flex-shrink:0; border-radius:4px; background:var(--bg) center/cover no-repeat; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:0.6rem; overflow:hidden; }
-  .cardpick-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .cardpick-thumb img, .cardpick-thumb video { width:100%; height:100%; object-fit:cover; display:block; }
+  .capguide-list { color:var(--text-2); font-size:0.82rem; line-height:1.6; margin:8px 0 4px; }
+  .capguide-list b { color:var(--text); }
+  .capguide-list .ex { color:var(--muted); font-size:0.74rem; }
+  .capguide-never { display:flex; align-items:center; gap:8px; margin:10px 0 0; font-size:0.8rem; color:var(--text-2); cursor:pointer; }
+  .capguide-never input { width:auto; margin:0; padding:0; }
   .cardpick-txt { min-width:0; flex:1; }
   .cardpick-name { font-size:0.82rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cardpick-name .def { color:var(--accent); font-weight:800; margin-left:4px; }
@@ -498,6 +504,23 @@
         <div class="trim-actions">
           <button type="button" id="pvGuideOk" style="flex:1;box-shadow:inset 0 0 0 1px var(--text);">확인</button>
           <button type="button" id="pvGuideNever" style="flex:1;font-size:0.8rem;">다시 알림 보지 않기</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap-modal" id="capGuideModal" role="dialog" aria-modal="true" aria-label="자막 쓰는 법">
+      <div class="cap-modal-box" style="max-width:340px;position:relative;padding-bottom:0;">
+        <button type="button" id="capGuideX" class="trim-x" title="닫기">✕</button>
+        <div class="cap-modal-hint" style="font-size:0.9rem;font-weight:700;color:var(--text);">자막 쓰는 법</div>
+        <div class="capguide-list">
+          · <b>줄바꿈</b> = 자막 한 줄. 한 줄씩 화면에 나와요.<br>
+          · <b>[ ]</b> 안은 읽기만 하고 자막엔 숨겨요.<br><span class="ex">&nbsp;&nbsp;예) [구독 좋아요 해주시면] 나도 좋아요 → 자막은 "나도 좋아요"만</span><br>
+          · <b>{ }</b> 안은 자막에만 보이고 읽지 않아요(무음).<br><span class="ex">&nbsp;&nbsp;예) 구독은 {무료입니다} → 목소리는 "구독은"만</span><br>
+          · 앞뒤를 띄운 <b>" - "</b> = 0.3초 쉼. 여러 개면 개수만큼 쉬어요(<b>- -</b> = 0.6초).<br><span class="ex">&nbsp;&nbsp;K-pop, 코로나-19처럼 붙은 하이픈은 쉼이 아니에요.</span><br>
+          · <b>**글자**</b> = 노란 강조 자막.
+        </div>
+        <label class="capguide-never"><input type="checkbox" id="capGuideNever"> 다시 보지 않기</label>
+        <div class="trim-actions">
+          <button type="button" id="capGuideOk" style="flex:1;box-shadow:inset 0 0 0 1px var(--text);">닫기</button>
         </div>
       </div>
     </div>
@@ -740,6 +763,57 @@
   // ───── 장면 카드 소재 영역 (릴스 EDITS 앱처럼): 미리보기 + 타임라인 한 줄 + 도구줄 ─────
   // 타임라인 클립 칸에 깔 대표 썸네일. 사진은 그 사진, 영상은 Pexels 썸네일 또는 첫 프레임을 뜬 그림, 빈 화면은 색.
   const pexelsThumbMem = {};   // Pexels 영상 주소 -> 검색 결과의 썸네일 주소 (이번 화면에서 검색/자동 배치한 것만. DB에는 저장하지 않는다)
+  // ── Pexels 영상 겹침 확인 (docs/storyboard-contract.md 2절) ──
+  // 같은 영상이라도 검색마다 고른 파일(hd_url)이 다를 수 있어서, 주소의 /video-files/<영상 id>/ 로 비교한다 (id가 없는 옛 주소는 주소 그대로)
+  function pexelsVideoKey(u) {
+    const m = /^https?:\/\/(?:[\w-]+\.)*pexels\.com\/video-files\/(\d+)\//i.exec(String(u || ""));
+    return m ? "pxv:" + m[1] : String(u || "");
+  }
+  function pexelsKeySet(paths) {
+    const set = new Set();
+    for (const p of paths) { set.add(String(p)); set.add(pexelsVideoKey(p)); }
+    return set;
+  }
+  function pexelsResultIn(set, r) {
+    return (r.id != null && set.has("pxv:" + r.id)) || set.has(r.hd_url) || set.has(pexelsVideoKey(r.hd_url));
+  }
+  function shuffled(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  // 다른 콘티(이전 영상)에 이미 들어간 영상 주소: 화면을 연 뒤 처음 필요할 때 한 번만 읽어 콘티별로 들고 있는다.
+  // 지금 콘티의 몫은 매번 화면의 최신 소재로 바꿔 둔다 (다른 콘티로 넘어가도 방금 넣은 영상이 "사용함"으로 잡히게)
+  let otherUsedLoad = null;
+  async function loadUsedPathsByScript() {
+    const byScript = new Map();
+    const PAGE = 1000;
+    for (let offset = 0; ; offset += PAGE) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=script_id,asset_paths&order=id.asc&limit=${PAGE}&offset=${offset}`, { headers });
+      if (!res.ok) throw new Error(await res.text());
+      const rows = await res.json();
+      for (const r of rows) {
+        const urls = (r.asset_paths || []).filter((p) => /^https?:\/\//i.test(String(p)));   // 직접 올린 파일(스토리지 경로)은 상관없다
+        if (!urls.length) continue;
+        const k = String(r.script_id);
+        byScript.set(k, [...(byScript.get(k) || []), ...urls]);
+      }
+      if (rows.length < PAGE) break;
+    }
+    return byScript;
+  }
+  async function otherScriptsUsedKeys() {
+    let byScript;
+    try {
+      byScript = await (otherUsedLoad || (otherUsedLoad = loadUsedPathsByScript()));
+    } catch {
+      otherUsedLoad = null;   // 다음 검색 때 다시 읽는다 (못 읽어도 검색은 그대로 한다)
+      return new Set();
+    }
+    const cur = String($("scriptSelect").value);
+    if (cur) byScript.set(cur, segments.flatMap((s) => s.asset_paths || []));
+    return pexelsKeySet([...byScript].filter(([k]) => k !== cur).flatMap(([, v]) => v));
+  }
   const thumbDone = {};        // 소재 경로 -> 썸네일 주소 (null이면 못 구함)
   const thumbWait = {};        // 소재 경로 -> 구하는 중인 Promise
   let grabRunning = 0;
@@ -2383,15 +2457,23 @@
       if (!res.ok) throw new Error("구독 카드 표를 읽지 못함");
       draftCards = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
       if (!draftCards.length) throw new Error(`${ch.label} 채널에 채널 카드가 없음`);
-      sel.innerHTML = draftCards.map((c) => `<option value="${c.id}"${c.is_default ? " selected" : ""}>${escapeHtml(c.name)}${c.is_default ? " (기본)" : ""} · 사진 ${c.image_paths.length}장</option>`).join("");
-      hint.textContent = `${ch.label} 채널의 카드예요. 카드 문구·사진은 채널 화면에서 고쳐요.`;
+      sel.innerHTML = draftCards.map((c) => `<option value="${c.id}"${c.is_default ? " selected" : ""}>${escapeHtml(c.name)}${c.is_default ? " (기본)" : ""} · ${cardMediaText(c.image_paths)}</option>`).join("");
+      hint.textContent = `${ch.label} 채널의 카드예요. 카드 문구·사진·영상은 채널 화면에서 고쳐요.`;
     } catch (err) {
       draftCards = [];
       sel.innerHTML = '<option value="">기본 문구 (카드를 못 읽음)</option>';
       hint.textContent = `채널 카드를 불러오지 못해 기본 문구를 써요 (${err.message}).`;
     }
   }
-  // 카드 사진 중 한 장: 그 카드로 이미 만든 콘티 수 기준으로 돌아가며 (못 세면 무작위). 사진이 없으면 빈 배열
+  // 채널 카드 소재 개수 글자: "사진 2장 · 영상 1개"
+  function cardMediaText(paths) {
+    const list = paths || [];
+    const v = list.filter((p) => isVideo(p)).length, ph = list.length - v;
+    if (!list.length) return "소재 없음";
+    return [ph ? `사진 ${ph}장` : "", v ? `영상 ${v}개` : ""].filter(Boolean).join(" · ");
+  }
+  // 카드 소재(사진 또는 영상) 중 하나: 그 카드로 이미 만든 콘티 수 기준으로 돌아가며 (못 세면 무작위). 소재가 없으면 빈 배열
+  // 영상도 스토리지 경로라서 장면 asset_paths에 그대로 들어가고, 콘티 미리보기·파이프라인이 직접 올린 영상과 똑같이 다룬다
   // excludeId: 이미 있는 콘티에 불러올 때 그 콘티 자신은 세지 않는다 (새 콘티 만들 때와 같은 순번이 되게)
   async function pickCardPhoto(card, excludeId) {
     const list = card.image_paths || [];
@@ -2925,6 +3007,7 @@
     };
     setBody('<div class="seg-pexels-loading">Pexels에서 검색 중...</div>');
     try {
+      const otherUsedP = otherScriptsUsedKeys();   // Pexels 검색과 같이 읽는다 (처음 한 번만 DB를 부른다)
       const res = await fetch(`/api/pexels-search?q=${encodeURIComponent(query)}&orientation=portrait`);
       const data = await res.json().catch(() => ({}));
       if (res.status === 429) throw new Error("Pexels 한도 초과입니다. 잠시 뒤에 다시 검색하세요.");
@@ -2933,17 +3016,22 @@
         setBody('<div class="seg-pexels-loading">검색 결과가 없습니다.</div>');
         return;
       }
+      const otherUsed = await otherUsedP;
       const seg = segments.find((s) => String(s.id) === id);
-      const already = new Set((seg && seg.asset_paths) || []);
+      const already = pexelsKeySet((seg && seg.asset_paths) || []);   // 같은 영상의 다른 파일이 들어 있어도 "추가됨"
       data.results.forEach((r) => { if (r.hd_url && r.thumbnail) pexelsThumbMem[r.hd_url] = r.thumbnail; });   // 타임라인 썸네일용
-      setBody(`<div class="seg-pexels-grid">${data.results.map((r) => `
+      // 순서는 매번 섞는다. 다른 콘티에서 쓴 영상은 "사용함"을 달아 뒤로 보낸다 (고를 수는 있다)
+      const usedElsewhere = (r) => pexelsResultIn(otherUsed, r);
+      const ordered = [...shuffled(data.results.filter((r) => !usedElsewhere(r))), ...shuffled(data.results.filter(usedElsewhere))];
+      setBody(`<div class="seg-pexels-grid">${ordered.map((r) => `
         <div class="seg-pexels-item">
           <div class="seg-pexels-thumb-wrap" data-preview="${escapeAttr(r.preview_url)}">
             <img src="${r.thumbnail}?w=200" alt="" loading="lazy">
             <span class="seg-pexels-dur">${Math.round(r.duration)}s</span>
+            ${usedElsewhere(r) ? '<span class="seg-pexels-used" title="다른 콘티에서 이미 쓴 영상입니다">사용함</span>' : ""}
           </div>
-          <button type="button" class="seg-pexels-pick" data-hd="${escapeAttr(r.hd_url)}" data-dur="${Number(r.duration) || ""}" ${already.has(r.hd_url) ? "disabled" : ""}>
-            ${already.has(r.hd_url) ? "추가됨 ✓" : "선택"}
+          <button type="button" class="seg-pexels-pick" data-hd="${escapeAttr(r.hd_url)}" data-dur="${Number(r.duration) || ""}" ${pexelsResultIn(already, r) ? "disabled" : ""}>
+            ${pexelsResultIn(already, r) ? "추가됨 ✓" : "선택"}
           </button>
         </div>
       `).join("")}</div>
@@ -4213,6 +4301,34 @@
     $("pvGuideNever").onclick = () => close(true);
     m.classList.add("open");
   }
+  // 자막(대사) 칸을 처음 누르면 자막 쓰는 법을 한 번 보여준다. "다시 보지 않기"를 체크하고 닫기 전까지는 화면을 열 때마다 한 번
+  let capGuideShownThisVisit = false;
+  function capGuideNeeded() {
+    if (capGuideShownThisVisit) return false;
+    try { return localStorage.getItem("capGuideOff") !== "1"; } catch { return true; }
+  }
+  function capShowGuide(field) {
+    capGuideShownThisVisit = true;
+    const m = $("capGuideModal");
+    $("capGuideNever").checked = false;
+    const close = () => {
+      if ($("capGuideNever").checked) { try { localStorage.setItem("capGuideOff", "1"); } catch { /* 저장 못 하면 다음에 또 보인다 */ } }
+      m.classList.remove("open");
+      document.removeEventListener("keydown", onKey, true);
+      if (field && field.isConnected) field.focus();   // 쓰던 자막 칸으로 돌아간다
+    };
+    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } };
+    $("capGuideOk").onclick = close;
+    $("capGuideX").onclick = close;
+    m.onclick = (e) => { if (e.target === m) close(); };
+    document.addEventListener("keydown", onKey, true);
+    if (field) field.blur();
+    m.classList.add("open");
+  }
+  document.addEventListener("focusin", (e) => {
+    const t = e.target;
+    if (t && t.matches && t.matches(".seg-script") && capGuideNeeded()) capShowGuide(t);
+  });
   // 그 시점으로 이동 (재생 중이면 거기서 이어서, 목소리는 끊고 그 줄부터 다시 이어 읽는다)
   function pvSeek(el, t) {
     const ctx = pvActivate(el);
@@ -4761,6 +4877,7 @@
     autofillBusy.add(id);
     refreshThumbs(id);
     let status = "error", results = [];
+    const otherUsedP = otherScriptsUsedKeys();   // 다른 콘티(이전 영상)에서 쓴 영상은 넣지 않는다
     try {
       const res = await fetch(`/api/pexels-search?q=${encodeURIComponent(q)}&orientation=portrait`);
       if (res.status === 429) status = "quota";
@@ -4776,21 +4893,25 @@
     } catch {
       status = "error";
     }
+    const otherUsed = await otherUsedP;
     autofillBusy.delete(id);
     if (!segments.includes(seg)) return status;   // 그 사이 다른 콘티로 넘어갔다
     const trims = { ...(seg.asset_trims || {}) };
     if (trims.__cleared) { refreshThumbs(id); return status; }   // 검색하는 사이 사용자가 직접 지웠다
     // 저장 직전의 최신 소재 목록에 더한다 (검색하는 사이 올린 사진이 있어도 지워지지 않게)
     const paths = [...(seg.asset_paths || [])];
-    const used = new Set(segments.flatMap((s) => s.asset_paths || []));   // 이 장면·다른 장면에 이미 있는 영상은 넣지 않는다
+    const used = pexelsKeySet(segments.flatMap((s) => s.asset_paths || []));   // 이 장면·다른 장면에 이미 있는 영상은 넣지 않는다
     const pex = { ...(trims.__pexels || {}) };
     let want = needClips(segSecondsOf(seg)) - paths.length;
     let added = 0;
-    for (const r of results) {
+    // 맞는 후보 중에서 무작위로 고른다. 모자라면 그대로 두고 짧은/빈 장면 안내가 알려준다
+    for (const r of shuffled(results.filter((r) => !pexelsResultIn(otherUsed, r)))) {
       if (want <= 0) break;
-      if (used.has(r.hd_url)) continue;
+      if (pexelsResultIn(used, r)) continue;
       paths.push(r.hd_url);
       used.add(r.hd_url);
+      used.add(pexelsVideoKey(r.hd_url));
+      if (r.id != null) used.add("pxv:" + r.id);
       if (Number(r.duration) > 0) pex[r.hd_url] = Number(r.duration);
       want--; added++;
     }
@@ -5102,11 +5223,11 @@
           const first = (normalizeScript(c.script_text || "").split("\n").find((l) => l.trim()) || "(문구 없음)").trim();
           const img = c.image_paths[0];
           return `<button type="button" class="cardpick-item" data-i="${i}">
-          <span class="cardpick-thumb">${img ? `<img src="${escapeAttr(assetUrl(img))}" alt="" loading="lazy" onerror="this.remove()">` : "사진 없음"}</span>
+          <span class="cardpick-thumb">${!img ? "소재 없음" : isVideo(img) ? `<video src="${escapeAttr(assetUrl(img))}#t=0.1" muted playsinline preload="metadata"></video>` : `<img src="${escapeAttr(assetUrl(img))}" alt="" loading="lazy" onerror="this.remove()">`}</span>
           <span class="cardpick-txt">
             <span class="cardpick-name" style="display:block;">${escapeHtml(c.name || "(이름 없음)")}${c.is_default ? '<span class="def">★기본</span>' : ""}${String(c.id) === String(curId) ? ' <span style="color:var(--muted);font-weight:700;">· 지금 카드</span>' : ""}</span>
             <span class="cardpick-line" style="display:block;">${escapeHtml(first)}</span>
-            <span class="cardpick-line" style="display:block;">사진 ${c.image_paths.length}장${c.direction ? " · " + escapeHtml(oneLine(c.direction)) : ""}</span>
+            <span class="cardpick-line" style="display:block;">${cardMediaText(c.image_paths)}${c.direction ? " · " + escapeHtml(oneLine(c.direction)) : ""}</span>
           </span>
         </button>`;
         }).join("")}</div>`
@@ -5115,7 +5236,7 @@
       const t = currentSettings.name || "";
       const regHtml = segId ? `<div class="cardpick-reg">
           <div class="cardpick-reg-title">이 카드를 채널 카드로 등록</div>
-          <div class="cardpick-reg-hint">지금 장면의 문구·연출·사진을 ${escapeHtml(ch.label)} 채널의 새 카드로 저장해요. 사진은 채널 카드 보관함으로 복사돼요.</div>
+          <div class="cardpick-reg-hint">지금 장면의 문구·연출·사진·영상을 ${escapeHtml(ch.label)} 채널의 새 카드로 저장해요. 사진·영상(Pexels 영상 포함)은 채널 카드 보관함으로 복사되고, 빈 화면은 빠져요.</div>
           <div class="cardpick-reg-row">
             <input type="text" class="cardpick-reg-name" maxlength="40" placeholder="카드 이름" value="${escapeAttr(t ? `${t} 카드`.slice(0, 40) : "새 채널 카드")}">
             <button type="button" class="cardpick-reg-btn">등록</button>
@@ -5133,8 +5254,11 @@
     }
   }
   // 지금 채널 카드 장면을 이 채널의 새 카드(youtube_subscribe_cards)로 저장한다.
-  // 장면 사진은 콘티에서 지우면 스토리지에서도 지워지는 파일일 수 있으므로 subscribe/<채널>/ 아래로 복사해서 쓴다 (채널 화면 업로드와 같은 이름 규칙).
-  // 영상·빈 화면·Pexels 소재(외부 주소)는 카드 사진이 될 수 없어 뺀다.
+  // 장면 소재는 콘티에서 지우면 스토리지에서도 지워지는 파일일 수 있으므로 subscribe/<채널>/ 아래로 복사해서 쓴다 (채널 화면 업로드와 같은 이름 규칙).
+  //  - 우리 스토리지의 사진·영상: 내려받아 subscribe/로 복사
+  //  - Pexels 영상·사진(외부 주소): 브라우저가 Pexels 서버에서 직접 못 받을 수 있어(CORS) /api/save-pexels-clip이 받아서 subscribe/에 저장
+  //  - 빈 화면(blank:*)과 그 밖의 외부 주소는 카드 소재가 될 수 없어 빼고 알려 준다
+  const CARD_MAX_MB = 50;   // 파일 한 개 최대 (Supabase 무료 요금제 업로드 한도. 채널 화면·서버 함수와 같다)
   async function registerSceneAsCard(scriptId, segId, ch, name) {
     if (cardPickBusy) return;
     const seg = segments.find((s) => String(s.id) === String(segId));
@@ -5146,24 +5270,41 @@
     const scriptText = el ? el.querySelector(".seg-script").value : (seg.script_text || "");
     const direction = el ? el.querySelector(".seg-direction").value : (seg.direction || "");
     const assets = seg.asset_paths || [];
-    const photos = assets.filter((p) => isStoragePath(p) && isImage(p));
-    const skipped = assets.length - photos.length;
+    const items = assets.filter((p) => isStoragePath(p) || isPexels(p));
+    const blanks = assets.filter(isBlank).length;
+    const others = assets.length - items.length - blanks;
+    let tooBig = 0;
     cardPickBusy = true;
     if (btn) { btn.disabled = true; btn.textContent = "등록 중…"; }
     const copied = [];
     try {
-      for (const p of photos) {
+      for (const [i, p] of items.entries()) {
+        if (btn) btn.textContent = `등록 중… (${i + 1}/${items.length})`;
+        const kind = isVideo(p) ? "영상" : "사진";
+        if (isPexels(p)) {
+          const r = await fetch("/api/save-pexels-clip", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: p, slot: Number(ch.slot) }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (r.status === 413) { tooBig++; continue; }
+          if (!r.ok || !data.path) throw new Error(`Pexels ${kind}을 저장하지 못함 (${data.error || r.status})`);
+          copied.push(data.path);
+          continue;
+        }
         const r = await fetch(publicUrl(p));
-        if (!r.ok) throw new Error(`사진을 읽지 못함 (${p.split("/").pop()})`);
+        if (!r.ok) throw new Error(`${kind}을 읽지 못함 (${p.split("/").pop()})`);
         const blob = await r.blob();
-        const safeName = (p.split("/").pop() || "photo.jpg").replace(/[^\w.\-]/g, "_");
+        if (blob.size > CARD_MAX_MB * 1024 * 1024) { tooBig++; continue; }
+        const safeName = (p.split("/").pop() || (isVideo(p) ? "clip.mp4" : "photo.jpg")).replace(/[^\w.\-]/g, "_");
         const dest = `subscribe/${ch.slot}/${Date.now()}_${safeName}`;
         const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${dest}`, {
           method: "POST",
           headers: { ...headers, "Content-Type": blob.type || "application/octet-stream" },
           body: blob,
         });
-        if (!up.ok) throw new Error(`사진 복사 실패: ${await up.text()}`);
+        if (!up.ok) throw new Error(`${kind} 복사 실패: ${await up.text()}`);
         copied.push(dest);
       }
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards`, {
@@ -5184,13 +5325,17 @@
       currentSettings.channel_slot = card.channel_slot;
       partEdits.card++;
       const saved = await savePart("card");
-      const skipText = skipped ? ` 영상·빈 화면·Pexels 소재 ${skipped}개는 사진이 아니라서 뺐어요.` : "";
-      const text = `"${card.name}" 카드를 등록했어요 (사진 ${copied.length}장).${skipText}`;
+      const skipText = [
+        blanks ? ` 빈 화면 ${blanks}개는 카드 소재가 될 수 없어 뺐어요.` : "",
+        others ? ` 외부 주소 소재 ${others}개는 뺐어요.` : "",
+        tooBig ? ` ${CARD_MAX_MB}MB가 넘는 파일 ${tooBig}개는 뺐어요.` : "",
+      ].join("");
+      const text = `"${card.name}" 카드를 등록했어요 (${cardMediaText(copied)}).${skipText}`;
       if (saved) showMsg(text, true);
       openCardPick(segId, { text, ok: true });
     } catch (err) {
       cardPickBusy = false;
-      // 카드를 못 만들었으면 복사해 둔 사진도 지운다
+      // 카드를 못 만들었으면 복사해 둔 사진·영상도 지운다
       for (const p of copied) { try { await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${p}`, { method: "DELETE", headers }); } catch { /* 넘어간다 */ } }
       if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = "등록"; }
       showMsg(`채널 카드 등록 실패: ${err.message}`, false);
