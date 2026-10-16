@@ -54,6 +54,16 @@ const ContiCore = (() => {
     return [list[n % list.length]];
   }
 
+  // 채널 카드의 이름 붙은 목소리(youtube_subscribe_cards.voice = { name, voice, rate, pitch }) → 콘티 video_settings 키.
+  // 영상은 콘티 전체를 목소리 하나로 읽으므로(tts_voice/tts_rate/tts_pitch) 카드 목소리 = 콘티 전체 목소리. voice_name·voice_sync는 화면 표시용.
+  // 카드에 목소리가 없으면 {} (목소리 설정은 그대로). prev = 지금 video_settings: 예전에 동기화 중이었으면 동기화만 끈다
+  function cardVoiceSettings(card, prev) {
+    const v = card && card.voice;
+    const name = v && typeof v === "object" ? String(v.name || "").trim() : "";
+    if (name && v.voice) return { tts_voice: String(v.voice), tts_rate: Number(v.rate) || 0, tts_pitch: Number(v.pitch) || 0, voice_name: name.slice(0, 20), voice_sync: true };
+    return prev && (prev.voice_sync || prev.voice_name) ? { voice_sync: false, voice_name: null } : {};
+  }
+
   function applyCard(segs, card, photo) {
     if (!card) return segs;
     return segs.map((s) => s.section === SUB_SECTION
@@ -124,9 +134,9 @@ const ContiCore = (() => {
     const photo = card ? await pickCardMedia(deps, card, row.id) : [];
     const segs = applyCard(d.segments, card, photo);
     const mood = req.mood || d.mood;   // 직접 고른 분위기 > 제미나이 판단
-    const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : (req.channel_slot != null ? { channel_slot: req.channel_slot } : {});
-    const texts = segs.map((s) => s.script_text || "");
     const vs0 = row.video_settings || {};
+    const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot, ...cardVoiceSettings(card, vs0) } : (req.channel_slot != null ? { channel_slot: req.channel_slot } : {});
+    const texts = segs.map((s) => s.script_text || "");
     let patch, note = "";
     if (isNews) {
       const articles = req.articles || [];
@@ -239,6 +249,6 @@ const ContiCore = (() => {
     }
   }
 
-  return { STALE_MS, TIME_LIMIT_MSG, isStale, screenText, setStatus, phaseDraft, phaseImages, finish, errorText, runAll };
+  return { STALE_MS, TIME_LIMIT_MSG, isStale, screenText, cardVoiceSettings, setStatus, phaseDraft, phaseImages, finish, errorText, runAll };
 })();
 // ==== END ContiCore ====

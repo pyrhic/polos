@@ -134,6 +134,9 @@
   .settings-card .tok.on { background:var(--accent); color:var(--on-accent); }
   .settings-card .tok-btn { border:1px solid var(--line-strong); color:var(--text); border-radius:10px; padding:0 7px; margin-left:4px; font-size:0.72rem; }
   .settings-card .tok-del { color:var(--danger); border-color:var(--danger); }
+  .settings-card span.tok:hover { background:none; color:var(--text); }
+  .voice-sync { display:inline-flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:600; color:var(--text-2, var(--text)); cursor:pointer; margin:0; }
+  .voice-sync input { width:auto; margin:0; accent-color:var(--accent); }
   .settings-card .sr-input { background:transparent; border:none; border-radius:0; padding:0; margin:0; font-size:0.8rem; font-weight:800; color:var(--text); width:100%; }
   .ov-parts .ov-sep { color:var(--muted); font-weight:600; }
   .settings-card .sr-input::placeholder { color:var(--muted-2); font-weight:400; }
@@ -405,7 +408,6 @@
         <input type="range" id="capWeight" min="0" max="4" step="1">
         <input type="range" id="capPos" min="3" max="85" step="1">
         <select id="voiceSel"></select>
-        <audio id="voiceSample" preload="none"></audio>
         <input type="range" id="ttsRate" min="-30" max="30" step="1"><b id="ttsRateVal"></b>
         <input type="range" id="ttsPitch" min="-20" max="20" step="1"><b id="ttsPitchVal"></b>
         <div id="bgmRow"></div>
@@ -415,17 +417,20 @@
       </div>
     </div>
 
-    <!-- 음향: 성우(목소리·속도·높낮이·샘플)와 BGM(올리기·볼륨). 위 카드와 따로 저장된다(이 카드의 키만 덮어씀) -->
+    <!-- 음향: 성우(목소리·속도·높낮이)와 BGM(올리기·볼륨). 위 카드와 따로 저장된다(이 카드의 키만 덮어씀) -->
     <div class="card-box settings-card" id="soundCard" style="display:none;margin-top:14px;">
       <div class="settings-head" id="soundHead" style="justify-content:flex-end;">
         <span class="settings-dirty-badge" id="soundDirtyBadge"></span>
       </div>
       <div class="sr-list">
         <div class="sr"><span class="k">성우</span><span class="v">
-          <button type="button" class="tok" data-wheel="voice" id="tokVoice"></button> ·
+          <span class="tok" id="tokVoiceName" title="채널 카드 목소리 (동기화 중이라 여기서 못 바꿔요)" style="display:none;cursor:default;"></span>
+          <span id="voiceTokens"><button type="button" class="tok" data-wheel="voice" id="tokVoice"></button> ·
           <button type="button" class="tok" data-wheel="rate" id="tokRate"></button> ·
-          <button type="button" class="tok" data-wheel="pitch" id="tokPitch"></button>
-          <button type="button" class="tok tok-btn" id="tokSample">▶ 샘플</button></span></div>
+          <button type="button" class="tok" data-wheel="pitch" id="tokPitch"></button></span></span></div>
+        <!-- 채널 카드에 이름 붙은 목소리가 있을 때만: 켜면 카드 목소리(읽기 전용), 끄면 직접 설정 -->
+        <div class="sr" id="voiceSyncRow" style="display:none;"><span class="k"></span><span class="v">
+          <label class="voice-sync"><input type="checkbox" id="voiceSyncChk"> 채널 카드 목소리와 동기화</label></span></div>
         <div class="sr"><span class="k">BGM</span><span class="v">
           <button type="button" class="tok" id="tokBgm"></button>
           <span id="bgmExtra">
@@ -1888,11 +1893,7 @@
     { label: "굵게", family: "'IBM Plex Sans KR'", weight: 700 },
     { label: "아주 굵게", family: "'Black Han Sans'", weight: 400 },
   ];
-  const VOICES = [
-    { id: "ko-KR-InJoonNeural", label: "인준 (남성) — 현재 기본" },
-    { id: "ko-KR-HyunsuMultilingualNeural", label: "현수 (남성)" },
-    { id: "ko-KR-SunHiNeural", label: "선희 (여성)" },
-  ];
+  const VOICES = GEN_VOICES;   // 성우 목록은 generate.js (채널 화면 카드 목소리와 같은 목록)
   let currentSettings = { ...DEFAULT_SETTINGS };
   let savedBgmPath = null;
   const $ = (id) => document.getElementById(id);
@@ -1907,11 +1908,12 @@
     cap: ["caption_font_size", "caption_weight", "caption_position_pct"],
     name: ["name"],
     card: ["subscribe_card_id", "channel_slot"],   // 채널 카드 불러오기: 고른 카드와 그 채널만
+    voice: ["tts_voice", "tts_rate", "tts_pitch", "voice_name", "voice_sync"],   // 채널 카드 목소리 동기화(켜기·끄기·카드 목소리 반영): 바로 저장
   };
   const PART_BTN = { main: "settingsSaveBtn", sound: "soundSaveBtn" };
   const dirtyParts = new Set();
   const savingParts = new Set();
-  const partEdits = { main: 0, sound: 0, cap: 0, name: 0, mood: 0, card: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
+  const partEdits = { main: 0, sound: 0, cap: 0, name: 0, mood: 0, card: 0, voice: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
   const justSavedParts = new Set();
   let saveChain = Promise.resolve();   // 저장은 하나씩 차례로(앞 저장 결과 위에 다음 저장을 덮어쓰도록)
 
@@ -2028,6 +2030,15 @@
     const r = Number($("ttsRate").value), p = Number($("ttsPitch").value);
     $("tokRate").textContent = `속도 ${r > 0 ? "+" : ""}${r}%`;
     $("tokPitch").textContent = `높낮이 ${p > 0 ? "+" : ""}${p}Hz`;
+    // 채널 카드 목소리와 동기화 중이면 이름으로(읽기 전용), 아니면 고칠 수 있는 성우·속도·높낮이
+    const synced = !!(currentSettings.voice_sync && currentSettings.voice_name);
+    $("tokVoiceName").style.display = synced ? "" : "none";
+    $("voiceTokens").style.display = synced ? "none" : "";
+    if (synced) $("tokVoiceName").textContent = genVoiceLabel(currentSettings.voice_name, currentSettings.tts_voice, currentSettings.tts_rate, currentSettings.tts_pitch);
+    const cv = contiCardVoice();
+    $("voiceSyncRow").style.display = cv ? "" : "none";
+    $("voiceSyncChk").checked = synced;
+    $("voiceSyncChk").parentElement.title = cv ? `카드 목소리: ${genVoiceLabel(cv.name, cv.voice, cv.rate, cv.pitch)}` : "";
     const hasBgm = !!currentSettings.bgm_path;
     $("tokBgm").textContent = hasBgm ? (bgmPlayer && !bgmPlayer.paused ? "■ 정지" : "▶ 듣기") : "+ 음악 올리기";
     $("bgmExtra").style.display = hasBgm ? "inline" : "none";
@@ -2061,12 +2072,6 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeWheel(); });
 
   document.querySelectorAll(".tok[data-wheel]").forEach((t) => t.addEventListener("click", () => openWheelFor(t)));
-  $("tokSample").addEventListener("click", () => {
-    const a = $("voiceSample");
-    if (!a.paused) { a.pause(); return; }
-    a.currentTime = 0;
-    a.play().catch(() => showMsg("샘플을 재생할 수 없습니다.", false));
-  });
   $("tokBgm").addEventListener("click", () => {
     if (!currentSettings.bgm_path) { $("bgmFile").click(); return; }
     if (bgmPlayer && !bgmPlayer.paused) { stopBgmPlayer(); updateSettingsSummary(); return; }
@@ -2130,7 +2135,6 @@
     $("moodSel").value = currentSettings.mood;
     currentSettings.transition = "cut";   // 화면 전환 설정은 없앴다. 늘 컷 (예전 fade 콘티도 컷)
     $("voiceSel").value = currentSettings.tts_voice;
-    $("voiceSample").src = `/youtube/voices/${currentSettings.tts_voice}.mp3`;
     $("ttsRate").value = currentSettings.tts_rate;
     $("ttsPitch").value = currentSettings.tts_pitch;
     updateVoiceLabels();
@@ -2144,7 +2148,69 @@
     updateSettingsPreview();
     updateSettingsSummary();
     if (needFramed) { markPartDirty("cap"); capScheduleSave(); }
+    loadContiCard(scriptId);
   }
+
+  // ───── 채널 카드 목소리 ─────
+  // 카드(youtube_subscribe_cards.voice = { name, voice, rate, pitch })에 이름 붙은 목소리가 있으면 콘티 전체 목소리(tts_voice/rate/pitch)가 그 목소리.
+  // voice_sync = true면 콘티를 열 때 카드의 지금 목소리를 다시 읽어 바뀌었으면 반영·저장한다. 끄면 직접 설정(voice_name 비움).
+  let contiCard = null;      // 지금 콘티의 채널 카드 (목소리 확인용)
+  let contiCardSeq = 0;
+  function contiCardVoice() {
+    const v = contiCard && contiCard.voice;
+    return v && typeof v === "object" && String(v.name || "").trim() && v.voice ? v : null;
+  }
+  function refreshVoiceControls() {
+    $("voiceSel").value = currentSettings.tts_voice;
+    $("ttsRate").value = currentSettings.tts_rate;
+    $("ttsPitch").value = currentSettings.tts_pitch;
+    updateVoiceLabels();
+    updateSettingsSummary();
+    updateRuntimeSummary();   // 속도가 바뀌면 자막 줄 예상 길이도 바뀐다
+  }
+  const voiceKeysOf = (o) => JSON.stringify(["tts_voice", "tts_rate", "tts_pitch", "voice_name", "voice_sync"].map((k) => (o[k] === undefined ? null : o[k])));
+  // 카드 목소리를 콘티에 반영(없으면 동기화만 끈다). 바뀐 게 있으면 바로 저장
+  function applyCardVoice(card) {
+    contiCard = card || null;
+    const vset = ContiCore.cardVoiceSettings(card, currentSettings);
+    if (!Object.keys(vset).length || voiceKeysOf({ ...currentSettings, ...vset }) === voiceKeysOf(currentSettings)) { updateSettingsSummary(); return Promise.resolve(true); }
+    Object.assign(currentSettings, vset);
+    refreshVoiceControls();
+    partEdits.voice++;
+    return savePart("voice");
+  }
+  async function loadContiCard(scriptId) {
+    const seq = ++contiCardSeq;
+    contiCard = null;
+    const id = currentSettings.subscribe_card_id;
+    if (id == null || id === "") { updateSettingsSummary(); return; }
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards?select=*&id=eq.${encodeURIComponent(id)}`, { headers });
+      if (!res.ok) return;
+      const card = (await res.json())[0] || null;
+      if (seq !== contiCardSeq || String($("scriptSelect").value) !== String(scriptId)) return;
+      contiCard = card;
+      if (!card) { updateSettingsSummary(); return; }
+      // 동기화 중이면 카드의 지금 목소리로 (채널 화면에서 바뀌었을 수 있다). 카드 목소리가 없어졌으면 동기화만 끈다.
+      // 목소리 칸이 아직 없는 카드(SQL 실행 전)는 건드리지 않는다
+      if (currentSettings.voice_sync && Object.prototype.hasOwnProperty.call(card, "voice")) await applyCardVoice(card);
+      else updateSettingsSummary();
+    } catch { /* 카드를 못 읽으면 저장된 목소리 그대로 */ }
+  }
+  $("voiceSyncChk").addEventListener("change", () => {
+    const cv = contiCardVoice();
+    if ($("voiceSyncChk").checked) {
+      if (!cv) { $("voiceSyncChk").checked = false; return; }
+      applyCardVoice(contiCard);
+      return;
+    }
+    // 끄기: 목소리 값은 그대로 두고 직접 고칠 수 있게
+    currentSettings.voice_sync = false;
+    currentSettings.voice_name = null;
+    refreshVoiceControls();
+    partEdits.voice++;
+    savePart("voice");
+  });
 
   function updateVoiceLabels() {
     const r = Number($("ttsRate").value), p = Number($("ttsPitch").value);
@@ -2211,7 +2277,7 @@
         }
         return true;
       } catch (err) {
-        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름", mood: "분위기", card: "채널 카드 설정" }[part];
+        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름", mood: "분위기", card: "채널 카드 설정", voice: "목소리" }[part];
         showMsg(`${what} 저장 실패: ${err.message}`, false);
         if (same()) dirtyParts.add(part);
         return false;
@@ -2286,12 +2352,10 @@
   VOICES.forEach((v) => $("voiceSel").add(new Option(v.label, v.id)));
   $("voiceSel").addEventListener("change", () => {
     currentSettings.tts_voice = $("voiceSel").value;
-    $("voiceSample").src = `/youtube/voices/${currentSettings.tts_voice}.mp3`;
     markPartDirty("sound");
   });
   $("ttsRate").addEventListener("input", () => {
     currentSettings.tts_rate = Number($("ttsRate").value);
-    $("voiceSample").playbackRate = 1 + currentSettings.tts_rate / 100;
     updateVoiceLabels();
     markPartDirty("sound");
     updateRuntimeSummary();   // 목소리 속도가 바뀌면 자막 줄 예상 길이(=장면 길이)도 바뀐다
@@ -2300,9 +2364,6 @@
     currentSettings.tts_pitch = Number($("ttsPitch").value);
     updateVoiceLabels();
     markPartDirty("sound");
-  });
-  $("voiceSample").addEventListener("play", () => {
-    $("voiceSample").playbackRate = 1 + currentSettings.tts_rate / 100;
   });
   $("capSize").addEventListener("input", () => {
     currentSettings.caption_font_size = Number($("capSize").value);
@@ -5254,6 +5315,7 @@
       currentSettings.channel_slot = card.channel_slot;
       partEdits.card++;
       const saved = await savePart("card");
+      applyCardVoice(card);   // 새 카드엔 목소리가 없다 → 동기화 중이었으면 끈다
       const skipText = [
         blanks ? ` 빈 화면 ${blanks}개는 카드 소재가 될 수 없어 뺐어요.` : "",
         others ? ` 외부 주소 소재 ${others}개는 뺐어요.` : "",
@@ -5326,6 +5388,7 @@
       currentSettings.channel_slot = card.channel_slot;
       partEdits.card++;
       const saved = savePart("card");
+      applyCardVoice(card);   // 카드에 이름 붙은 목소리가 있으면 콘티 전체 목소리도 그 목소리로 (없으면 지금 목소리 그대로, 동기화만 끔)
       await refreshSegments(scriptId);
       capAutoSplitOnOpen(scriptId);   // 새 문구에서 화면 폭을 넘는 줄은 자동으로 나눈다
       const target = seg ? document.querySelector(`.seg-item[data-id="${seg.id}"]`)

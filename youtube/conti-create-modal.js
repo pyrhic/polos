@@ -327,7 +327,9 @@ const ContiCreateModal = (() => {
       const channelSlot = ch ? Number(ch.slot) : null;
       const cardSettings = { ...(channelSlot != null ? { channel_slot: channelSlot } : {}), ...(card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : {}) };
       if (ch) { try { localStorage.setItem(CHANNEL_LS_KEY, ch.slot); } catch { /* 저장소를 못 씀 */ } }
-      const settings = { ...baseSettings(await defaults()), ...cardSettings };
+      // 카드에 이름 붙은 목소리가 있으면 콘티 전체 목소리(tts_voice/rate/pitch)가 그 목소리로 (ContiCore와 같은 규칙)
+      const cardVoice = card && typeof ContiCore !== "undefined" ? ContiCore.cardVoiceSettings(card) : {};
+      const settings = { ...baseSettings(await defaults()), ...cardSettings, ...cardVoice };
       if (!articles.length) {
         const row = await createEmpty(name, card, settings, mood, categoryFor(slot));
         if (opts.onCreated) { try { await opts.onCreated(row.id, "empty"); } catch { /* 무시 */ } }

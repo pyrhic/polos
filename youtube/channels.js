@@ -13,7 +13,50 @@
   let channels = [];
   let cards = [];
   let openId = null;       // 펼친 채널 카드 id
-  let draft = null;        // 펼친 카드의 저장 전 값 { name, script_text, direction }
+  let draft = null;        // 펼친 카드의 저장 전 값 { name, script_text, direction, voice }
+  // 채널 카드 목소리(youtube_subscribe_cards.voice jsonb { name, voice, rate, pitch }). 칸이 아직 없으면(youtube_tables_17_card_voice.sql 실행 전) false
+  let voiceColumn = null;  // null = 모름(카드가 없음), true/false
+  const VOICE_SQL_HINT = "목소리 칸이 아직 없어요 — Supabase에서 youtube_tables_17_card_voice.sql을 실행하면 저장돼요.";
+  // 들어보기 글: 윤동주 「별 헤는 밤」 (공유 저작물). 줄바꿈 그대로 두고, 읽을 때 연(빈 줄) 단위로 나눠 차례로 합성·재생한다
+  const VOICE_SAMPLE = `계절이 지나가는 하늘에는
+가을로 가득 차 있습니다.
+
+나는 아무 걱정도 없이
+가을 속의 별들을 다 헤일 듯합니다.
+
+가슴속에 하나둘 새겨지는 별을
+이제 다 못 헤는 것은
+쉬이 아침이 오는 까닭이요,
+내일 밤이 남은 까닭이요,
+아직 나의 청춘이 다하지 않은 까닭입니다.
+
+별 하나에 추억과
+별 하나에 사랑과
+별 하나에 쓸쓸함과
+별 하나에 동경과
+별 하나에 시와
+별 하나에 어머니, 어머니,
+
+어머님, 나는 별 하나에 아름다운 말 한마디씩 불러 봅니다. 소학교 때 책상을 같이 했던 아이들의 이름과, 패, 경, 옥, 이런 이국 소녀들의 이름과, 벌써 아기 어머니 된 계집애들의 이름과, 가난한 이웃 사람들의 이름과, 비둘기, 강아지, 토끼, 노새, 노루, ‘프랑시스 잠’, ‘라이너 마리아 릴케’ 이런 시인의 이름을 불러 봅니다.
+
+이네들은 너무나 멀리 있습니다.
+별이 아스라이 멀듯이.
+
+어머님,
+그리고 당신은 멀리 북간도에 계십니다.
+
+나는 무엇인지 그리워
+이 많은 별빛이 내린 언덕 위에
+내 이름자를 써 보고
+흙으로 덮어 버리었습니다.
+
+딴은 밤을 새워 우는 벌레는
+부끄러운 이름을 슬퍼하는 까닭입니다.
+
+그러나 겨울이 지나고 나의 별에도 봄이 오면
+무덤 위에 파란 잔디가 피어나듯이
+내 이름자 묻힌 언덕 위에도
+자랑처럼 풀이 무성할 거외다.`;
   let pvIndex = 0;         // 미리보기에서 보고 있는 자막 줄
   let pvMedia = 0;         // 미리보기에서 보고 있는 소재(사진·영상) 번호
   let busy = false;
@@ -60,7 +103,21 @@
     ]);
     channels = ch || [];
     cards = (sc || []).map(normCard);
+    if (cards.length) voiceColumn = cards.some((c) => Object.prototype.hasOwnProperty.call(c, "voice"));
   }
+  // 목소리 값 정리: 이름이 비면 null(카드 목소리 없음). 값 모양은 콘티 video_settings와 같다(voice = Edge 목소리 id, rate %, pitch Hz 숫자)
+  function normVoice(v) {
+    if (!v || typeof v !== "object") return null;
+    const name = String(v.name || "").trim();
+    if (!name) return null;
+    return { name: name.slice(0, 20), voice: String(v.voice || GEN_VOICES[0].id), rate: Number(v.rate) || 0, pitch: Number(v.pitch) || 0 };
+  }
+  // 편집 칸 값(이름이 비어도 성우·속도·높낮이는 들고 있는다)
+  function voiceDraftOf(k) {
+    const v = normVoice(k.voice);
+    return v || { name: "", voice: GEN_VOICES[0].id, rate: 0, pitch: 0 };
+  }
+  const draftOf = (k) => ({ name: k.name, script_text: k.script_text, direction: k.direction, voice: voiceDraftOf(k) });
   function normCard(c) {
     return { ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] };
   }
@@ -169,6 +226,7 @@
         <label>카메라 연출</label>
         <select class="f-dir">${DIRECTIONS.map((d) => `<option${d === draft.direction ? " selected" : ""}>${d}</option>`).join("")}
           ${DIRECTIONS.includes(draft.direction) ? "" : `<option selected>${esc(draft.direction)}</option>`}</select>
+        ${voiceHtml()}
         <button type="button" class="sc-pv-btn" data-act="pv-open">▶ 미리보기</button>
         <div class="sc-save-row">
           <button type="button" class="sc-save${isDirty() ? " dirty" : ""}" data-act="save" data-card="${k.id}" style="flex:2;">${isDirty() ? "저장" : "저장됨"}</button>
@@ -176,6 +234,96 @@
         </div>
         <div class="sc-msg"></div>
       </div>`;
+  }
+
+  // 목소리: 이름을 쓰면 이 카드를 쓰는 콘티 전체의 성우가 이 목소리(이름으로 표시)가 된다. 이름을 비우면 카드 목소리 없음
+  function voiceHtml() {
+    const v = draft.voice;
+    const sg = (n) => `${n > 0 ? "+" : ""}${n}`;
+    const opts = (a, b, unit, cur) => { const o = []; for (let n = a; n <= b; n++) o.push(`<option value="${n}"${n === cur ? " selected" : ""}>${sg(n)}${unit}</option>`); return o.join(""); };
+    const off = !v.name.trim();
+    return `<label>목소리 <span style="font-weight:400;color:var(--muted);">(선택)</span></label>
+        <div class="sc-voice">
+          <input type="text" class="f-vname" maxlength="20" placeholder="이름 (예: Bam) — 비우면 카드 목소리 없음" value="${esc(v.name)}" aria-label="목소리 이름">
+          <div class="sc-voice-row"${off ? ' style="opacity:.55;"' : ""}>
+            <select class="f-vvoice" aria-label="성우">${GEN_VOICES.map((o) => `<option value="${esc(o.id)}"${o.id === v.voice ? " selected" : ""}>${esc(o.label.replace(/ — .*/, ""))}</option>`).join("")}</select>
+            <select class="f-vrate" aria-label="속도">${opts(-30, 30, "%", v.rate)}</select>
+            <select class="f-vpitch" aria-label="높낮이">${opts(-20, 20, "Hz", v.pitch)}</select>
+            <button type="button" class="btn-sm" data-act="v-play">▶ 들어보기</button>
+          </div>
+        </div>
+        <div class="sc-hint">${voiceColumn === false ? esc(VOICE_SQL_HINT)
+          : "이름을 붙이면 이 카드로 만든 콘티 전체의 성우가 이 목소리가 돼요 (영상은 목소리 하나로 읽어요). 콘티에서 동기화를 끌 수 있어요."}</div>`;
+  }
+  // 들어보기: 콘티 미리보기와 같은 /api/tts (Edge TTS 실제 목소리)로 VOICE_SAMPLE을 읽는다.
+  // /api/tts는 한 번에 3000바이트까지라(한글 약 1000자) 시 전체(약 3700바이트)를 연 단위 묶음으로 나눈다.
+  // 첫 묶음은 첫 연 하나만이라 빨리 시작하고, 한 묶음을 재생하는 동안 다음 묶음을 미리 받는다. 같은 글·목소리는 서버 캐시에서 바로 온다.
+  // 줄 끝에 문장부호가 없으면 쉼표를 붙여 줄바꿈 자리에서 살짝 쉬게 읽는다
+  const VOICE_CHUNK_BYTES = 900;
+  function sampleChunks() {
+    const enc = new TextEncoder();
+    const stanzas = VOICE_SAMPLE.split(/\n\s*\n/).map((st) => st.split("\n").map((l) => l.trim()).filter(Boolean)
+      .map((l, i, a) => (i < a.length - 1 && !/[.,?!…]$/.test(l) ? l + "," : l)).join(" ")).filter(Boolean);
+    const out = [];
+    stanzas.forEach((st, i) => {
+      const last = out[out.length - 1];
+      if (i > 1 && last && enc.encode(last + " " + st).length <= VOICE_CHUNK_BYTES) out[out.length - 1] = last + " " + st;
+      else out.push(st);
+    });
+    return out;
+  }
+  let vAudio = null, vGen = 0;   // vGen: 들어보기를 멈추거나 다시 시작하면 늘어나, 받는 중이던 묶음은 버린다
+  function stopVoice() {
+    vGen++;
+    if (vAudio) { vAudio.pause(); vAudio = null; }
+    const b = document.querySelector('[data-act="v-play"]');
+    if (b) { b.disabled = false; b.textContent = "▶ 들어보기"; }
+  }
+  function ttsChunk(text, v) {
+    return fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voice: v.voice, rate: v.rate, pitch: v.pitch }) })
+      .then(async (r) => {
+        let j = null;
+        try { j = await r.json(); } catch { /* 아래에서 */ }
+        if (!r.ok || !j || j.error || !j.audio) throw new Error((j && j.error) || `HTTP ${r.status}`);
+        return `data:audio/mpeg;base64,${j.audio}`;
+      });
+  }
+  async function playVoice(btn) {
+    if (vAudio || btn.dataset.loading) { delete btn.dataset.loading; stopVoice(); return; }   // 재생·준비 중에 다시 누르면 멈춘다
+    const gen = ++vGen;
+    const v = { ...draft.voice };
+    const chunks = sampleChunks();
+    const label = () => document.querySelector('[data-act="v-play"]');
+    const set = (t) => { const b = label(); if (b) b.textContent = t; };
+    btn.dataset.loading = "1";
+    set("준비 중… (■ 멈춤)");
+    let next = ttsChunk(chunks[0], v);
+    next.catch(() => {});
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const src = await next;
+        if (gen !== vGen) return;
+        if (i + 1 < chunks.length) { next = ttsChunk(chunks[i + 1], v); next.catch(() => {}); }   // 재생하는 동안 다음 묶음
+        const a = new Audio(src);
+        vAudio = a;
+        const b = label(); if (b) delete b.dataset.loading;
+        set("■ 정지");
+        await new Promise((res, rej) => {
+          a.addEventListener("ended", res);
+          a.addEventListener("pause", res);
+          a.addEventListener("error", () => rej(new Error("소리를 재생하지 못함")));
+          a.play().catch(rej);
+        });
+        if (gen !== vGen) return;
+        vAudio = null;
+        if (i + 1 < chunks.length) { const b2 = label(); if (b2) b2.dataset.loading = "1"; set("■ 정지"); }
+      }
+      stopVoice();
+    } catch (err) {
+      if (gen !== vGen) return;
+      stopVoice();
+      cardMsg("목소리를 들을 수 없어요: " + err.message, false);
+    }
   }
 
   // ───── 미리보기 ─────
@@ -286,7 +434,8 @@
 
   function isDirty() {
     const k = cards.find((c) => String(c.id) === String(openId));
-    return !!(k && draft && (draft.name !== k.name || draft.script_text !== k.script_text || draft.direction !== k.direction));
+    return !!(k && draft && (draft.name !== k.name || draft.script_text !== k.script_text || draft.direction !== k.direction
+      || JSON.stringify(normVoice(draft.voice)) !== JSON.stringify(normVoice(k.voice))));
   }
   function refreshDirty() {
     const box = document.querySelector(".sc-item.open");
@@ -315,7 +464,7 @@
     } else {
       const k = cards.find((c) => String(c.id) === String(id));
       openId = k.id;
-      draft = { name: k.name, script_text: k.script_text, direction: k.direction };
+      draft = draftOf(k);
       pvIndex = 0;
     }
     render();
@@ -477,11 +626,28 @@
     const name = draft.name.trim();
     if (!name) { cardMsg("카드 이름을 입력하세요.", false); return; }
     const body = { name, script_text: draft.script_text, direction: draft.direction, updated_at: nowIso() };
-    await patch("youtube_subscribe_cards", `id=eq.${k.id}`, body);
+    const voice = normVoice(draft.voice);
+    const voiceChanged = JSON.stringify(voice) !== JSON.stringify(normVoice(k.voice));
+    let note = "";
+    if (voiceColumn !== false) body.voice = voice;
+    else if (voiceChanged) note = " " + VOICE_SQL_HINT;
+    try {
+      await patch("youtube_subscribe_cards", `id=eq.${k.id}`, body);
+    } catch (err) {
+      // 목소리 칸이 아직 없으면(SQL 실행 전) 목소리만 빼고 저장한다
+      if (!("voice" in body) || !/voice/i.test(err.message) || !/column|PGRST204|schema/i.test(err.message)) throw err;
+      voiceColumn = false;
+      delete body.voice;
+      await patch("youtube_subscribe_cards", `id=eq.${k.id}`, body);
+      if (voice || voiceChanged) note = " " + VOICE_SQL_HINT;
+    }
+    if ("voice" in body) voiceColumn = true;
     Object.assign(k, body);
     draft.name = name;
+    draft.voice = voiceDraftOf(k);   // 목소리 칸이 없으면 저장 못 한 목소리는 버린다(안내는 아래 글)
+    stopVoice();
     render();
-    cardMsg("저장했습니다.", true);
+    cardMsg("저장했습니다." + note, !note);
   }
 
   // ───── 카드 이름: 펼친 카드의 ★ 줄에서 바로 바꾸고, Enter나 바깥을 누르면 이름만 바로 저장 (Esc는 취소) ─────
@@ -620,12 +786,14 @@
       if (act === "save") return guarded(() => saveCard(t.dataset.card), t);
       if (act === "revert") {
         const k = cards.find((c) => String(c.id) === String(openId));
-        draft = { name: k.name, script_text: k.script_text, direction: k.direction };
+        draft = draftOf(k);
+        stopVoice();
         render();
         return;
       }
       if (act === "ph-left" || act === "ph-right" || act === "ph-del") return guarded(() => photoAction(act, Number(t.dataset.i)), t);
       if (act === "pv-open") { pvIndex = 0; return openPreview(); }
+      if (act === "v-play") return playVoice(t);
     }
     if (t && t.closest("#pvModal")) {
       const act = t.dataset.act;
@@ -685,12 +853,25 @@
     }
     if (t.matches(".f-files")) { const files = t.files; guarded(() => uploadPhotos(files)); t.value = ""; return; }
     if (t.matches(".f-dir")) { draft.direction = t.value; updatePreview(); refreshDirty(); }
+    if (t.matches(".f-vvoice, .f-vrate, .f-vpitch") && draft) {
+      if (t.matches(".f-vvoice")) draft.voice.voice = t.value;
+      else if (t.matches(".f-vrate")) draft.voice.rate = Number(t.value);
+      else draft.voice.pitch = Number(t.value);
+      stopVoice();
+      refreshDirty();
+    }
   });
 
   document.addEventListener("input", (e) => {
     const t = e.target;
     if (!draft) return;
     if (t.matches(".f-name")) { draft.name = t.value; refreshDirty(); }
+    else if (t.matches(".f-vname")) {
+      draft.voice.name = t.value;
+      const row = t.parentElement.querySelector(".sc-voice-row");
+      if (row) row.style.opacity = t.value.trim() ? "" : ".55";
+      refreshDirty();
+    }
     else if (t.matches(".f-script")) {
       draft.script_text = t.value;
       // 커서가 있는 줄을 미리보기에 띄운다

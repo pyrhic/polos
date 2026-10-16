@@ -4,6 +4,23 @@ const GEN_SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
 const GEN_SUPABASE_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
 const genHeaders = { apikey: GEN_SUPABASE_KEY, Authorization: `Bearer ${GEN_SUPABASE_KEY}` };
 
+// 성우 목록 (Edge TTS 목소리). 콘티 화면의 음향 카드와 채널 화면의 채널 카드 목소리가 같이 쓴다
+const GEN_VOICES = [
+  { id: "ko-KR-InJoonNeural", label: "인준 (남성) — 현재 기본" },
+  { id: "ko-KR-HyunsuMultilingualNeural", label: "현수 (남성)" },
+  { id: "ko-KR-SunHiNeural", label: "선희 (여성)" },
+];
+// 목소리 짧은 이름 (예: "선희")
+function genVoiceShort(id) {
+  const v = GEN_VOICES.find((x) => x.id === id);
+  return v ? v.label.replace(/ \(.*$/, "") : String(id || "");
+}
+// 채널 카드 목소리 표시: "Bam (선희 · +12% · -14Hz)"
+function genVoiceLabel(name, voice, rate, pitch) {
+  const sg = (n) => `${Number(n) > 0 ? "+" : ""}${Number(n) || 0}`;
+  return `${name} (${genVoiceShort(voice)} · ${sg(rate)}% · ${sg(pitch)}Hz)`;
+}
+
 function genAssetUrl(path) {
   // 전체 주소(Pexels 등)와 빈 화면 토큰(blank:black / blank:white / blank:bars)은 그대로 넘긴다
   if (/^https?:\/\//.test(path) || /^blank:/.test(path)) return path;
