@@ -56,12 +56,12 @@
   <div class="wrap">
     <a class="back" href="/youtube/search.html">← Search</a>
     <h1 style="font-size:1.4rem;margin-bottom:0.6rem;">Wikipedia</h1>
-    <p class="wk-note">한국어·영어 위키피디아에서 <b>인물 · 사건 · 지식</b> 이야기를 찾아요. 인물은 지금 <b>사망한 인물</b>만 다뤄요. 이야기 후보를 고르면 한 편씩 콘티가 만들어져요.</p>
+    <p class="wk-note">한국어·영어 위키피디아에서 <b>인물 · 사건 · 지식</b> 이야기를 찾아요. 인물은 <b>사망한 인물</b>만 다뤄요(생존 인물은 명예훼손 위험 때문에 제외). 목록·동음이의어 문서, 영화·드라마·노래 같은 작품, 기업·방송사·그룹 문서도 쓰지 않아요. 이야기 후보를 고르면 한 편씩 콘티가 만들어져요.</p>
 
     <div class="wk-tabs">
       <button type="button" class="wk-tab active" data-tab="search">검색</button>
-      <button type="button" class="wk-tab" data-tab="popular">인기 인물</button>
-      <button type="button" class="wk-tab" data-tab="today">오늘의 기일·생일</button>
+      <button type="button" class="wk-tab" data-tab="popular">인기 문서</button>
+      <button type="button" class="wk-tab" data-tab="today">오늘의 역사</button>
     </div>
 
     <div id="panelSearch" class="wk-panel">
@@ -211,14 +211,16 @@
     } catch (e) { msg($("msg"), "검색 실패: " + e.message, false); }
     finally { $("searchBtn").disabled = false; $("searchBtn").textContent = "검색"; }
   }
+  // 쓰지 않는 문서의 이유 (서버 wiki-search의 skip 값)
+  const SKIP_TEXT = { meta: "목록·동음이의어 문서 · 제외", work: "작품(영화·드라마·노래 등) · 제외", org: "기업·방송·그룹 문서 · 제외" };
   function status(r) {
     if (r.kind === "event") return { cls: "wk-kind", text: "사건", ok: true };
     if (r.kind === "thing") return { cls: "wk-kind", text: "지식", ok: true };
-    if (r.kind !== "person") return { cls: "wk-other", text: "소재로 쓰지 않는 문서", ok: false };
-    if (!r.deceased) return { cls: "wk-live", text: "생존 인물(아직 지원 안 함)", ok: false };
+    if (r.kind !== "person") return { cls: "wk-other", text: SKIP_TEXT[r.skip] || "소재로 쓰지 않는 문서", ok: false };
+    if (!r.deceased) return { cls: "wk-live", text: "생존 인물 · 다루지 않음", ok: false };
     return { cls: "wk-dead", text: "인물 · 사망", ok: true };
   }
-  // 검색 / 인기 인물 / 오늘의 기일·생일이 같은 카드 모양을 쓴다. groups = [{title, items}]
+  // 검색 / 인기 문서 / 오늘의 역사가 같은 카드 모양을 쓴다. groups = [{title, items}]
   function renderResults(groups) {
     groups = groups || [{ title: "", items: results }];
     results = groups.flatMap((g) => g.items);
@@ -238,7 +240,7 @@
     }).join("") : "")).join("");
   }
 
-  // ───── 탭: 검색 / 인기 인물 / 오늘의 기일·생일 ─────
+  // ───── 탭: 검색 / 인기 문서 / 오늘의 역사 ─────
   document.querySelectorAll(".wk-tab").forEach((b) => b.addEventListener("click", () => {
     document.querySelectorAll(".wk-tab").forEach((x) => x.classList.toggle("active", x === b));
     document.querySelectorAll(".wk-panel").forEach((p) => { p.style.display = "none"; });
