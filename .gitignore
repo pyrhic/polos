@@ -2,3 +2,6 @@
 polos-projects-*.json
 polos-writing-*.json
 .claude/
+
+# Supabase CLI 임시 파일
+supabase/.temp/
