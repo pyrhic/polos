@@ -235,7 +235,8 @@ function genRequestPermission() {
   } catch { /* 알림을 못 쓰는 환경이면 화면 안 알림창만 쓴다 */ }
 }
 
-function genToast(text, ok) {
+// link: { href, text } — 알림창 오른쪽 링크. 안 주면(undefined) 성공 알림에 "Studio 열기"(영상 생성 알림의 옛 동작), null이면 링크 없음
+function genToast(text, ok, link) {
   let box = document.getElementById("genToast");
   if (!box) {
     box = document.createElement("div");
@@ -250,11 +251,12 @@ function genToast(text, ok) {
   span.style.flex = "1";
   span.textContent = text;
   box.appendChild(span);
-  if (ok) {
+  if (link === undefined && ok) link = { href: "/youtube/review.html", text: "Studio 열기" };
+  if (link && link.href) {
     const a = document.createElement("a");
-    a.href = "/youtube/review.html";
-    a.textContent = "Studio 열기";
-    a.style.cssText = "color:#ffffff;text-decoration:underline;white-space:nowrap;";
+    a.href = link.href;
+    a.textContent = link.text || "열기";
+    a.style.cssText = `color:${ok ? "#ffffff" : "#000000"};text-decoration:underline;white-space:nowrap;`;
     box.appendChild(a);
   }
   const x = document.createElement("button");
@@ -265,15 +267,94 @@ function genToast(text, ok) {
   box.appendChild(x);
 }
 
-async function genNotify(name, ok) {
-  const title = ok ? "영상이 완성되었습니다" : "영상 생성에 실패했습니다";
-  genToast(`${title} — ${name}`, ok);
+// opts(선택): { title, body, url, linkText } — 안 주면 영상 생성 알림(옛 동작)
+async function genNotify(name, ok, opts) {
+  const o = opts || {};
+  const title = o.title || (ok ? "영상이 완성되었습니다" : "영상 생성에 실패했습니다");
+  const url = o.url || "/youtube/review.html";
+  genToast(name ? `${title} — ${name}` : title, ok, o.url ? { href: o.url, text: o.linkText || "열기" } : undefined);
   try {
     if ("Notification" in window && Notification.permission === "granted") {
-      const opts = { body: name + (ok ? " · Studio에서 확인하세요" : " · Studio에서 상태를 확인하세요"), icon: "/icon-192.png", data: { url: "/youtube/review.html" } };
-      const reg = navigator.serviceWorker ? await navigator.serviceWorker.ready : null;
-      if (reg && reg.showNotification) reg.showNotification(title, opts);
-      else new Notification(title, opts);
+      const body = o.body || (name + (ok ? " · Studio에서 확인하세요" : " · Studio에서 상태를 확인하세요"));
+      const nopts = { body, icon: "/icon-192.png", data: { url } };
+      // ready는 서비스 워커가 없는 화면에서 끝나지 않으므로 getRegistration으로 (없으면 일반 알림)
+      const reg = navigator.serviceWorker ? await navigator.serviceWorker.getRegistration() : null;
+      if (reg && reg.showNotification) reg.showNotification(title, nopts);
+      else new Notification(title, nopts);
     }
   } catch { /* 기기 알림이 안 되면 화면 알림창만 */ }
 }
+
+// ───── 콘티 자동 생성 감시: 서버(Supabase Edge Function create-conti)가 만드는 콘티가 끝나면 알린다 ─────
+// 만들기를 시작한 콘티 번호를 이 기기 localStorage "contiJobs"에 적어 두고, 이 파일을 불러오는 모든 유튜브 화면이 확인한다.
+// 앱을 닫아 둔 사이에 끝난 것도 다음에 열 때 알린다. 끝나거나(done/error) 15분 넘게 멈추면 목록에서 뺀다.
+// 결과는 window에 "contijob" 이벤트({detail:{id, status, row}})로도 알린다 (콘티 목록·위키 화면이 다시 그릴 때 씀)
+const CONTI_JOBS_KEY = "contiJobs";
+const CONTI_JOB_POLL_MS = 8000;
+const CONTI_JOB_STALE_MS = 15 * 60 * 1000;
+function contiJobsGet() {
+  try { const v = JSON.parse(localStorage.getItem(CONTI_JOBS_KEY) || "[]"); return Array.isArray(v) ? v.filter((j) => j && j.id != null) : []; } catch { return []; }
+}
+function contiJobsSet(list) {
+  try { if (list.length) localStorage.setItem(CONTI_JOBS_KEY, JSON.stringify(list)); else localStorage.removeItem(CONTI_JOBS_KEY); } catch { /* 저장 못 하면 알림만 못 받는다 */ }
+}
+function contiJobsAdd(id, name) {
+  const list = contiJobsGet().filter((j) => String(j.id) !== String(id));
+  list.push({ id: Number(id), name: name || "", at: Date.now() });
+  contiJobsSet(list);
+  contiJobWatch();
+}
+function contiJobsRemove(id) {
+  contiJobsSet(contiJobsGet().filter((j) => String(j.id) !== String(id)));
+}
+function contiJobUrl(id) { return `/youtube/storyboard.html?open=${encodeURIComponent(id)}`; }
+
+let contiJobChecking = null;
+function contiJobCheckNow() {
+  if (!contiJobChecking) contiJobChecking = contiJobCheck().finally(() => { contiJobChecking = null; });
+  return contiJobChecking;
+}
+async function contiJobCheck() {
+  const jobs = contiJobsGet();
+  if (!jobs.length) return;
+  let rows;
+  try {
+    const res = await fetch(`${GEN_SUPABASE_URL}/rest/v1/youtube_scripts?select=id,create_status,create_error,create_started_at,created_at,video_settings,hook&id=in.(${jobs.map((j) => Number(j.id)).join(",")})`, { headers: genHeaders });
+    if (!res.ok) return;   // 표에 칸이 아직 없거나 서버 오류 — 다음에 다시
+    rows = await res.json();
+  } catch { return; }
+  const now = Date.now();
+  for (const j of jobs) {
+    const r = rows.find((x) => String(x.id) === String(j.id));
+    // 다른 탭이 먼저 알렸으면 건너뛴다
+    if (!contiJobsGet().some((x) => String(x.id) === String(j.id))) continue;
+    if (!r) { contiJobsRemove(j.id); continue; }   // 지운 콘티
+    const name = (r.video_settings && r.video_settings.name) || j.name || (r.hook || "").slice(0, 20);
+    let st = r.create_status;
+    if (st === "queued" || st === "running") {
+      const t = Date.parse(r.create_started_at || r.created_at || "") || j.at;
+      if (now - t <= CONTI_JOB_STALE_MS) { contiJobEvent(j.id, st, r); continue; }
+      st = "timeout";
+    }
+    contiJobsRemove(j.id);
+    if (st === "done" || st == null) {
+      genNotify(name, true, { title: "콘티가 만들어졌습니다", body: name + " · Scenes에서 열어 보세요", url: contiJobUrl(j.id), linkText: "열기" });
+      contiJobEvent(j.id, "done", r);
+    } else {
+      const why = st === "timeout" ? "시간이 너무 오래 걸려 멈춘 것 같아요" : (r.create_error || "");
+      genNotify(name, false, { title: "콘티 생성에 실패했습니다", body: `${name}${why ? " · " + why : ""}`, url: contiJobUrl(j.id), linkText: "확인" });
+      contiJobEvent(j.id, st === "timeout" ? "timeout" : "error", r);
+    }
+  }
+}
+function contiJobEvent(id, status, row) {
+  try { window.dispatchEvent(new CustomEvent("contijob", { detail: { id: Number(id), status, row } })); } catch { /* 무시 */ }
+}
+let contiJobTimer = null;
+function contiJobWatch() {
+  if (contiJobTimer) return;
+  contiJobTimer = setInterval(() => { if (!document.hidden && contiJobsGet().length) contiJobCheckNow(); }, CONTI_JOB_POLL_MS);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && contiJobsGet().length) contiJobCheckNow(); });
+  if (contiJobsGet().length) contiJobCheckNow();   // 화면을 열 때 한 번 (앱을 닫아 둔 사이 끝난 것)
+}
+contiJobWatch();

@@ -34,6 +34,9 @@
   .wk-opts { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0; }
   .wk-opts select { width:auto; margin:0; }
   .wk-done a { color:var(--accent); }
+  .wk-done .st { color:var(--muted); font-size:0.8rem; margin:4px 0; }
+  .wk-done .st.ok { color:var(--accent); }
+  .wk-done .st.err { color:var(--danger); }
   .wk-tabs { display:flex; gap:6px; margin-bottom:12px; }
   .wk-tab { width:auto; flex:1; padding:9px 6px; font-size:0.8rem; text-transform:none; letter-spacing:0; }
   .wk-tab.active { background:var(--accent); color:var(--on-accent); }
@@ -167,6 +170,10 @@
   </div>
 
 <script src="/config.js"></script>
+<script src="/youtube/generate.js"></script>
+<!-- 콘티 자동 생성(서버 create-conti + 브라우저 대체 경로 + 생성 중 화면) -->
+<script src="/youtube/conti-core.js"></script>
+<script src="/youtube/conti-job.js"></script>
 <script>
 (function () {
   const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL, KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
@@ -329,116 +336,62 @@
     }
   }
   loadCards();
-  // 카드 사진 중 한 장: 그 카드로 이미 만든 콘티 수 기준으로 돌아가며 (못 세면 무작위). 사진이 없으면 빈 배열
-  async function pickCardPhoto(card) {
-    const list = card.image_paths || [];
-    if (!list.length) return [];
-    let n = Math.floor(Math.random() * list.length);
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id&video_settings->>subscribe_card_id=eq.${card.id}`, { headers });
-      if (r.ok) n = (await r.json()).length;
-    } catch { /* 무작위 */ }
-    return [list[n % list.length]];
-  }
-
   // ───── 콘티 만들기 ─────
   const slugOf = (s) => String(s).replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 24);
-  // opts: { mood: 직접 고른 분위기(""이면 Gemini 값), card: 고른 구독 카드(없으면 null) }
-  async function createOne(idea, secs, opts) {
-    const lang = ideasData.article.lang;
-    const res = await fetch("/api/gemini-wiki-draft", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lang, title: ideasData.article.title, idea, seconds: secs, personName: ideasData.person.name_ko, kind: ideasData.kind }),
-    });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || "대본 생성 실패");
-    await userDefaultsReady;
-    // 구독/좋아요 장면을 고른 카드로 채운다 (문구·연출·사진 한 장)
-    const card = opts && opts.card;
-    if (card) {
-      const photo = await pickCardPhoto(card);
-      d.segments = d.segments.map((s) => s.section === "구독/좋아요"
-        ? { ...s, script_text: card.script_text || s.script_text, direction: card.direction || s.direction, asset_paths: photo }
-        : s);
-    }
-    const mood = (opts && opts.mood) || d.mood;   // 직접 고른 분위기 > Gemini 판단
-    const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : (channelSlot != null ? { channel_slot: channelSlot } : {});
-    const texts = d.segments.map((s) => s.script_text);
-    const sourceLines = [
-      ...d.sources.map((s) => `${s.title} (CC BY-SA 4.0) ${s.url}`),
-      ...(d.credits || []),
-    ];
-    const sRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts`, {
-      method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
-      body: JSON.stringify({
-        category: { person: "위키 인물", event: "위키 사건", thing: "위키 지식" }[ideasData.kind] || "위키 인물", hook: texts[0], story: texts.slice(1).join("\n"), closing: "",
-        fact_sources: sourceLines.join("\n"), status: "approved",
-        slug: `${new Date().toISOString().slice(0, 10)}_wiki-${slugOf(ideasData.person.name_ko)}-${Date.now() % 10000}`,
-        video_settings: { ...(userDefaults || {}), name: (d.name || idea.title).slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과", ...(mood ? { mood } : {}), ...cardSettings },
-      }),
-    });
-    if (!sRes.ok) throw new Error(await sRes.text());
-    const script = (await sRes.json())[0];
-    const gRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
-      method: "POST", headers: { ...jsonHeaders, Prefer: "return=representation" },
-      body: JSON.stringify(d.segments.map((s, i) => ({ script_id: script.id, order_no: i + 1, section: s.section || "", script_text: s.script_text || "", keyword: s.keyword || "", direction: s.direction || "", asset_paths: (s.asset_paths && s.asset_paths.length) ? s.asset_paths : [] }))),
-    });
-    if (!gRes.ok) throw new Error(await gRes.text());
-    const segs = (await gRes.json()).sort((a, b) => a.order_no - b.order_no);
-
-    // 사진 배정: 제미나이가 고른 번호를 우선, 남는 사진은 사진 없는 카드에 차례로 (구독/좋아요 카드는 제외)
-    const assign = new Map();   // 카드 index -> [사진 index]
-    const used = new Set();
-    d.segments.forEach((s, i) => { if (s.image >= 0 && !used.has(s.image)) { assign.set(i, [s.image]); used.add(s.image); } });
-    const free = d.images.map((_, k) => k).filter((k) => !used.has(k));
-    for (let i = 0; i < d.segments.length - 1 && free.length; i++) { if (!assign.has(i)) assign.set(i, [free.shift()]); }
-    let ok = 0, n = 0;
-    for (const [i, list] of assign) {
-      const seg = segs[i];
-      const paths = [], notes = {};
-      for (const k of list) {
-        const im = d.images[k];
-        try {
-          const r = await fetch("/api/save-article-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: im.url, referer: im.page, scriptId: script.id, segId: seg.id, n: n++ }) });
-          const j = await r.json();
-          if (!r.ok) continue;
-          paths.push(j.path);
-          notes[j.path] = { source: "위키미디어 커먼즈", license: im.license, artist: im.artist, articleUrl: im.page, articleTitle: im.file, caption: im.caption, origUrl: im.url };
-          ok++;
-        } catch { /* 한 장 실패해도 계속 */ }
-      }
-      if (paths.length) await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${seg.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ asset_paths: paths, asset_notes: notes }) });
-    }
-    return { id: script.id, name: d.name || idea.title, cards: d.segments.length, photos: ok, totalPhotos: d.images.length, chars: d.totalChars };
-  }
-
+  // 이야기마다 빈 콘티 행(대기 중)을 만들고 서버(create-conti)에 맡긴다 — 화면을 나가도 서버가 계속 만들고, 다 되면 알림.
+  // 서버를 못 쓰면 이 브라우저에서 하나씩 만든다 (conti-job.js). 대본·사진 순서는 conti-core.js(ContiCore)
   $("makeBtn").addEventListener("click", async () => {
     const picked = [...document.querySelectorAll(".idea-chk:checked")].map((c) => ideasData.ideas[Number(c.dataset.i)]);
     if (!picked.length) { msg($("msg2"), "만들 이야기를 하나 이상 고르세요.", false); return; }
     if (picked.length > 3 && !confirm(`${picked.length}편을 만들면 제미나이를 ${picked.length}번 써요 (하루 약 20회 한도). 계속할까요?`)) return;
     const secs = Number($("secSel").value);
-    const opts = { mood: $("moodSel").value, card: cards.find((c) => String(c.id) === $("cardSel").value) || null };
-    $("makeBtn").disabled = true;
-    const made = [];
-    for (let i = 0; i < picked.length; i++) {
-      $("makeBtn").textContent = `콘티 만드는 중… (${i + 1}/${picked.length}) — 한 편에 20~40초`;
-      try { made.push(await createOne(picked[i], secs, opts)); }
-      catch (e) { msg($("msg2"), `"${picked[i].title}" 실패: ${e.message}` + (made.length ? ` (앞의 ${made.length}편은 만들어졌어요)` : ""), false); break; }
+    const mood = $("moodSel").value;   // 직접 고른 분위기(""이면 Gemini 판단)
+    const card = cards.find((c) => String(c.id) === $("cardSel").value) || null;
+    $("makeBtn").disabled = true; $("makeBtn").textContent = "콘티 만들기를 시작하는 중…";
+    const jobs = [];
+    try {
+      await userDefaultsReady;
+      const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : (channelSlot != null ? { channel_slot: channelSlot } : {});
+      for (const idea of picked) {
+        const row = await ContiJob.createPlaceholder({
+          category: { person: "위키 인물", event: "위키 사건", thing: "위키 지식" }[ideasData.kind] || "위키 인물",
+          name: idea.title,
+          slug: `${new Date().toISOString().slice(0, 10)}_wiki-${slugOf(ideasData.person.name_ko)}-${Date.now() % 10000}${jobs.length}`,
+          video_settings: { ...(userDefaults || {}), ...cardSettings },
+          request: {
+            kind: "wiki", lang: ideasData.article.lang, title: ideasData.article.title, idea, seconds: secs,
+            personName: ideasData.person.name_ko, wiki_kind: ideasData.kind, mood,
+            card_id: card ? card.id : null, channel_slot: card ? card.channel_slot : channelSlot,
+          },
+        });
+        jobs.push({ id: row.id, name: idea.title });
+      }
+    } catch (e) {
+      msg($("msg2"), "콘티 만들기를 시작하지 못했어요: " + e.message + (jobs.length ? ` (앞의 ${jobs.length}편은 시작했어요)` : ""), false);
+    } finally {
+      $("makeBtn").disabled = false; $("makeBtn").textContent = "선택한 이야기로 콘티 만들기";
     }
-    $("makeBtn").disabled = false; $("makeBtn").textContent = "선택한 이야기로 콘티 만들기";
-    if (made.length) {
-      msg($("msg2"), `콘티 ${made.length}개를 만들었어요. Scenes에서 대본·사진을 확인하고 영상을 만드세요.`, true);
-      $("done").innerHTML = made.map((m) => `<div class="card-box"><div class="title">${esc(m.name)}</div>
-        <div class="meta">카드 ${m.cards}장 · 글자 ${m.chars}자 · 사진 ${m.photos}/${m.totalPhotos}장</div>
-        <a href="#" class="open-conti" data-id="${m.id}">Scenes에서 열기 →</a></div>`).join("");
-    }
+    if (!jobs.length) return;
+    if ($("msg2").className !== "msg err") msg($("msg2"), `콘티 ${jobs.length}개를 만들고 있어요. 다른 화면으로 가도 서버가 계속 만들고, 다 되면 알려 드려요.`, true);
+    $("done").innerHTML = jobs.map((j) => `<div class="card-box" data-job="${j.id}"><div class="title">${esc(j.name)}</div>
+      <div class="st">생성 중…</div>
+      <a href="${contiJobUrl(j.id)}">Scenes에서 보기 →</a></div>`).join("");
+    ContiJob.launch(jobs, { onOpen: (id) => { location.href = contiJobUrl(id); } });
   });
-  $("done").addEventListener("click", (e) => {
-    const a = e.target.closest(".open-conti");
-    if (!a) return;
-    e.preventDefault();
-    try { sessionStorage.setItem("openConti", a.dataset.id); } catch { /* 무시 */ }
-    location.href = "/youtube/storyboard.html";
+  // 만드는 중 카드의 상태 글 (generate.js의 감시가 알려 준다)
+  window.addEventListener("contijob", (e) => {
+    const { id, status, row } = e.detail || {};
+    const box = document.querySelector(`#done [data-job="${Number(id)}"] .st`);
+    if (!box) return;
+    if (status === "done") {
+      box.className = "st ok";
+      box.textContent = "다 만들었어요" + (row && row.video_settings && row.video_settings.name ? ` — ${row.video_settings.name}` : "");
+    } else if (status === "error" || status === "timeout") {
+      box.className = "st err";
+      box.textContent = "실패: " + (status === "timeout" ? "시간이 너무 오래 걸려 멈췄어요" : (row && row.create_error) || "알 수 없는 오류") + " — Scenes에서 다시 만들 수 있어요";
+    } else if (status === "running") {
+      box.className = "st"; box.textContent = "만드는 중…";
+    }
   });
 })();
 </script>

@@ -349,7 +349,8 @@
       if (!res.ok) throw new Error(data.error || "구성안 생성 실패");
       cur.title = data.title || title; $("curTitle").value = cur.title;
       cur.items = data.items.map((it) => ({ name: it.name, comment: it.comment, keyword: it.keyword, photo: null }));
-      renderItems(); queueSave();
+      renderItems();
+      clearTimeout(saveTimer); dirty = true; await saveNow();   // 구성안을 바로 저장 — 사진을 고르는 중에 화면을 나가도 구성안은 남는다
       // 항목마다 사진 첫 후보를 자동으로 (이미 쓴 사진은 피해서)
       const used = new Set();
       let done = 0;

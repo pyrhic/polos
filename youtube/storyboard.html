@@ -170,6 +170,15 @@
   .conti-item:hover, .conti-item:focus-visible { border-color:var(--accent); background:var(--card); color:#fff; }
   .conti-item .title { font-weight:800; font-size:1rem; margin-bottom:4px; }
   .conti-item .meta { color:var(--muted); font-size:0.8rem; }
+  .conti-item.cj-pending { cursor:default; opacity:0.85; }
+  .conti-item.cj-pending:hover { border-color:transparent; }
+  .cj-badge { display:inline-block; font-size:0.68rem; font-weight:700; padding:1px 7px; border-radius:9px; margin-left:6px; vertical-align:middle; background:var(--line); color:var(--text-2); }
+  .cj-badge.run { background:var(--accent-dim); color:var(--accent); }
+  .cj-badge.err { background:var(--danger-bg); color:var(--danger); }
+  .cj-err-text { color:var(--danger); font-size:0.8rem; line-height:1.4; margin-top:6px; }
+  .cj-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .cj-actions button { width:auto; margin:0; padding:6px 10px; font-size:0.75rem; }
+  .cj-actions button.del { background:var(--danger-bg); color:var(--danger); box-shadow:none; }
   #newDraft > summary { list-style:none; cursor:pointer; text-align:center; font-weight:800; background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--text); border-radius:3px; padding:12px; margin:-16px -18px 0; transition:background 0.15s, color 0.15s; }
   #newDraft > summary:hover { background:var(--hover); color:var(--on-accent); }
   #newDraft > summary::-webkit-details-marker { display:none; }
@@ -595,6 +604,9 @@
 <script src="/config.js"></script>
 <!-- 자막 줄 계산(genCaption*)을 콘티 화면도 같이 쓰므로 먼저 불러온다 -->
 <script src="/youtube/generate.js"></script>
+<!-- 콘티 자동 생성(서버 create-conti + 브라우저 대체 경로 + 생성 중 화면) -->
+<script src="/youtube/conti-core.js"></script>
+<script src="/youtube/conti-job.js"></script>
 <script>
   const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
   const SUPABASE_ANON_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
@@ -2403,9 +2415,9 @@
       scripts.map((r) => `<option value="${r.id}">${escapeHtml(nameOf(r))}</option>`).join("");
     sel.value = keep;
     $("contiList").innerHTML = scripts.length
-      ? scripts.map((r) => `<div class="conti-item" role="button" tabindex="0" data-id="${r.id}">
-          <div class="title">${escapeHtml(nameOf(r))}</div>
-          <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>
+      ? scripts.map((r) => `<div class="conti-item${contiIncomplete(r) ? " cj-pending" : ""}" role="button" tabindex="0" data-id="${r.id}">
+          <div class="title">${escapeHtml(nameOf(r))}${contiBadge(r)}</div>
+          <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>${contiErrorBox(r)}
         </div>`).join("")
       : '<div class="empty" style="margin:20px 0;">아직 콘티가 없습니다</div>';
   }
@@ -2416,9 +2428,69 @@
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&category=not.in.(${PEXELS_CATEGORIES.map((c) => encodeURIComponent(c)).join(",")})&order=created_at.desc`, { headers });
       scripts = await res.json();
       renderScriptList();
+      schedulePendingRefresh();
     } catch (err) {
       sel.innerHTML = '<option value="">불러오기 실패</option>';
       $("contiList").innerHTML = '<div class="empty" style="margin:20px 0;">불러오기 실패</div>';
+    }
+  }
+
+
+  // ───── 서버가 만드는 중인 콘티 (create_status: queued·running = 만드는 중, error = 실패, 비어 있음·done = 완성) ─────
+  // 만드는 중인 콘티는 열 수 없고, 8초마다 그 행들만 다시 읽어 목록을 고친다 (다른 콘티를 편집 중인 값은 건드리지 않는다)
+  const contiPending = (r) => !!r && (r.create_status === "queued" || r.create_status === "running");
+  const contiIncomplete = (r) => !!r && (contiPending(r) || r.create_status === "error");
+  function contiBadge(r) {
+    if (!contiIncomplete(r)) return "";
+    if (r.create_status === "error") return ' <span class="cj-badge err">실패</span>';
+    if (ContiCore.isStale(r)) return ' <span class="cj-badge err">시간 초과</span>';
+    return r.create_status === "queued" ? ' <span class="cj-badge">대기 중</span>' : ' <span class="cj-badge run">만드는 중…</span>';
+  }
+  function contiErrorBox(r) {
+    const err = r.create_status === "error", stale = ContiCore.isStale(r);
+    if (!err && !stale) return "";
+    const why = err ? (r.create_error || "알 수 없는 오류") : "시간이 너무 오래 걸려 멈춘 것 같아요 (15분 넘음).";
+    return `<div class="cj-err-text">${escapeHtml(why)}</div><div class="cj-actions">
+      <button type="button" data-act="retry">다시 만들기</button><button type="button" data-act="browser">브라우저에서 만들기</button><button type="button" data-act="del" class="del">삭제</button></div>`;
+  }
+  let pendingTimer = 0;
+  function schedulePendingRefresh() {
+    clearTimeout(pendingTimer);
+    if (scripts.some(contiPending)) pendingTimer = setTimeout(refreshPending, 8000);
+  }
+  async function refreshPending() {
+    const ids = scripts.filter(contiIncomplete).map((r) => r.id);
+    if (ids.length) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&id=in.(${ids.join(",")})`, { headers });
+        if (res.ok) {
+          const rows = await res.json();
+          scripts = scripts.filter((r) => !ids.includes(r.id) || rows.some((x) => x.id === r.id));
+          rows.forEach((x) => { const r = scripts.find((y) => y.id === x.id); if (r) Object.assign(r, x); });
+          renderScriptList();
+        }
+      } catch { /* 다음에 다시 */ }
+    }
+    schedulePendingRefresh();
+  }
+  window.addEventListener("contijob", () => refreshPending());
+  // 실패·시간 초과한 콘티 다시 만들기: browser=true면 이 브라우저에서 (화면을 나가면 멈춤)
+  async function retryConti(id, browser) {
+    const r = scripts.find((x) => String(x.id) === String(id));
+    if (!r) return;
+    const name = (r.video_settings && r.video_settings.name) || (r.hook || "").slice(0, 30);
+    try {
+      // 먼저 "대기 중"으로 되돌린다 (감시가 옛 실패 상태를 보고 바로 실패 알림을 띄우지 않게)
+      const patch = { create_status: "queued", create_error: null, create_started_at: new Date().toISOString() };
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${r.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify(patch) });
+      if (!res.ok) throw new Error(await res.text());
+      Object.assign(r, patch);
+      renderScriptList();
+      $("listMsg").className = "msg"; $("listMsg").textContent = "";
+      ContiJob.launch([{ id: r.id, name }], { browser, onOpen: (x) => openConti(x) }).then(() => refreshPending());
+      schedulePendingRefresh();
+    } catch (err) {
+      showListMsg("다시 만들기를 시작하지 못했어요: " + err.message, false);
     }
   }
 
@@ -2485,14 +2557,6 @@
     } catch { /* 무작위 */ }
     return [list[n % list.length]];
   }
-  // 새 콘티 장면 목록에서 구독/좋아요 장면을 카드 값으로 바꾼다. card가 없으면 그대로 둔다
-  function applyCardToSegs(segs, card, photo) {
-    if (!card) return segs;
-    return segs.map((s) => s.section === "구독/좋아요"
-      ? { ...s, script_text: card.script_text || s.script_text, direction: card.direction || s.direction, asset_paths: photo }
-      : s);
-  }
-
   function initDraftFromTrend() {
     let saved = null;
     try {
@@ -2593,98 +2657,40 @@
     }
   }
 
-  // "제목 + 영상 + 출처" 화면 구성에 쓰는 문구: 제목 두 줄은 AI 제안, 출처는 참고한 기사의 매체명 (화면 구성이 다르면 영상에는 안 나온다)
-  function draftScreenText(data, articles) {
-    const out = {};
-    if (data.title1) out.title1 = String(data.title1).slice(0, 20);
-    if (data.title2) out.title2 = String(data.title2).slice(0, 20);
-    const names = [];
-    [...((data.usedArticles || []).map((a) => a.source)), ...articles.map((a) => a.source)].forEach((n) => {
-      n = String(n || "").trim();
-      // 주소(도메인)만 있는 경우는 매체명이 아니라서 제외
-      if (n && !/^[\w.-]+\.[a-z]{2,}$/i.test(n) && !names.includes(n)) names.push(n);
-    });
-    if (names.length) out.source_text = ("출처: " + names.join(", ")).slice(0, 60);
-    return out;
-  }
-
+  // 새 콘티: 빈 콘티 행(대기 중)을 만들고 서버(create-conti)에 맡긴다. 서버를 못 쓰면 이 브라우저에서 같은 행을 채운다 (conti-job.js)
+  // 대본·장면·기사 사진 가져오기 순서는 conti-core.js(ContiCore) — 서버와 브라우저가 같이 쓴다
   async function createDraft() {
     const topic = $("draftTopic").value.trim();
     if (!topic) { showDraftMsg("주제를 입력하세요.", false); return; }
-    const articles = draftCandidates.slice();   // 후보 기사는 전부 쓴다
+    const articles = draftCandidates.slice().map((a) => ({ title: a.title, url: a.url, source: a.source }));   // 후보 기사는 전부 쓴다
     const card = draftCards.find((c) => String(c.id) === $("draftCard").value) || null;
-    const pickedMood = $("draftMood").value;   // 직접 고른 분위기가 Gemini 판단보다 우선
-
     const btn = $("draftBtn");
     btn.disabled = true;
-    btn.textContent = "대본과 콘티를 만드는 중... (10~30초)";
-    showDraftMsg("기사를 읽고, 배경·관점을 검색한 뒤 대본을 쓰는 중입니다.", true);
+    btn.textContent = "콘티 만들기를 시작하는 중...";
     try {
       await userDefaultsReady;
-      const res = await fetch("/api/gemini-draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, articles, note: $("draftNote").value.trim(), traffic: draftTraffic, geo: draftGeo }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "생성 실패");
-
-      const cardPhoto = card ? await pickCardPhoto(card) : [];
-      const segs = applyCardToSegs(data.segments, card, cardPhoto);
-      const mood = pickedMood || data.mood;
       // 구독 카드와 채널: 카드를 골랐으면 그 카드의 채널, 못 읽었으면 트렌드 채널만 (업로드 기본 채널로 쓴다)
       const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : (draftChannelSlot != null ? { channel_slot: draftChannelSlot } : {});
-      const texts = segs.map((s) => s.script_text);
-      const scriptRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts`, {
-        method: "POST",
-        headers: { ...jsonHeaders, Prefer: "return=representation" },
-        body: JSON.stringify({
-          category: "뉴스/이슈",
-          hook: texts[0],
-          story: texts.slice(1).join("\n") || texts[0],
-          closing: "",
-          fact_sources: [
-            ...articles.map((a) => a.url).filter(Boolean),
-            ...((data.research && data.research.sources) || []).slice(0, 4).map((s) => `${s.title} — ${s.url}`),
-          ].join("\n"),
-          status: "approved",
-          slug: `${new Date().toISOString().slice(0, 10)}_${topic.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20)}`,
-          // 기본값의 자막 위치가 framed 기준(새 기본값엔 layout이 없다)이면 그대로 framed로 만든다. 기본값이 없거나 옛 full 기준이면
-          // layout을 비워 두고, 열 때 framed로 바꾸며 자막 위치 7→22 전환을 적용한다(loadSettingsCard)
-          video_settings: { ...(userDefaults || {}), ...(userDefaults && userDefaults.caption_position_pct != null && userDefaults.layout !== "full" ? { layout: "framed" } : {}), name: (data.name || topic).slice(0, 40), ...draftScreenText(data, articles), ...(mood ? { mood } : {}), ...cardSettings },   // 분위기: 직접 고른 값 > Gemini가 기사를 보고 고른 값 > 기본값
-        }),
+      const row = await ContiJob.createPlaceholder({
+        category: "뉴스/이슈",
+        name: topic,
+        slug: `${new Date().toISOString().slice(0, 10)}_${topic.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20)}`,
+        // 기본값의 자막 위치가 framed 기준(새 기본값엔 layout이 없다)이면 그대로 framed로 만든다. 기본값이 없거나 옛 full 기준이면
+        // layout을 비워 두고, 열 때 framed로 바꾸며 자막 위치 7→22 전환을 적용한다(loadSettingsCard)
+        video_settings: { ...(userDefaults || {}), ...(userDefaults && userDefaults.caption_position_pct != null && userDefaults.layout !== "full" ? { layout: "framed" } : {}), ...cardSettings },
+        request: {
+          kind: "news", topic, articles, note: $("draftNote").value.trim(), traffic: draftTraffic, geo: draftGeo,
+          mood: $("draftMood").value,   // 직접 고른 분위기가 Gemini 판단보다 우선 (""이면 Gemini 값)
+          card_id: card ? card.id : null, channel_slot: card ? card.channel_slot : draftChannelSlot,
+        },
       });
-      if (!scriptRes.ok) throw new Error(await scriptRes.text());
-      const created = (await scriptRes.json())[0];
-
-      const segRes = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments`, {
-        method: "POST",
-        headers: { ...jsonHeaders, Prefer: "return=representation" },
-        body: JSON.stringify(segs.map((s, i) => ({
-          script_id: created.id, order_no: i + 1,
-          // 값이 undefined인 칸은 JSON에서 빠져 행마다 칸 이름이 달라진다(PGRST102) → 모두 문자열로
-          section: s.section || "", script_text: s.script_text || "", keyword: s.keyword || "", direction: s.direction || "",
-          asset_paths: (s.asset_paths && s.asset_paths.length) ? s.asset_paths : [],   // 구독 카드 사진 (여러 행을 한 번에 넣을 땐 모든 행의 칸 이름이 같아야 한다)
-        }))),
-      });
-      if (!segRes.ok) throw new Error(await segRes.text());
-      const createdSegs = (await segRes.json()).sort((a, b) => a.order_no - b.order_no);
-
-      let imageNote = "";
-      if ((data.images || []).length) {   // 기사 사진·영상은 늘 가져온다 (구독/좋아요 장면에는 넣지 않는다)
-        imageNote = await importArticleImages(created.id, createdSegs.filter((sg) => sg.section !== "구독/좋아요"), [...data.images.filter((m) => m.type !== "video").slice(0, 8), ...data.images.filter((m) => m.type === "video").slice(0, 3)], btn);
-      }
-
-      imageNote += embedNote(data.embeds);
-      const researchNote = data.research && data.research.ok
-        ? ` 관점 자료로 관련 칼럼·분석 기사 ${data.research.sources.length}건을 참고했습니다.`
-        : " 관련 칼럼·분석 기사를 찾지 못해 관점 정리 없이 기사 중심으로 썼습니다.";
-      const doneText = `"${data.name}" 콘티가 만들어졌습니다.${researchNote}${imageNote}`;
-      showDraftMsg(doneText, true);
-      showMsg(doneText, true);
+      $("draftMsg").className = "msg"; $("draftMsg").textContent = "";
       $("newDraft").open = false;
+      $("draftTopic").value = ""; $("draftNote").value = "";
+      draftCandidates = []; draftTraffic = ""; draftGeo = "";
+      $("draftArticlesWrap").style.display = "none"; $("draftArticles").innerHTML = "";
       await loadScripts();
-      openConti(created.id);
+      ContiJob.launch([{ id: row.id, name: topic }], { onOpen: (id) => openConti(id) }).then(() => refreshPending());
     } catch (err) {
       showDraftMsg("생성 실패: " + err.message, false);
     } finally {
@@ -4958,6 +4964,19 @@
     if (inDetail) refreshGenState(e.target.value);
   });
   function openConti(id) {
+    const row = id ? scripts.find((r) => String(r.id) === String(id)) : null;
+    if (row && contiIncomplete(row)) {   // 아직 만드는 중이거나 실패한 콘티는 열지 않는다
+      if ($("scriptSelect").value) { $("scriptSelect").value = ""; $("scriptSelect").dispatchEvent(new Event("change", { bubbles: true })); }
+      showListMsg(row.create_status === "error" ? "만들기에 실패한 콘티예요. 아래 버튼으로 다시 만들거나 삭제하세요." : "아직 만드는 중인 콘티예요. 다 만들어지면 알려 드릴게요.", row.create_status !== "error");
+      const el = document.querySelector(`.conti-item[data-id="${row.id}"]`);
+      if (el) el.scrollIntoView({ block: "center" });
+      return;
+    }
+    if (row && row.create_request && row.create_request.result_note && !row.create_request.note_shown) {   // 자동 생성 결과 안내(처음 열 때 한 번)
+      showMsg(`"${(row.video_settings && row.video_settings.name) || ""}" 콘티가 만들어졌습니다. ${row.create_request.result_note}`, true);
+      row.create_request.note_shown = true;
+      fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?id=eq.${row.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ create_request: row.create_request }) }).catch(() => {});
+    }
     const sel = $("scriptSelect");
     sel.value = String(id);
     sel.dispatchEvent(new Event("change", { bubbles: true }));
@@ -4989,9 +5008,18 @@
   bindLongPress($("contiList"), ".conti-item", (id) => deleteConti(id));
   $("contiList").addEventListener("click", (e) => {
     const item = e.target.closest(".conti-item");
-    if (item) openConti(item.dataset.id);
+    if (!item) return;
+    const act = e.target.closest("[data-act]");
+    if (act) {   // 실패한 콘티의 버튼: 다시 만들기 / 브라우저에서 만들기 / 삭제
+      e.stopPropagation();
+      if (act.dataset.act === "del") deleteConti(item.dataset.id);
+      else retryConti(item.dataset.id, act.dataset.act === "browser");
+      return;
+    }
+    openConti(item.dataset.id);
   });
   $("contiList").addEventListener("keydown", (e) => {
+    if (e.target.closest("[data-act]")) return;
     const item = e.target.closest(".conti-item");
     if (item && e.key === "Enter") openConti(item.dataset.id);
   });
@@ -5008,6 +5036,7 @@
     const row = scripts.find((r) => String(r.id) === String(id));
     if (!row) return;
     if (row.generation_status === "running") { showListMsg("영상 생성 중인 콘티는 끝난 뒤에 삭제할 수 있습니다.", false); return; }
+    if (contiPending(row) && !ContiCore.isStale(row)) { showListMsg("콘티를 만드는 중이라 다 만든 뒤에 삭제할 수 있어요.", false); return; }
     const name = (row.video_settings && row.video_settings.name) || (row.hook || "").slice(0, 30) || "(이름 없음)";
     try {
       const [segRes, outRes] = await Promise.all([
@@ -5049,6 +5078,7 @@
       if (!r.ok) throw new Error("콘티 삭제 실패: " + await r.text());
 
       if (genWatch.has(String(id))) { clearInterval(genWatch.get(String(id))); genWatch.delete(String(id)); }
+      contiJobsRemove(id);
       await loadScripts();
       showListMsg(`"${name}" 콘티를 삭제했습니다.`, true);
     } catch (err) {
@@ -5468,6 +5498,14 @@
     // 다른 페이지(Wikipedia 등)에서 만든 콘티를 바로 열어 준다
     let id = null;
     try { id = sessionStorage.getItem("openConti"); sessionStorage.removeItem("openConti"); } catch { /* 무시 */ }
+    // 알림의 "열기" 링크: ?open=<콘티 번호>
+    const params = new URLSearchParams(location.search);
+    if (params.get("open")) {
+      id = params.get("open");
+      params.delete("open");
+      history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "") + location.hash);
+      if (!scripts.some((r) => String(r.id) === String(id))) { showListMsg("그 콘티를 찾을 수 없어요 (삭제됐을 수 있어요).", false); id = null; }
+    }
     if (id) openConti(id);
   });
   initDraftFromTrend();
