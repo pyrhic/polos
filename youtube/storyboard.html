@@ -311,9 +311,8 @@
   .seg-kw-search { flex:0 0 auto; width:auto; margin:0; padding:0 8px; font-size:0.62rem; font-weight:800; letter-spacing:0.04em; background:var(--btn); color:var(--text); border:1px solid var(--line-strong); border-radius:3px; }
   .pexels-pick-body .seg-pexels-grid { flex-wrap:wrap; overflow:visible; justify-content:flex-start; max-height:60vh; overflow-y:auto; }
   .seg-pexels-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:0.72rem; margin-bottom:6px; }
-  .seg-side-lab-row { display:flex; justify-content:space-between; align-items:center; gap:6px; }
-  .seg-card-load { width:auto; margin:0; padding:2px 7px; font-size:0.64rem; font-weight:700; text-transform:none; letter-spacing:0; color:var(--text); background:var(--btn); box-shadow:none; white-space:nowrap; flex-shrink:0; }
-  .cardpick-list { max-height:62vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+  .seg-card-set { width:auto; margin:0; padding:3px 8px; font-size:0.66rem; font-weight:800; text-transform:none; letter-spacing:0; color:var(--accent); background:var(--btn); border:1px solid var(--line-strong); box-shadow:none; white-space:nowrap; flex-shrink:0; }
+  .cardpick-list { max-height:42vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
   .cardpick-item { display:flex; align-items:center; gap:10px; width:100%; margin:0; padding:8px; text-align:left; text-transform:none; letter-spacing:0; color:var(--text); background:var(--btn); box-shadow:none; min-width:0; }
   .cardpick-thumb { width:44px; height:44px; flex-shrink:0; border-radius:4px; background:var(--bg) center/cover no-repeat; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:0.6rem; overflow:hidden; }
   .cardpick-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
@@ -321,6 +320,14 @@
   .cardpick-name { font-size:0.82rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cardpick-name .def { color:var(--accent); font-weight:800; margin-left:4px; }
   .cardpick-line { font-size:0.72rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+  .cardpick-note { font-size:0.72rem; color:var(--muted); background:var(--inset); border-radius:4px; padding:6px 8px; margin-bottom:8px; }
+  .cardpick-note.ok { color:var(--accent); }
+  .cardpick-reg { margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+  .cardpick-reg-title { font-size:0.8rem; font-weight:800; color:var(--text); }
+  .cardpick-reg-hint { font-size:0.68rem; color:var(--muted); margin:3px 0 8px; }
+  .cardpick-reg-row { display:flex; gap:6px; align-items:stretch; }
+  .cardpick-reg-name { flex:1; min-width:0; padding:7px 9px; font-size:0.8rem; }
+  .cardpick-reg-btn { width:auto; margin:0; padding:0 12px; font-size:0.74rem; font-weight:800; white-space:nowrap; flex-shrink:0; }
   .seg-pexels-close { width:auto; margin:0; padding:2px 8px; font-size:0.8rem; background:transparent; box-shadow:none; color:var(--muted); }
   .seg-tl-area.ro-on > :not(.seg-ro-wrap) { display:none; }
   /* 클립을 고르면 나오는 도구줄 */
@@ -2680,6 +2687,7 @@
       <div class="card-box seg-item" data-id="${seg.id}" tabindex="0">
         <div class="seg-head">
           <div class="seg-no">${seg.order_no}</div>
+          ${isSubscribeSeg(seg) ? '<button type="button" class="seg-card-set" title="채널 카드 불러오기 / 지금 장면을 채널 카드로 등록">채널 카드 설정</button>' : ""}
           <div class="seg-duration">
             <span class="seg-duration-display"></span>
             <input type="number" class="seg-duration-input" step="0.1" min="0" style="display:none;">
@@ -2707,9 +2715,7 @@
             <div class="seg-stage-side">
               <div class="seg-pv-time">00:00 / 00:00</div>
               <div class="seg-pv-info"></div>
-              ${isSubscribeSeg(seg)
-                ? '<div class="seg-side-lab seg-side-lab-row"><span>SCRIPT</span><button type="button" class="seg-card-load" title="채널 화면에서 만든 채널 카드로 이 장면을 바꿔요">채널 카드 불러오기</button></div>'
-                : '<div class="seg-side-lab">SCRIPT</div>'}
+              <div class="seg-side-lab">SCRIPT</div>
               <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
               <div class="seg-side-lab">ACTION</div>
               <textarea class="seg-direction" rows="1" wrap="off" placeholder="예: 천천히 줌인">${escapeHtml(oneLine(seg.direction))}</textarea>
@@ -2822,8 +2828,8 @@
       bindTimelineGestures(el);
       bindCapGestures(el);
       el.querySelector(".seg-revert-btn").addEventListener("click", () => { clearTimeout(el._autoTimer); revertSegmentCard(id, el); });
-      const cardLoadBtn = el.querySelector(".seg-card-load");
-      if (cardLoadBtn) cardLoadBtn.addEventListener("click", () => openCardPick(id));
+      const cardSetBtn = el.querySelector(".seg-card-set");
+      if (cardSetBtn) cardSetBtn.addEventListener("click", () => openCardPick(id));
       el.querySelector(".seg-delete-btn").addEventListener("click", () => { clearTimeout(el._autoTimer); deleteSegmentCard(id, el); });
 
       const durDisplay = el.querySelector(".seg-duration-display");
@@ -5045,11 +5051,13 @@
     }
   });
 
-  // ───── 채널 카드 불러오기: 이미 있는 콘티의 채널 카드 장면(구독/좋아요)을 채널 화면에서 만든 카드로 바꾼다 ─────
+  // ───── 채널 카드 설정: 이미 있는 콘티의 채널 카드 장면(구독/좋아요)을 채널 화면에서 만든 카드로 바꾸거나, 지금 장면을 새 카드로 등록한다 ─────
   // 채널은 콘티에 저장된 channel_slot, 없으면 출처 규칙(위키 콘티 → source=wiki 채널, 그 밖 → trend 채널).
-  // 채널 카드 장면이 없는 옛 콘티는 같은 팝업으로 맨 끝에 채널 카드 장면을 새로 붙인다 (segId = null).
+  // 채널 카드 장면이 없는 옛 콘티는 같은 팝업으로 맨 끝에 채널 카드 장면을 새로 붙인다 (segId = null, 등록 칸 없음).
   let cardPickCards = [];
+  let cardPickBusy = false;   // 등록 중에는 팝업을 닫지 않는다
   function closeCardPick() {
+    if (cardPickBusy) return;
     $("cardPickModal").classList.remove("open");
     $("cardPickBody").innerHTML = "";
     cardPickCards = [];
@@ -5067,34 +5075,33 @@
     if (vs.channel_slot != null) return { slot: vs.channel_slot, label: `채널 ${vs.channel_slot}` };
     throw new Error("이 콘티의 채널이 정해지지 않음");
   }
-  async function openCardPick(segId) {
+  // note: 목록 위에 띄울 짧은 안내 { text, ok } (등록 직후 다시 그릴 때)
+  async function openCardPick(segId, note) {
     const scriptId = $("scriptSelect").value;
     const row = scripts.find((r) => String(r.id) === String(scriptId));
     if (!row) return;
     const body = $("cardPickBody");
     const head = (title) => `<div class="seg-pexels-head"><span>${escapeHtml(title)}</span><button type="button" class="seg-pexels-close" title="닫기">✕</button></div>`;
+    const noteHtml = note ? `<div class="cardpick-note${note.ok ? " ok" : ""}">${escapeHtml(note.text)}</div>` : "";
     const setBody = (title, html) => {
-      body.innerHTML = head(title) + html;
+      body.innerHTML = head(title) + noteHtml + html;
       body.querySelector(".seg-pexels-close").addEventListener("click", closeCardPick);
     };
     $("cardPickModal").classList.add("open");
-    setBody("채널 카드", '<div class="empty" style="margin:16px 0;">불러오는 중...</div>');
+    if (!note) setBody("채널 카드 설정", '<div class="empty" style="margin:16px 0;">불러오는 중...</div>');
     try {
       const ch = await contiChannel(row);
       const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards?select=*&channel_slot=eq.${ch.slot}&order=sort_order.asc,id.asc`, { headers });
       if (!res.ok) throw new Error("채널 카드 표를 읽지 못함");
       if (String($("scriptSelect").value) !== String(scriptId)) return;   // 그 사이 다른 콘티로 넘어갔다
       cardPickCards = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
-      const curId = (row.video_settings || {}).subscribe_card_id;
+      const curId = currentSettings.subscribe_card_id != null ? currentSettings.subscribe_card_id : (row.video_settings || {}).subscribe_card_id;
       const title = `${ch.label} 채널 카드 · ${segId ? "고르면 이 장면에 적용" : "고르면 맨 끝에 추가"}`;
-      if (!cardPickCards.length) {
-        setBody(title, `<div class="empty" style="margin:16px 0;">${escapeHtml(ch.label)} 채널에 채널 카드가 없어요. 채널 화면에서 먼저 만들어 주세요.</div>`);
-        return;
-      }
-      setBody(title, `<div class="cardpick-list">${cardPickCards.map((c, i) => {
-        const first = (normalizeScript(c.script_text || "").split("\n").find((l) => l.trim()) || "(문구 없음)").trim();
-        const img = c.image_paths[0];
-        return `<button type="button" class="cardpick-item" data-i="${i}">
+      const listHtml = cardPickCards.length
+        ? `<div class="cardpick-list">${cardPickCards.map((c, i) => {
+          const first = (normalizeScript(c.script_text || "").split("\n").find((l) => l.trim()) || "(문구 없음)").trim();
+          const img = c.image_paths[0];
+          return `<button type="button" class="cardpick-item" data-i="${i}">
           <span class="cardpick-thumb">${img ? `<img src="${escapeAttr(assetUrl(img))}" alt="" loading="lazy" onerror="this.remove()">` : "사진 없음"}</span>
           <span class="cardpick-txt">
             <span class="cardpick-name" style="display:block;">${escapeHtml(c.name || "(이름 없음)")}${c.is_default ? '<span class="def">★기본</span>' : ""}${String(c.id) === String(curId) ? ' <span style="color:var(--muted);font-weight:700;">· 지금 카드</span>' : ""}</span>
@@ -5102,13 +5109,92 @@
             <span class="cardpick-line" style="display:block;">사진 ${c.image_paths.length}장${c.direction ? " · " + escapeHtml(oneLine(c.direction)) : ""}</span>
           </span>
         </button>`;
-      }).join("")}</div>`);
+        }).join("")}</div>`
+        : `<div class="empty" style="margin:16px 0;">${escapeHtml(ch.label)} 채널에 채널 카드가 없어요.${segId ? " 아래에서 지금 장면을 카드로 등록하거나" : ""} 채널 화면에서 만들어 주세요.</div>`;
+      // 등록 칸: 채널 카드 장면이 있을 때만 (지금 장면의 문구·연출·사진을 이 채널의 새 카드로)
+      const t = currentSettings.name || "";
+      const regHtml = segId ? `<div class="cardpick-reg">
+          <div class="cardpick-reg-title">이 카드를 채널 카드로 등록</div>
+          <div class="cardpick-reg-hint">지금 장면의 문구·연출·사진을 ${escapeHtml(ch.label)} 채널의 새 카드로 저장해요. 사진은 채널 카드 보관함으로 복사돼요.</div>
+          <div class="cardpick-reg-row">
+            <input type="text" class="cardpick-reg-name" maxlength="40" placeholder="카드 이름" value="${escapeAttr(t ? `${t} 카드`.slice(0, 40) : "새 채널 카드")}">
+            <button type="button" class="cardpick-reg-btn">등록</button>
+          </div>
+        </div>` : "";
+      setBody(title, listHtml + regHtml);
       body.querySelectorAll(".cardpick-item").forEach((b) => b.addEventListener("click", () => {
         const card = cardPickCards[Number(b.dataset.i)];
         if (card) applyCardToConti(scriptId, segId, card);
       }));
+      const regBtn = body.querySelector(".cardpick-reg-btn");
+      if (regBtn) regBtn.addEventListener("click", () => registerSceneAsCard(scriptId, segId, ch, body.querySelector(".cardpick-reg-name").value.trim()));
     } catch (err) {
-      setBody("채널 카드", `<div class="empty" style="margin:16px 0;">채널 카드를 불러오지 못했어요 (${escapeHtml(err.message)})</div>`);
+      setBody("채널 카드 설정", `<div class="empty" style="margin:16px 0;">채널 카드를 불러오지 못했어요 (${escapeHtml(err.message)})</div>`);
+    }
+  }
+  // 지금 채널 카드 장면을 이 채널의 새 카드(youtube_subscribe_cards)로 저장한다.
+  // 장면 사진은 콘티에서 지우면 스토리지에서도 지워지는 파일일 수 있으므로 subscribe/<채널>/ 아래로 복사해서 쓴다 (채널 화면 업로드와 같은 이름 규칙).
+  // 영상·빈 화면·Pexels 소재(외부 주소)는 카드 사진이 될 수 없어 뺀다.
+  async function registerSceneAsCard(scriptId, segId, ch, name) {
+    if (cardPickBusy) return;
+    const seg = segments.find((s) => String(s.id) === String(segId));
+    if (!seg) { closeCardPick(); return; }
+    if (!name) { alert("카드 이름을 써 주세요."); return; }
+    const btn = $("cardPickBody").querySelector(".cardpick-reg-btn");
+    const el = document.querySelector(`.seg-item[data-id="${seg.id}"]`);
+    // 문구·연출은 화면에 보이는 값 그대로 (아직 자동 저장 전이어도)
+    const scriptText = el ? el.querySelector(".seg-script").value : (seg.script_text || "");
+    const direction = el ? el.querySelector(".seg-direction").value : (seg.direction || "");
+    const assets = seg.asset_paths || [];
+    const photos = assets.filter((p) => isStoragePath(p) && isImage(p));
+    const skipped = assets.length - photos.length;
+    cardPickBusy = true;
+    if (btn) { btn.disabled = true; btn.textContent = "등록 중…"; }
+    const copied = [];
+    try {
+      for (const p of photos) {
+        const r = await fetch(publicUrl(p));
+        if (!r.ok) throw new Error(`사진을 읽지 못함 (${p.split("/").pop()})`);
+        const blob = await r.blob();
+        const safeName = (p.split("/").pop() || "photo.jpg").replace(/[^\w.\-]/g, "_");
+        const dest = `subscribe/${ch.slot}/${Date.now()}_${safeName}`;
+        const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${dest}`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": blob.type || "application/octet-stream" },
+          body: blob,
+        });
+        if (!up.ok) throw new Error(`사진 복사 실패: ${await up.text()}`);
+        copied.push(dest);
+      }
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_subscribe_cards`, {
+        method: "POST",
+        headers: { ...jsonHeaders, Prefer: "return=representation" },
+        body: JSON.stringify({
+          channel_slot: Number(ch.slot), name: name.slice(0, 40), script_text: scriptText, image_paths: copied, direction,
+          is_default: false, sort_order: cardPickCards.reduce((m, c) => Math.max(m, c.sort_order || 0), 0) + 1,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const rows = await res.json();
+      const card = Array.isArray(rows) ? rows[0] : rows;
+      cardPickBusy = false;
+      if (String($("scriptSelect").value) !== String(scriptId)) return;
+      // 새 카드를 이 콘티의 지금 카드로 (savePart 규칙: 고른 카드와 그 채널만 덮어쓴다)
+      currentSettings.subscribe_card_id = card.id;
+      currentSettings.channel_slot = card.channel_slot;
+      partEdits.card++;
+      const saved = await savePart("card");
+      const skipText = skipped ? ` 영상·빈 화면·Pexels 소재 ${skipped}개는 사진이 아니라서 뺐어요.` : "";
+      const text = `"${card.name}" 카드를 등록했어요 (사진 ${copied.length}장).${skipText}`;
+      if (saved) showMsg(text, true);
+      openCardPick(segId, { text, ok: true });
+    } catch (err) {
+      cardPickBusy = false;
+      // 카드를 못 만들었으면 복사해 둔 사진도 지운다
+      for (const p of copied) { try { await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${p}`, { method: "DELETE", headers }); } catch { /* 넘어간다 */ } }
+      if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = "등록"; }
+      showMsg(`채널 카드 등록 실패: ${err.message}`, false);
+      alert(`채널 카드 등록 실패: ${err.message}`);
     }
   }
   async function applyCardToConti(scriptId, segId, card) {
