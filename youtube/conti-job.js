@@ -1,7 +1,7 @@
 // 콘티 자동 생성 — 브라우저 쪽 도구 (Scenes·Wikipedia 화면이 같이 쓴다). /config.js, generate.js, conti-core.js 다음에 불러온다.
 //  1) 빈 콘티 행(create_status='queued')을 만들고  2) Supabase Edge Function create-conti를 부른다 (사용자가 화면을 나가도 서버가 계속)
 //  3) 함수를 못 부르면(아직 배포 안 함·네트워크) 같은 행을 이 브라우저에서 만든다 (ContiCore.runAll — 화면을 나가면 멈춤)
-//  4) 만드는 동안 "생성 중" 화면을 띄운다: 최소 30초 머물러 달라고 하고(광고 자리 #contiAdSlot), 그 뒤엔 나가도 알림을 준다고 안내
+//  4) 서버에서 만들면 알림창만 띄우고(다 되면 알림), 브라우저에서 만들 때만 "생성 중" 화면(나가지 말라는 안내, 광고 자리 #contiAdSlot)
 // 끝났는지 확인·알림은 generate.js의 contiJobWatch가 한다 (window "contijob" 이벤트)
 const ContiJob = (() => {
   const SB = POLOS_CONFIG.SUPABASE_URL, KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
@@ -9,7 +9,6 @@ const ContiJob = (() => {
   const FN_URL = `${SB}/functions/v1/create-conti`;
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const MIN_STAY_SECS = () => (window.__contiMinSecs != null ? Number(window.__contiMinSecs) : 30);   // __contiMinSecs: 시험용으로 줄이기
   const BROWSER_MSG = "서버 생성을 못 써서 브라우저에서 만들어요 — 화면을 나가지 마세요";
   const BROWSER_CHOSEN_MSG = "브라우저에서 만들고 있어요 — 다 될 때까지 화면을 나가지 마세요";
 
@@ -85,8 +84,10 @@ const ContiJob = (() => {
     opts = opts || {};
     try { genRequestPermission(); } catch { /* 무시 */ }
     jobs.forEach((j) => contiJobsAdd(j.id, j.name));
-    const ov = overlay(jobs, opts);
-    const local = [];
+    // 서버에서 만들면 영상 생성처럼 알림창만 띄우고 끝(다 되면 contiJobWatch가 알림). "생성 중" 화면은 브라우저에서 만들 때만
+    let ov = null;
+    const getOv = () => ov || (ov = overlay(jobs, opts));
+    const local = [], started = [], refused = [];
     let serverOk = !opts.browser;
     for (let i = 0; i < jobs.length; i++) {
       const j = jobs[i];
@@ -94,13 +95,16 @@ const ContiJob = (() => {
       if (i) await sleep(window.__contiSpacingMs != null ? window.__contiSpacingMs : 2000);
       const s = await startServer(j.id);
       if (s.state === "unavailable") { serverOk = false; local.push(j); console.warn("create-conti 함수를 못 써서 브라우저에서 만듭니다:", s.error); }
-      else if (s.state === "refused") ov.fail(j.id, s.error);
+      else if (s.state === "refused") refused.push(`${j.name || "콘티"}: ${s.error || "실패"}`);
+      else started.push(j);
     }
+    if (refused.length) genToast(`콘티 생성을 시작하지 못했어요 — ${refused.join(" / ")}`, false, null);
+    else if (started.length) genToast(`콘티 생성을 시작했어요${started.length > 1 ? ` (${started.length}개)` : ""}. 다른 화면으로 가도 되고, 다 만들어지면 알려 드릴게요.`, true, null);
     if (local.length) {
-      ov.browserMode(opts.browser ? BROWSER_CHOSEN_MSG : BROWSER_MSG);
+      getOv().browserMode(opts.browser ? BROWSER_CHOSEN_MSG : BROWSER_MSG);
       for (const j of local) {
-        try { await runInBrowser(j.id, (t) => ov.progress(j.id, t)); }
-        catch (e) { ov.fail(j.id, e.message); }
+        try { await runInBrowser(j.id, (t) => getOv().progress(j.id, t)); }
+        catch (e) { getOv().fail(j.id, e.message); }
         await contiJobCheckNow();
       }
     }
@@ -156,7 +160,7 @@ const ContiJob = (() => {
     document.body.appendChild(el);
     const $ = (s) => el.querySelector(s);
     const state = new Map(jobs.map((j) => [String(j.id), "wait"]));
-    let browser = "", left = MIN_STAY_SECS(), closed = false;
+    let browser = "", closed = false;
 
     function allFinished() { return [...state.values()].every((v) => v === "done" || v === "err"); }
     function render() {
@@ -169,14 +173,12 @@ const ContiJob = (() => {
         stay.className = "cj-msg"; stay.textContent = ok ? "Scenes에서 열어 확인하세요." : "Scenes 목록에서 다시 만들기를 눌러 주세요.";
       } else if (browser) {
         stay.className = "cj-msg warn"; stay.textContent = browser;
-      } else if (left > 0) {
-        stay.className = "cj-msg"; stay.textContent = `서버에서 만들고 있어요. 최소 ${left}초만 이 화면에 머물러 주세요.`;
       } else {
         stay.className = "cj-msg"; stay.textContent = "이제 다른 화면으로 가도 괜찮아요. 다 만들어지면 알림으로 알려 드릴게요.";
       }
       const btn = $("#cjClose");
-      btn.disabled = !fin && (browser || left > 0);
-      btn.textContent = fin ? "닫기" : (browser || left > 0) ? "만드는 중…" : "닫고 계속 둘러보기";
+      btn.disabled = !fin && !!browser;
+      btn.textContent = fin ? "닫기" : browser ? "만드는 중…" : "닫고 계속 둘러보기";
     }
     function setJob(id, cls, html) {
       const row = el.querySelector(`.cj-job[data-id="${Number(id)}"]`);
@@ -185,7 +187,6 @@ const ContiJob = (() => {
       if (cls) row.classList.add(cls);
       row.querySelector(".s").innerHTML = html;
     }
-    const tick = setInterval(() => { if (left > 0) { left--; render(); } }, 1000);
     const poll = setInterval(() => { if (!document.hidden) contiJobCheckNow(); }, 4000);   // 열려 있는 동안은 더 자주 확인
     function onEvent(e) {
       const { id, status, row } = e.detail || {};
@@ -212,7 +213,7 @@ const ContiJob = (() => {
     function close() {
       if (closed) return;
       closed = true;
-      clearInterval(tick); clearInterval(poll);
+      clearInterval(poll);
       window.removeEventListener("contijob", onEvent);
       el.remove();
       if (opts.onClose) opts.onClose();
