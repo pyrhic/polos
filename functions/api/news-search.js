@@ -15,6 +15,8 @@ export async function onRequestPost(context) {
     const query = String(q || "").trim().slice(0, 100);
     if (!query) return json({ error: "검색할 주제를 입력하세요" }, 400);
     const items = await searchNews(`${query} when:7d`, 20);   // 최근 1주 기사
+    let diag = null;
+    if (!items.length) { try { const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ko&gl=KR&ceid=KR:ko`, { headers: { "User-Agent": "Mozilla/5.0" } }); const t = await r.text(); diag = { status: r.status, head: t.slice(0, 160) }; } catch (e) { diag = { err: e.message }; } }
     // 같은 기사(제목 앞부분이 같음)는 하나만
     const seen = new Set();
     const uniq = items.filter((it) => { const k = norm(it.title); if (seen.has(k)) return false; seen.add(k); return true; });
@@ -27,7 +29,7 @@ export async function onRequestPost(context) {
       out.push({ title: it.title, url: urls[i], source: it.source || "", date: it.pubDate || "" });
     });
     // 진단용: 구글 뉴스가 몇 건을 줬고 몇 건을 풀었는지 (화면은 items만 쓴다)
-    return json({ items: out, found: items.length, resolved: urls.filter(Boolean).length }, 200);
+    return json({ items: out, found: items.length, resolved: urls.filter(Boolean).length, diag }, 200);
   } catch (err) {
     return json({ error: err.message }, 500);
   }
