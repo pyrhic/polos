@@ -32,6 +32,13 @@
   .t-tabs select { width:auto; padding:8px 12px; font-size:0.9rem; }
   .t-tr { color:var(--muted); font-size:0.72rem; margin-left:8px; text-decoration:none; font-weight:400; white-space:nowrap; }
   .t-tr:hover { color:var(--accent); }
+  .t-recent-h { font-size:1rem; margin:22px 0 4px; }
+  .t-recent-note { color:var(--muted); font-size:0.75rem; margin-bottom:8px; }
+  .t-recent { display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line); }
+  .t-recent .t-rt { flex:1; min-width:0; font-weight:700; font-size:0.92rem; overflow-wrap:anywhere; }
+  .t-recent .t-rm { color:var(--muted); font-size:0.72rem; font-weight:400; display:block; margin-top:2px; }
+  .t-recent .t-make { margin:0; flex-shrink:0; }
+  .t-recent .t-del { width:auto; margin:0; padding:2px 8px; flex-shrink:0; background:none; box-shadow:none; color:var(--muted); font-size:1rem; }
 </style>
 </head>
 <body>
@@ -61,6 +68,12 @@
     <div class="msg" id="msg"></div>
     <div id="meta" style="color:var(--muted);font-size:0.78rem;margin-bottom:10px;"></div>
     <div id="list"><div class="empty">불러오는 중...</div></div>
+    <!-- 실시간 목록에서 사라져도 다시 콘티로 만들 수 있게: 내가 눌렀던 주제 (이 기기에 저장) -->
+    <div id="recentWrap" style="display:none;">
+      <h2 class="t-recent-h">내가 눌렀던 주제</h2>
+      <div class="t-recent-note">제목·기사·콘티 만들기를 누른 주제예요. 트렌드 목록에서 사라져도 여기서 다시 만들 수 있어요 (이 기기에만 저장).</div>
+      <div id="recentList"></div>
+    </div>
   </div>
 
 <script>
@@ -89,6 +102,61 @@
     return scope === "domestic" ? "대한민국" : document.getElementById("countrySel").selectedOptions[0].textContent;
   }
 
+  // ───── 내가 눌렀던 주제: 트렌드가 사라져도 다시 콘티로 만들 수 있게 이 기기(localStorage)에 남긴다 ─────
+  // 제목·기사·번역 링크나 "콘티 만들기"를 누른 주제만, 최근 것이 위로, 같은 주제는 맨 위로 올리고 하나만, 최대 20개
+  const RECENT_KEY = "polos_trend_recent";
+  const RECENT_MAX = 20;
+  const recentKey = (r) => (r.geo || "KR") + "|" + r.title;
+  function readRecent() {
+    try { const v = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); return Array.isArray(v) ? v.filter((r) => r && r.title) : []; } catch { return []; }
+  }
+  function writeRecent(list) {
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX))); } catch { /* 저장 못 하면 그냥 넘어간다 */ }
+  }
+  function rememberTopic(r) {
+    const item = { title: r.title, geo: r.geo || "KR", traffic: r.traffic || "", articles: (r.articles || []).map((n) => ({ title: n.title, url: n.url, source: n.source })), at: Date.now() };
+    writeRecent([item, ...readRecent().filter((x) => recentKey(x) !== recentKey(item))]);
+    renderRecent();
+  }
+  function tappedAgo(t) {
+    const min = Math.max(0, Math.round((Date.now() - t) / 60000));
+    if (min < 60) return `${min}분 전`;
+    if (min < 60 * 24) return `${Math.floor(min / 60)}시간 전`;
+    return `${Math.floor(min / 1440)}일 전`;
+  }
+  const geoName = (g) => (g === "KR" ? "" : ((document.querySelector(`#countrySel option[value="${g}"]`) || {}).textContent || g));
+  let recentShown = [];
+  function renderRecent() {
+    recentShown = readRecent();
+    document.getElementById("recentWrap").style.display = recentShown.length ? "" : "none";
+    document.getElementById("recentList").innerHTML = recentShown.map((r, i) => `
+      <div class="t-recent">
+        <div class="t-rt">${escapeHtml(r.title)}<span class="t-rm">${escapeHtml([geoName(r.geo), r.traffic ? r.traffic + " 검색" : "", r.at ? tappedAgo(r.at) : "", `기사 ${(r.articles || []).length}건`].filter(Boolean).join(" · "))}</span></div>
+        <button type="button" class="t-make" data-r="${i}">콘티 만들기</button>
+        <button type="button" class="t-del" data-del="${i}" aria-label="목록에서 지우기">×</button>
+      </div>`).join("");
+  }
+  document.getElementById("recentList").addEventListener("click", (e) => {
+    const del = e.target.closest("[data-del]");
+    if (del) {
+      const r = recentShown[Number(del.dataset.del)];
+      if (r) { writeRecent(readRecent().filter((x) => recentKey(x) !== recentKey(r))); renderRecent(); }
+      return;
+    }
+    const b = e.target.closest(".t-make");
+    if (!b) return;
+    const r = recentShown[Number(b.dataset.r)];
+    if (!r) return;
+    rememberTopic(r);   // 다시 누르면 맨 위로
+    openMake({ topic: r.title, geo: r.geo, traffic: r.traffic, articles: r.articles });
+  });
+  renderRecent();
+
+  // 콘티 만들기 팝업 (Scenes의 "새 콘티 만들기"와 같은 conti-create-modal.js). 만들기 시작하면 이 화면에서 생성 중 화면·알림
+  function openMake({ topic, geo, traffic, articles }) {
+    ContiCreateModal.open({ topic, geo, traffic, articles: (articles || []).map((n) => ({ title: n.title, url: n.url, source: n.source })) });
+  }
+
   let loadSeq = 0;
 
   async function load() {
@@ -106,12 +174,13 @@
       document.getElementById("meta").textContent =
         `${regionName()} · ${data.items.length}개 · ${new Date(data.fetchedAt).toLocaleTimeString("ko-KR")} 기준`;
 
+      const geoNow = currentGeo();
       if (!data.items.length) {
         list.innerHTML = '<div class="empty">지금 표시할 검색어가 없습니다.</div>';
         return;
       }
       list.innerHTML = data.items.map((it, idx) => `
-        <div class="card-box t-item ${it.rank === 1 ? "t-first" : ""}">
+        <div class="card-box t-item ${it.rank === 1 ? "t-first" : ""}" data-i="${idx}">
           <div class="t-top">
             <div class="t-rank">${it.rank}</div>
             <a class="t-title" href="https://www.google.com/search?q=${encodeURIComponent(it.title)}" target="_blank" rel="noopener">${escapeHtml(it.title)}</a>
@@ -123,17 +192,19 @@
           ${it.news.length ? `<ul class="t-news">${it.news.map((n) => `
             <li><a href="${escapeHtml(safeUrl(n.url))}" target="_blank" rel="noopener">${escapeHtml(n.title)}</a>
               <span class="src">— ${escapeHtml(n.source)}</span></li>`).join("")}</ul>` : ""}
-          <button type="button" class="t-make" data-i="${idx}">이 주제로 대본·콘티 만들기</button>
+          <button type="button" class="t-make" data-i="${idx}">콘티 만들기</button>
         </div>
       `).join("");
 
-      list.querySelectorAll(".t-make").forEach((btn) =>
-        btn.addEventListener("click", () => {
-          const it = data.items[Number(btn.dataset.i)];
-          try {
-            sessionStorage.setItem("trendDraft", JSON.stringify({ topic: it.title, geo: currentGeo(), traffic: it.traffic || "", articles: it.news }));
-          } catch {}
-          location.href = "/youtube/storyboard.html?new=1";
+      // 제목·기사·번역 링크나 "콘티 만들기"를 누르면 "내가 눌렀던 주제"에 남긴다
+      list.querySelectorAll(".t-item").forEach((card) =>
+        card.addEventListener("click", (e) => {
+          const hit = e.target.closest("a, .t-make");
+          if (!hit) return;
+          const it = data.items[Number(card.dataset.i)];
+          const r = { title: it.title, geo: geoNow, traffic: it.traffic || "", articles: it.news };
+          rememberTopic(r);
+          if (hit.classList.contains("t-make")) openMake({ ...r, topic: it.title });
         })
       );
     } catch (err) {
@@ -162,8 +233,11 @@
     navigator.serviceWorker.register("/sw.js");
   }
 </script>
-<!-- 콘티 자동 생성 완료 알림 (generate.js의 contiJobWatch) -->
+<!-- 콘티 자동 생성 완료 알림 (generate.js의 contiJobWatch) + 콘티 만들기 팝업 -->
 <script src="/config.js"></script>
 <script src="/youtube/generate.js"></script>
+<script src="/youtube/conti-core.js"></script>
+<script src="/youtube/conti-job.js"></script>
+<script src="/youtube/conti-create-modal.js"></script>
 </body>
 </html>

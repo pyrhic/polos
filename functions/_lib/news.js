@@ -16,10 +16,11 @@ export async function searchNews(query, limit = 20) {
     const rawTitle = decode((block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || "").replace(/<!\[CDATA\[|\]\]>/g, "");
     const link = decode((block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || "").trim();
     const source = decode((block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || "");
+    const pubDate = decode((block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || "").trim();
     if (!rawTitle || !link) continue;
     // 제목 끝의 " - 매체명"은 떼어낸다
     const title = source && rawTitle.endsWith(" - " + source) ? rawTitle.slice(0, -(source.length + 3)) : rawTitle;
-    items.push({ title, link, source });
+    items.push({ title, link, source, pubDate });
     if (items.length >= limit) break;
   }
   return items;

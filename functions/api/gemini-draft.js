@@ -28,12 +28,14 @@ const COUNTRY_NAMES = { US: "미국", JP: "일본", GB: "영국", DE: "독일", 
 const MOOD_IDS = ["neutral", "mystery", "bright", "calm"];
 const normalizeMood = (m) => { const v = String(m || "").trim().toLowerCase(); return MOOD_IDS.includes(v) ? v : "neutral"; };
 
+// 참고 기사는 최대 5건. 기사 본문은 전체 약 10,500자(예전 3건 × 3,500자)를 기사 수로 나눠 읽는다 (프롬프트 크기·응답 시간이 예전과 비슷하게)
+const MAX_ARTICLES = 5;
+const ARTICLE_TEXT_BUDGET = 10500;
+
 const SUBSCRIBE_TEXT = "내 알고리즘 밖의 이야기가 궁금하다면 구독 좋아요 해주시면 나도 좋아요";
 
 function buildPrompt(topic, articles, researchText, note, traffic, country) {
-  const refs = articles.length
-    ? articles.map((a, i) => `(${i + 1}) [${a.source || "출처 미상"}] ${a.title}\n${a.text || "(본문을 가져오지 못해 제목만 참고)"}`).join("\n\n")
-    : "(참고 기사 없음 — 주제만으로 작성하되, 구체적 수치/날짜/인용은 쓰지 말 것)";
+  const refs = articles.map((a, i) => `(${i + 1}) [${a.source || "출처 미상"}] ${a.title}\n${a.text || "(본문을 가져오지 못해 제목만 참고)"}`).join("\n\n");
   const hasResearch = researchUsable(researchText);
   // 해외 트렌드(미국·일본 등)로 만들 때는 "한국 시청자에게 외국 소식을 전해주는" 방식으로 쓴다. 국내 트렌드는 기존 그대로.
   // 대본이 1분(약 250자)으로 짧아서, 도입 카드는 한 문장 + 한국 시청자용 배경 한 문장만 넣는다.
@@ -90,10 +92,13 @@ export async function onRequestPost(context) {
     if (!topic || !String(topic).trim()) return json({ error: "주제가 필요합니다" }, 400);
     const cleanTopic = String(topic).trim().slice(0, 100);
 
-    const picked = (Array.isArray(articles) ? articles : []).slice(0, 3).map((a) => ({
+    // 기사 없이 주제만으로 쓰는 길은 없앴다 (사실 확인이 안 되는 대본이 나와서). 기사 없이 만들면 화면에서 Gemini 없이 빈 콘티가 된다
+    const picked = (Array.isArray(articles) ? articles : []).filter((a) => a && /^https?:\/\//.test(String(a.url || ""))).slice(0, MAX_ARTICLES).map((a) => ({
       title: String(a.title || "").slice(0, 200), url: String(a.url || ""), source: String(a.source || "").slice(0, 60),
     }));
-    const fetched = await Promise.all(picked.map((a) => fetchArticle(a.url)));
+    if (!picked.length) return json({ error: "참고 기사가 없어요. 콘티 만들기 창에서 Search로 기사를 찾아 고른 뒤 다시 만들어 주세요" }, 400);
+    const perArticle = Math.max(2000, Math.min(3500, Math.floor(ARTICLE_TEXT_BUDGET / picked.length)));
+    const fetched = await Promise.all(picked.map((a) => fetchArticle(a.url, perArticle)));   // 동시에 읽어서(기사마다 최대 7초) 건수가 늘어도 시간은 거의 같다
     picked.forEach((a, i) => { a.text = fetched[i].text; a.media = [...fetched[i].images, ...fetched[i].videos]; a.embeds = fetched[i].embeds; });
 
     // 관점 자료: 구글 뉴스 검색(무료)으로 관련 칼럼·분석 기사를 찾아 본문을 읽는다. 못 찾으면 관점 정리 없이 쓴다.
