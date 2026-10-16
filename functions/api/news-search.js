@@ -26,7 +26,8 @@ export async function onRequestPost(context) {
       if (!urls[i] || out.length >= MAX) return;
       out.push({ title: it.title, url: urls[i], source: it.source || "", date: it.pubDate || "" });
     });
-    return json({ items: out }, 200);
+    // 진단용: 구글 뉴스가 몇 건을 줬고 몇 건을 풀었는지 (화면은 items만 쓴다)
+    return json({ items: out, found: items.length, resolved: urls.filter(Boolean).length }, 200);
   } catch (err) {
     return json({ error: err.message }, 500);
   }
