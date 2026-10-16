@@ -2662,7 +2662,8 @@
         headers: { ...jsonHeaders, Prefer: "return=representation" },
         body: JSON.stringify(segs.map((s, i) => ({
           script_id: created.id, order_no: i + 1,
-          section: s.section, script_text: s.script_text, keyword: s.keyword, direction: s.direction,
+          // 값이 undefined인 칸은 JSON에서 빠져 행마다 칸 이름이 달라진다(PGRST102) → 모두 문자열로
+          section: s.section || "", script_text: s.script_text || "", keyword: s.keyword || "", direction: s.direction || "",
           asset_paths: (s.asset_paths && s.asset_paths.length) ? s.asset_paths : [],   // 구독 카드 사진 (여러 행을 한 번에 넣을 땐 모든 행의 칸 이름이 같아야 한다)
         }))),
       });
