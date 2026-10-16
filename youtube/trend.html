@@ -154,7 +154,7 @@
 
   // 콘티 만들기 팝업 (Scenes의 "새 콘티 만들기"와 같은 conti-create-modal.js). 만들기 시작하면 이 화면에서 생성 중 화면·알림
   function openMake({ topic, geo, traffic, articles }) {
-    ContiCreateModal.open({ topic, geo, traffic, articles: (articles || []).map((n) => ({ title: n.title, url: n.url, source: n.source })) });
+    ContiCreateModal.open({ topic, geo, traffic, channelSource: "trend", articles: (articles || []).map((n) => ({ title: n.title, url: n.url, source: n.source })) });
   }
 
   let loadSeq = 0;

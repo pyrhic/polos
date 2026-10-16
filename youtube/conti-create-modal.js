@@ -1,8 +1,11 @@
 // "콘티 만들기" 팝업 — Trend와 Scenes가 같이 쓴다. /config.js, generate.js, conti-core.js, conti-job.js 다음에 불러온다.
-//  · 주제 + Search(구글 뉴스 /api/news-search, 최대 5건, 처음엔 전부 체크) + 분위기·방향 메모·채널 카드
+//  · 주제 + Search(구글 뉴스 — Supabase Edge Function news-search, 최대 5건, 처음엔 전부 체크) + 분위기·방향 메모·채널·채널 카드
+//    (Cloudflare에서는 구글 뉴스가 봇 차단 503을 줘서 Supabase 함수가 검색한다)
+//  · 채널: youtube_channels 전부. 기본 = Trend에서 열거나 기사가 있으면 트렌드 채널, 아니면 이 기기에서 마지막으로 쓴 채널, 없으면 트렌드 채널
 //  · 콘티 생성: 체크한 기사가 있으면 → 서버 작업(ContiJob: 빈 행 → create-conti → Gemini가 대본·장면·기사 사진)
 //               기사가 하나도 없으면 → Gemini 없이 빈 장면 5개 + 채널 카드 장면짜리 콘티를 바로 만든다
-// 사용: ContiCreateModal.open({ topic, articles, traffic, geo, getDefaults, onOpenConti(id), onCreated(id, kind) })
+// 사용: ContiCreateModal.open({ topic, articles, traffic, geo, channelSource, getDefaults, onOpenConti(id), onCreated(id, kind) })
+//   channelSource  (선택) "trend"면 트렌드 채널을 기본으로 (Trend 화면)
 //   getDefaults()  (선택) 새 콘티의 기본 설정을 돌려주는 async 함수. 없으면 youtube_default_settings·이 기기 복사본을 직접 읽는다
 //   onOpenConti(id) (선택) "열기"를 누를 때 (Scenes는 그 자리에서 연다). 없으면 Scenes 주소로 이동
 //   onCreated(id, kind) (선택) 콘티 행이 생긴 뒤 (kind: "job" | "empty")
@@ -23,10 +26,14 @@ const ContiCreateModal = (() => {
     { id: "bright", label: "밝고 경쾌" }, { id: "calm", label: "차분한 다큐" },
   ];
   const DEFAULTS_LS_KEY = "polos_youtube_default_settings";   // storyboard.html과 같은 키
+  const CHANNEL_LS_KEY = "polos_conti_channel";                 // 마지막으로 콘티를 만든 채널(slot)
+  const NEWS_FN_URL = `${SB}/functions/v1/news-search`;
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const safeUrl = (u) => (/^https?:\/\//.test(String(u || "")) ? u : "#");
 
-  let el = null, opts = {}, cands = [], traffic = "", geo = "", cards = [], channelSlot = null, cardsLoaded = null, busy = false;
+  let el = null, opts = {}, cands = [], traffic = "", geo = "", cards = [], busy = false;
+  let channels = [], channelsLoaded = null, cardsReady = null, cardsSeq = 0;
+  const cardCache = new Map();   // slot -> 카드 목록 (페이지를 새로 열 때까지 다시 읽지 않는다)
   const $ = (id) => el.querySelector("#" + id);
 
   function addStyle() {
@@ -76,6 +83,8 @@ const ContiCreateModal = (() => {
       <select id="ccmMood"><option value="">자동 (Gemini가 판단)</option>${MOODS.map((m) => `<option value="${m.id}">${esc(m.label)}</option>`).join("")}</select>
       <label for="ccmNote">방향 메모 (선택)</label>
       <input type="text" id="ccmNote" maxlength="300" placeholder="예: 경제 영향 위주로 / 찬반 입장 균형 있게">
+      <label for="ccmChannel">채널</label>
+      <select id="ccmChannel"><option value="">불러오는 중...</option></select>
       <label for="ccmCard">채널 카드</label>
       <select id="ccmCard"><option value="">불러오는 중...</option></select>
       <div class="ccm-hint" id="ccmCardHint"></div>
@@ -91,6 +100,7 @@ const ContiCreateModal = (() => {
     $("ccmTopic").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); search(); } });
     $("ccmList").addEventListener("change", updateCount);
     $("ccmCreate").addEventListener("click", create);
+    $("ccmChannel").addEventListener("change", () => { cardsReady = loadCards($("ccmChannel").value); });
   }
 
   function showMsg(html, ok) {
@@ -137,7 +147,7 @@ const ContiCreateModal = (() => {
     btn.disabled = true; btn.textContent = "찾는 중…";
     clearMsg();
     try {
-      const res = await fetch("/api/news-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q }) });
+      const res = await fetch(NEWS_FN_URL, { method: "POST", headers: JH, body: JSON.stringify({ q }), signal: AbortSignal.timeout(40000) });
       let data = null;
       try { data = await res.json(); } catch { /* JSON 아님 */ }
       if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
@@ -152,30 +162,85 @@ const ContiCreateModal = (() => {
     }
   }
 
-  // 트렌드 채널(youtube_channels.source = trend)의 채널 카드 — 한 번만 읽는다
-  function loadCards() {
-    if (cardsLoaded) return cardsLoaded;
-    cardsLoaded = (async () => {
-      const sel = $("ccmCard"), hint = $("ccmCardHint");
+  // 채널 목록 (youtube_channels 전부, 준비 안 된 채널도) — 한 번만 읽는다. 표를 못 읽으면 config.js의 YT_CHANNELS
+  function loadChannels() {
+    if (channelsLoaded) return channelsLoaded;
+    channelsLoaded = (async () => {
+      let rows = null;
       try {
-        const chRes = await fetch(`${SB}/rest/v1/youtube_channels?select=slot,label&source=eq.trend&order=sort_order.asc,slot.asc&limit=1`, { headers: H });
-        if (!chRes.ok) throw new Error("채널 표를 읽지 못함");
-        const ch = (await chRes.json())[0];
-        if (!ch) throw new Error("트렌드 채널이 정해지지 않음");
-        channelSlot = ch.slot;
-        const res = await fetch(`${SB}/rest/v1/youtube_subscribe_cards?select=*&channel_slot=eq.${ch.slot}&order=sort_order.asc,id.asc`, { headers: H });
-        if (!res.ok) throw new Error("구독 카드 표를 읽지 못함");
-        cards = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
-        if (!cards.length) throw new Error(`${ch.label} 채널에 채널 카드가 없음`);
-        sel.innerHTML = cards.map((c) => `<option value="${c.id}"${c.is_default ? " selected" : ""}>${esc(c.name)}${c.is_default ? " (기본)" : ""} · ${mediaText(c.image_paths)}</option>`).join("");
-        hint.textContent = `${ch.label} 채널의 카드예요. 카드 문구·사진·영상은 채널 화면에서 고쳐요.`;
-      } catch (err) {
-        cards = [];
-        sel.innerHTML = '<option value="">기본 문구 (카드를 못 읽음)</option>';
-        hint.textContent = `채널 카드를 불러오지 못해 기본 문구를 써요 (${err.message}).`;
-      }
+        const res = await fetch(`${SB}/rest/v1/youtube_channels?select=slot,label,ready,source&order=sort_order.asc,slot.asc`, { headers: H });
+        if (res.ok) rows = await res.json();
+      } catch { /* 아래 목록으로 */ }
+      if (!Array.isArray(rows) || !rows.length) rows = (POLOS_CONFIG.YT_CHANNELS || []).map((c) => ({ ...c, source: null }));
+      channels = rows.map((c) => ({ slot: String(c.slot), label: c.label || `채널 ${c.slot}`, ready: c.ready !== false, source: c.source || null }));
     })();
-    return cardsLoaded;
+    return channelsLoaded;
+  }
+  const channelOf = (slot) => channels.find((c) => c.slot === String(slot)) || null;
+  const trendChannel = () => channels.find((c) => c.source === "trend") || null;
+  // 기본 채널: Trend에서 열었거나 기사가 있으면 트렌드 채널 > 이 기기에서 마지막으로 쓴 채널 > 트렌드 채널 > 첫 채널
+  function defaultSlot() {
+    const trend = trendChannel();
+    if ((opts.channelSource === "trend" || cands.length) && trend) return trend.slot;
+    try { const s = localStorage.getItem(CHANNEL_LS_KEY); if (s && channelOf(s)) return s; } catch { /* 저장소를 못 씀 */ }
+    if (trend) return trend.slot;
+    return channels.length ? channels[0].slot : "";
+  }
+  function renderChannels(slot) {
+    const sel = $("ccmChannel");
+    sel.innerHTML = channels.length
+      ? channels.map((c) => `<option value="${esc(c.slot)}"${c.slot === slot ? " selected" : ""}>${esc(c.label)}${c.ready ? "" : " (준비 중)"}</option>`).join("")
+      : '<option value="">채널 없음</option>';
+  }
+  // 빈 콘티의 종류(category): 위키 채널이면 "위키 인물"(업로드 설명에 위키백과 출처·라이선스 문구), 그 밖(트렌드·Pexels 채널)은 "뉴스/이슈".
+  // "Pexels" 종류는 Scenes 목록에서 빠지는 Pexels 슬라이드쇼 전용이라 여기서는 쓰지 않는다 (채널은 channel_slot으로 정해진다)
+  function categoryFor(slot) {
+    const ch = channelOf(slot);
+    return ch && ch.source === "wiki" ? "위키 인물" : "뉴스/이슈";
+  }
+
+  // 고른 채널의 채널 카드 (기본 카드 ★를 미리 고른다). 채널을 바꾸면 다시 부른다
+  async function loadCards(slot) {
+    const seq = ++cardsSeq;
+    const sel = $("ccmCard"), hint = $("ccmCardHint");
+    const ch = channelOf(slot);
+    cards = [];
+    if (!ch) {
+      sel.innerHTML = '<option value="">기본 문구 (채널 없음)</option>';
+      hint.textContent = "채널을 못 읽어 기본 문구를 써요.";
+      return;
+    }
+    sel.innerHTML = '<option value="">불러오는 중...</option>';
+    hint.textContent = "";
+    try {
+      let list = cardCache.get(ch.slot);
+      if (!list) {
+        const res = await fetch(`${SB}/rest/v1/youtube_subscribe_cards?select=*&channel_slot=eq.${encodeURIComponent(ch.slot)}&order=sort_order.asc,id.asc`, { headers: H });
+        if (!res.ok) throw new Error("구독 카드 표를 읽지 못함");
+        list = (await res.json()).map((c) => ({ ...c, image_paths: Array.isArray(c.image_paths) ? c.image_paths : [] }));
+        cardCache.set(ch.slot, list);
+      }
+      if (seq !== cardsSeq) return;   // 그 사이 채널을 또 바꿨다
+      cards = list;
+      if (!cards.length) throw new Error(`${ch.label} 채널에 채널 카드가 없음`);
+      sel.innerHTML = cards.map((c) => `<option value="${c.id}"${c.is_default ? " selected" : ""}>${c.is_default ? "★ " : ""}${esc(c.name)}${c.is_default ? " (기본)" : ""} · ${mediaText(c.image_paths)}</option>`).join("");
+      hint.textContent = `${ch.label} 채널의 카드예요. 카드 문구·사진·영상은 채널 화면에서 고쳐요.${ch.ready ? "" : " 이 채널은 아직 준비 중이라 업로드할 때는 다른 채널이 기본으로 잡혀요."}`;
+    } catch (err) {
+      if (seq !== cardsSeq) return;
+      cards = [];
+      sel.innerHTML = '<option value="">기본 문구 (카드를 못 읽음)</option>';
+      hint.textContent = `채널 카드를 불러오지 못해 기본 문구를 써요 (${err.message}).`;
+    }
+  }
+  // 창을 열 때: 채널 목록 → 기본 채널 → 그 채널의 카드
+  function prepareChannel() {
+    $("ccmChannel").innerHTML = '<option value="">불러오는 중...</option>';
+    cardsReady = loadChannels().then(() => {
+      const slot = defaultSlot();
+      renderChannels(slot);
+      return loadCards(slot);
+    });
+    return cardsReady;
   }
   function mediaText(paths) {
     const list = paths || [];
@@ -215,11 +280,11 @@ const ContiCreateModal = (() => {
   const slugOf = (topic) => `${new Date().toISOString().slice(0, 10)}_${topic.replace(/[^\p{L}\p{N}]+/gu, "-").slice(0, 20)}`;
 
   // 기사 없이: Gemini 없이 빈 장면 5개 + 채널 카드(구독/좋아요) 장면
-  async function createEmpty(name, card, settings, mood) {
+  async function createEmpty(name, card, settings, mood, category) {
     const r = await fetch(`${SB}/rest/v1/youtube_scripts`, {
       method: "POST", headers: { ...JH, Prefer: "return=representation" },
       body: JSON.stringify({
-        category: "뉴스/이슈", hook: "", story: "", closing: "", fact_sources: "", status: "approved", slug: slugOf(name),
+        category, hook: "", story: "", closing: "", fact_sources: "", status: "approved", slug: slugOf(name),
         video_settings: { ...settings, ...(mood ? { mood } : {}), name: name.slice(0, 40) },
       }),
     });
@@ -249,18 +314,22 @@ const ContiCreateModal = (() => {
     const articles = selected().map((a) => ({ title: a.title, url: a.url, source: a.source }));
     if (!topic && articles.length) { showMsg("주제를 입력하세요.", false); return; }
     const name = topic || "새 콘티";
-    await loadCards();
+    await cardsReady;
+    const slot = $("ccmChannel").value;
+    const ch = channelOf(slot);
     const card = cards.find((c) => String(c.id) === $("ccmCard").value) || null;
     const mood = $("ccmMood").value;
     const btn = $("ccmCreate");
     busy = true; btn.disabled = true; btn.textContent = "콘티 만들기를 시작하는 중...";
     clearMsg();
     try {
-      // 구독 카드와 채널: 카드를 골랐으면 그 카드의 채널, 못 읽었으면 트렌드 채널만 (업로드 기본 채널로 쓴다)
-      const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : (channelSlot != null ? { channel_slot: channelSlot } : {});
+      // 채널과 구독 카드: 고른 채널(업로드 기본 채널로 쓴다) + 그 채널에서 고른 카드. slot은 숫자 칸(youtube_channels.slot)이라 숫자로 저장
+      const channelSlot = ch ? Number(ch.slot) : null;
+      const cardSettings = { ...(channelSlot != null ? { channel_slot: channelSlot } : {}), ...(card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot } : {}) };
+      if (ch) { try { localStorage.setItem(CHANNEL_LS_KEY, ch.slot); } catch { /* 저장소를 못 씀 */ } }
       const settings = { ...baseSettings(await defaults()), ...cardSettings };
       if (!articles.length) {
-        const row = await createEmpty(name, card, settings, mood);
+        const row = await createEmpty(name, card, settings, mood, categoryFor(slot));
         if (opts.onCreated) { try { await opts.onCreated(row.id, "empty"); } catch { /* 무시 */ } }
         if (opts.onOpenConti) { close(); opts.onOpenConti(row.id); return; }
         showMsg(`빈 콘티 "${esc(name)}"를 만들었어요 (장면 ${EMPTY_SCENES}개). <a href="${contiJobUrl(row.id)}">Scenes에서 열기 →</a>`, true);
@@ -271,7 +340,7 @@ const ContiCreateModal = (() => {
         request: {
           kind: "news", topic, articles, note: $("ccmNote").value.trim(), traffic, geo,
           mood,   // 직접 고른 분위기가 Gemini 판단보다 우선 (""이면 Gemini 값)
-          card_id: card ? card.id : null, channel_slot: card ? card.channel_slot : channelSlot,
+          card_id: card ? card.id : null, channel_slot: card ? card.channel_slot : channelSlot,   // create-conti가 video_settings.channel_slot으로 저장
         },
       });
       close();
@@ -285,7 +354,7 @@ const ContiCreateModal = (() => {
     }
   }
 
-  // o: { topic, articles, traffic, geo, getDefaults, onOpenConti, onCreated, onAfterJob }
+  // o: { topic, articles, traffic, geo, channelSource, getDefaults, onOpenConti, onCreated, onAfterJob }
   function open(o) {
     if (!el) build();
     opts = o || {};
@@ -300,7 +369,7 @@ const ContiCreateModal = (() => {
     renderList();
     el.style.display = "";
     document.body.style.overflow = "hidden";
-    loadCards();
+    prepareChannel();
     if (!opts.topic) setTimeout(() => $("ccmTopic").focus(), 0);
   }
   function close() {

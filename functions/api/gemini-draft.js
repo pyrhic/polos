@@ -101,9 +101,9 @@ export async function onRequestPost(context) {
     const fetched = await Promise.all(picked.map((a) => fetchArticle(a.url, perArticle)));   // 동시에 읽어서(기사마다 최대 7초) 건수가 늘어도 시간은 거의 같다
     picked.forEach((a, i) => { a.text = fetched[i].text; a.media = [...fetched[i].images, ...fetched[i].videos]; a.embeds = fetched[i].embeds; });
 
-    // 관점 자료: 구글 뉴스 검색(무료)으로 관련 칼럼·분석 기사를 찾아 본문을 읽는다. 못 찾으면 관점 정리 없이 쓴다.
+    // 관점 자료: 구글 뉴스 검색(무료, Supabase 함수 news-search)으로 관련 칼럼·분석 기사를 찾아 본문을 읽는다. 못 찾으면 관점 정리 없이 쓴다.
     let perspectives = [];
-    try { perspectives = await findPerspectiveArticles(cleanTopic, picked.map((a) => a.title), 3); } catch { /* 관점 자료 없이 진행 */ }
+    try { perspectives = await findPerspectiveArticles(cleanTopic, picked.map((a) => a.title), 3, env); } catch { /* 관점 자료 없이 진행 */ }
     const researched = {
       ok: perspectives.length > 0,
       text: perspectives.map((a, i) => `(${i + 1}) [${a.source}] ${a.title}\n${a.text}`).join("\n\n"),
