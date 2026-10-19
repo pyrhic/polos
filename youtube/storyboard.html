@@ -234,10 +234,10 @@
   .seg-stage .cap-lines.cap-adj { cursor:grabbing; box-shadow:0 0 0 3px rgba(79,195,247,0.6); }
   .seg-stage .pv-layer { position:absolute; inset:0; overflow:hidden; background:#000; }
   .seg-stage .pv-cut { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
-  /* Pexels 참고 영상 표시 (계약서 7절): 영상 칸 왼쪽 위. 1080폭 기준 글자 30px·모서리 24px 안쪽 → 무대(270폭)에선 0.25배.
-     영상 칸은 framed라 top:105px부터. 자막 직접 조작을 막지 않게 pointer-events:none */
-  .seg-stage .pv-ref { display:none; position:absolute; left:6px; top:111px; z-index:1; max-width:calc(100% - 12px); padding:1.5px 3px; border-radius:1.5px; background:rgba(0,0,0,0.55); color:#fff; font-size:7.5px; line-height:1.3; font-weight:500; white-space:nowrap; overflow:hidden; pointer-events:none; }
-  .seg-stage-ro .pv-ref { display:block; position:absolute; left:3px; top:3px; z-index:1; padding:1px 2px; border-radius:1px; background:rgba(0,0,0,0.55); color:#fff; font-size:4px; line-height:1.3; white-space:nowrap; pointer-events:none; }
+  /* Pexels 참고 영상 표시 (계약서 7절): 영상 칸 오른쪽 아래. 1080폭 기준 글자 30px·모서리 24px 안쪽 → 무대(270폭)에선 0.25배.
+     영상 칸은 framed라 기본 칸 아래 끝 1700px(무대 425px) 기준, 24px 위 → bottom:61px. 자막 직접 조작을 막지 않게 pointer-events:none */
+  .seg-stage .pv-ref { display:none; position:absolute; right:6px; bottom:61px; z-index:1; max-width:calc(100% - 12px); padding:1.5px 3px; border-radius:1.5px; background:rgba(0,0,0,0.55); color:#fff; font-size:7.5px; line-height:1.3; font-weight:500; white-space:nowrap; overflow:hidden; pointer-events:none; }
+  .seg-stage-ro .pv-ref { display:block; position:absolute; right:3px; bottom:3px; z-index:1; padding:1px 2px; border-radius:1px; background:rgba(0,0,0,0.55); color:#fff; font-size:4px; line-height:1.3; white-space:nowrap; pointer-events:none; }
   .seg-stage .pv-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:14px; text-align:center; color:var(--muted); font-size:0.95rem; line-height:1.5; background:#111111; }
   .seg-stage-side { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
   /* 멈춰 있을 때만 화면 가운데 반투명 ▶ (누르는 건 화면 자체가 받는다) */
@@ -466,7 +466,7 @@
       <div class="fpv-box" id="fpvBox">
         <div class="cap-preview seg-stage" id="fpvStage" title="눌러서 재생 / 멈춤">
           <div class="pv-layer"></div>
-          <div class="pv-ref">실제 인물과 관련없는 참고 영상입니다.</div>
+          <div class="pv-ref">참고 영상</div>
           <div class="cap-t1"></div>
           <div class="cap-t2"></div>
           <div class="cap-src"></div>
@@ -634,7 +634,7 @@
     return isExternalUrl(path) ? path : publicUrl(path);
   }
   // Pexels 소재 (호스트가 pexels.com으로 끝남, 사진·영상 모두) → 미리보기에 "참고 영상" 표시 (계약서 7절. 주소만 보고 판단)
-  const PV_REF_TEXT = "실제 인물과 관련없는 참고 영상입니다.";
+  const PV_REF_TEXT = "참고 영상";
   function isPexels(path) {
     if (!path || !isExternalUrl(path)) return false;
     try { const h = new URL(path).hostname.toLowerCase(); return h === "pexels.com" || h.endsWith(".pexels.com"); } catch { return false; }
@@ -2751,7 +2751,7 @@
             <div class="seg-stage-box">
               <div class="cap-preview seg-stage" title="눌러서 재생 / 멈춤">
                 <div class="pv-layer"></div>
-                <div class="pv-ref">실제 인물과 관련없는 참고 영상입니다.</div>
+                <div class="pv-ref">참고 영상</div>
                 <div class="cap-t1"></div>
                 <div class="cap-t2"></div>
                 <div class="cap-src"></div>
