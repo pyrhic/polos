@@ -108,8 +108,12 @@ function uploadBlockHtml(o, row) {
   const done = o.youtube_status === "done" && o.youtube_video_id;
   const last = ytLastFor(row, o) || {};
   const slot = last.channel_slot != null && ytChannels().some((c) => c.slot === String(last.channel_slot)) ? String(last.channel_slot) : ytDefaultSlot(row);
+  // 실제로 올린 채널 이름 (업로드 때 남긴 youtube_last의 채널, 준비 중으로 바뀐 채널도 이름은 보인다). 기록이 없는 옛 업로드는 생략
+  const allCh = ytChannelCache || (globalThis.POLOS_CONFIG || {}).YT_CHANNELS || [];
+  const upCh = last.channel_slot != null ? allCh.find((c) => String(c.slot) === String(last.channel_slot)) : null;
+  const upChannel = upCh ? upCh.label : "";
   const doneNote = done
-    ? `<div style="font-size:0.85rem;"><span style="font-weight:700;">업로드 완료</span> · <a class="accent" href="https://youtu.be/${escapeHtml(o.youtube_video_id)}" target="_blank" rel="noopener">유튜브에서 보기 ↗ (비공개로 업로드됨)</a></div>` : "";
+    ? `<div style="font-size:0.85rem;"><span style="font-weight:700;">업로드 완료</span> · <a class="accent" href="https://youtu.be/${escapeHtml(o.youtube_video_id)}" target="_blank" rel="noopener">유튜브에서 보기 ↗</a>${upChannel ? ` · ${escapeHtml(upChannel)}` : ""}</div>` : "";
   const errorNote = o.youtube_status === "error"
     ? `<div class="msg err" style="display:block;font-size:0.8rem;">업로드 실패: ${escapeHtml(o.youtube_error || "알 수 없는 오류")}</div>${ytReauthHelpHtml()}` : "";
   // 이미 유튜브에 올라간 영상 id가 있으면(완료, 또는 재업로드가 실패해 옛 id가 남은 경우) "다시 업로드"는 새 영상을 하나 더 올리는 것
