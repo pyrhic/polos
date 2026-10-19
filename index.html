@@ -334,15 +334,46 @@
     dragging = false;
     logoScroll.classList.remove("dragging");
     justDragged = dragMoved >= 6;
+    setTimeout(() => { justDragged = false; }, 0); // 클릭이 안 생긴 경우 다음 클릭이 먹히지 않도록 정리
   });
 
-  // 클릭(마우스)/탭(터치) 둘 다 여기서 처리 - 드래그 직후엔 무시.
-  // 가운데 있는 로고를 누르면 그 섹션 메인 화면으로 이동,
-  // 옆에 살짝 보이는(아직 안 골라진) 로고를 누르면 스와이프하듯 그 로고를 가운데로 이동만 함
-  logoScroll.addEventListener("click", (e) => {
+  // 캐러셀 화면 클릭/탭 처리 (드래그가 어려운 PC용 좌우 1/4 구역 이동 포함)
+  // - 화면 가로 기준 왼쪽 1/4 구역을 누르면 이전 로고, 오른쪽 1/4 구역을 누르면 다음 로고로 한 칸 이동
+  //   (양끝에서는 아무 일 없음, 순환 안 함). 이 구역에서 옆 로고를 직접 눌러 고르던 동작은 한 칸 이동으로 대체됨
+  // - 가운데 구역: 가운데 로고를 누르면 그 섹션 메인 화면으로 이동, 그 외 로고는 가운데로 이동
+  // - 드래그 직후 마우스를 놓으며 생기는 클릭은 무시(justDragged)
+  const EDGE_ZONE = 0.25;
+  const realItems = logoItems.filter((it) => it.dataset.id);
+  let lastNav = { idx: -1, t: 0 };
+
+  function edgeZone(clientX) {
+    const ratio = clientX / window.innerWidth;
+    return ratio < EDGE_ZONE ? -1 : ratio > 1 - EDGE_ZONE ? 1 : 0;
+  }
+  // 스크롤 애니메이션 중에 빠르게 연타하면 아직 도착 전이라 제자리걸음이 되므로, 직전 목표를 기준으로 계산
+  function stepIndex(dir) {
+    const cur = Date.now() - lastNav.t < 500 && lastNav.idx >= 0
+      ? lastNav.idx
+      : realItems.findIndex((it) => it.dataset.id === centeredId);
+    const next = cur + dir;
+    return next < 0 || next >= realItems.length ? -1 : next;
+  }
+
+  const screenCarousel = document.getElementById("screenCarousel");
+  screenCarousel.addEventListener("click", (e) => {
     if (justDragged) {
       justDragged = false;
       e.preventDefault();
+      return;
+    }
+    if (level !== 1) return;
+    if (e.target.closest("#chevronDown")) return;
+    const zone = edgeZone(e.clientX);
+    if (zone !== 0) {
+      const next = stepIndex(zone);
+      if (next === -1) return;
+      lastNav = { idx: next, t: Date.now() };
+      centerOn(logoItems.indexOf(realItems[next]), true);
       return;
     }
     const item = e.target.closest(".logo-item");
@@ -352,6 +383,20 @@
     } else {
       centerOn(logoItems.indexOf(item), true);
     }
+  });
+
+  // 마우스 커서 힌트: 좌/우 1/4 구역에서 이동 가능한 방향일 때만 w-resize / e-resize (그 외엔 기본 커서)
+  screenCarousel.addEventListener("mousemove", (e) => {
+    if (dragging || level !== 1) return;
+    const zone = edgeZone(e.clientX);
+    const c = zone !== 0 && !e.target.closest("#chevronDown") && stepIndex(zone) !== -1
+      ? (zone < 0 ? "w-resize" : "e-resize") : "";
+    logoScroll.style.cursor = c;
+    screenCarousel.style.cursor = c;
+  });
+  logoScroll.addEventListener("mousedown", () => {
+    logoScroll.style.cursor = "";
+    screenCarousel.style.cursor = "";
   });
 
   if ("serviceWorker" in navigator) {
