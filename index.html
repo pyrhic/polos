@@ -139,6 +139,35 @@
     height: auto;
     margin: 0 auto;
   }
+  /* 좌/우 1/4 구역 호버 힌트: 기존 chevron(︿ ﹀)을 90도 돌려 쓴 ‹ › 모양, 같은 회색 + 같은 깜빡임.
+     크기/색/가장자리 거리는 여기 변수만 바꾸면 됨 (모노톤) */
+  :root { --edge-chev-size: 1.6rem; --edge-chev-color: #9a9a9a; --edge-chev-gap: 24px; }
+  .edge-chev {
+    position: fixed;
+    top: 50%;
+    font-size: var(--edge-chev-size);
+    color: var(--edge-chev-color);
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    z-index: 900;
+    padding: 16px;
+  }
+  .edge-chev span { display: block; animation: bounceLeft 1.8s ease-in-out infinite; }
+  .edge-chev.show { opacity: 1; }
+  body:not(.at-carousel) .edge-chev { opacity: 0; }
+  #edgeLeft { left: calc(var(--edge-chev-gap) - 16px); transform: translateY(-50%); }
+  #edgeRight { right: calc(var(--edge-chev-gap) - 16px); transform: translateY(-50%); }
+  #edgeLeft span { transform: rotate(90deg); animation-name: bounceLeft; }
+  #edgeRight span { transform: rotate(-90deg); animation-name: bounceRight; }
+  @keyframes bounceLeft {
+    0%, 100% { transform: translateX(0) rotate(90deg); opacity: 0.4; }
+    50% { transform: translateX(-8px) rotate(90deg); opacity: 1; }
+  }
+  @keyframes bounceRight {
+    0%, 100% { transform: translateX(0) rotate(-90deg); opacity: 0.4; }
+    50% { transform: translateX(8px) rotate(-90deg); opacity: 1; }
+  }
   .logo-item img {
     display: block;
     -webkit-user-drag: none;
@@ -178,6 +207,9 @@
     </div>
   </div>
 
+<div class="edge-chev" id="edgeLeft"><span>﹀</span></div>
+<div class="edge-chev" id="edgeRight"><span>﹀</span></div>
+
 <script>
   const QUOTES = [
     { text: "시작이 반이다.", source: "" },
@@ -202,6 +234,7 @@
   function setLevel(n) {
     level = n;
     screens.classList.toggle("at-carousel", level === 1);
+    document.body.classList.toggle("at-carousel", level === 1); // 캐러셀 화면이 아니면 호버선 숨김(CSS)
   }
 
   document.getElementById("chevronUp").addEventListener("click", () => setLevel(1));
@@ -339,7 +372,7 @@
 
   // 캐러셀 화면 클릭/탭 처리 (드래그가 어려운 PC용 좌우 1/4 구역 이동 포함)
   // - 화면 가로 기준 왼쪽 1/4 구역을 누르면 이전 로고, 오른쪽 1/4 구역을 누르면 다음 로고로 한 칸 이동
-  //   (양끝에서는 아무 일 없음, 순환 안 함). 이 구역에서 옆 로고를 직접 눌러 고르던 동작은 한 칸 이동으로 대체됨
+  //   (양끝에서는 아무 일 없음, 순환 안 함). 호버 시 해당 쪽 화면 끝에 chevron으로 이동 가능함을 알림. 이 구역에서 옆 로고를 직접 눌러 고르던 동작은 한 칸 이동으로 대체됨
   // - 가운데 구역: 가운데 로고를 누르면 그 섹션 메인 화면으로 이동, 그 외 로고는 가운데로 이동
   // - 드래그 직후 마우스를 놓으며 생기는 클릭은 무시(justDragged)
   const EDGE_ZONE = 0.25;
@@ -374,6 +407,8 @@
       if (next === -1) return;
       lastNav = { idx: next, t: Date.now() };
       centerOn(logoItems.indexOf(realItems[next]), true);
+      if (e.pointerType === "mouse") lastMouseX = e.clientX;
+      updateEdgeLines(); // 끝에 도달했으면 chevron이 사라짐
       return;
     }
     const item = e.target.closest(".logo-item");
@@ -385,19 +420,24 @@
     }
   });
 
-  // 마우스 커서 힌트: 좌/우 1/4 구역에서 이동 가능한 방향일 때만 w-resize / e-resize (그 외엔 기본 커서)
-  screenCarousel.addEventListener("mousemove", (e) => {
-    if (dragging || level !== 1) return;
-    const zone = edgeZone(e.clientX);
-    const c = zone !== 0 && !e.target.closest("#chevronDown") && stepIndex(zone) !== -1
-      ? (zone < 0 ? "w-resize" : "e-resize") : "";
-    logoScroll.style.cursor = c;
-    screenCarousel.style.cursor = c;
+  // 이동 가능 구역 힌트: 마우스가 좌/우 1/4 구역 위에 있고 그 방향으로 더 갈 수 있을 때만
+  // 해당 화면 끝의 chevron(.edge-chev, 기존 ﹀를 돌린 ‹ ›)을 서서히 보여줌 (커서는 바꾸지 않음. 터치/가운데 구역/끝에서는 숨김)
+  const edgeLines = { "-1": document.getElementById("edgeLeft"), "1": document.getElementById("edgeRight") };
+  let lastMouseX = null;
+  function updateEdgeLines() {
+    const zone = lastMouseX === null || dragging || level !== 1 ? 0 : edgeZone(lastMouseX);
+    const show = zone !== 0 && stepIndex(zone) !== -1;
+    edgeLines["-1"].classList.toggle("show", show && zone === -1);
+    edgeLines["1"].classList.toggle("show", show && zone === 1);
+  }
+  screenCarousel.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    lastMouseX = e.target.closest("#chevronDown") ? null : e.clientX;
+    updateEdgeLines();
   });
-  logoScroll.addEventListener("mousedown", () => {
-    logoScroll.style.cursor = "";
-    screenCarousel.style.cursor = "";
-  });
+  screenCarousel.addEventListener("pointerleave", () => { lastMouseX = null; updateEdgeLines(); });
+  logoScroll.addEventListener("mousedown", () => { lastMouseX = null; updateEdgeLines(); });
+  document.getElementById("chevronDown").addEventListener("click", () => { lastMouseX = null; updateEdgeLines(); });
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js");
