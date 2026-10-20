@@ -206,6 +206,7 @@ async function edgeOnce(host, { text, voice, rate, pitch }) {
   ws.accept();
 
   const chunks = [];
+  const dbg = { text: 0, bin: 0, types: new Set(), heads: [] };   // 소리를 못 받았을 때 원인을 알려 주는 진단
   const words = [];
   let audioBytes = 0;
   const done = new Promise((resolve, reject) => {
@@ -213,7 +214,9 @@ async function edgeOnce(host, { text, voice, rate, pitch }) {
     const finish = (err) => { clearTimeout(timer); try { ws.close(1000); } catch {} if (err) reject(err); else resolve(); };
     ws.addEventListener("message", (ev) => {
       try {
+        dbg.types.add(Object.prototype.toString.call(ev.data));
         if (typeof ev.data === "string") {
+          dbg.text++;
           const sep = ev.data.indexOf("\r\n\r\n");
           const head = ev.data.slice(0, sep);
           const data = ev.data.slice(sep + 4);
@@ -230,10 +233,13 @@ async function edgeOnce(host, { text, voice, rate, pitch }) {
           return;
         }
         // 바이너리: 앞 2바이트 = 헤더 길이(big-endian), 그 뒤 헤더, 그 뒤 mp3
+        dbg.bin++;
         const u8 = new Uint8Array(ev.data);
         if (u8.length < 2) return;
         const hl = (u8[0] << 8) | u8[1];
         const head = new TextDecoder().decode(u8.subarray(2, 2 + hl));
+        if (dbg.heads.length < 2) dbg.heads.push(head.replace(/
+/g, "|").slice(0, 120));
         // 새 주소(api.msedgeservices.com)는 바이너리 머리에 "Path:audio"를 안 붙이고 Content-Type만 준다 → 둘 중 하나만 있어도 소리로 본다
         if (!/Path:audio/i.test(head) && !/Content-Type:audio\//i.test(head)) return;
         const audio = u8.subarray(2 + hl);
@@ -252,7 +258,7 @@ async function edgeOnce(host, { text, voice, rate, pitch }) {
   ws.send(`X-RequestId:${hex32()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${edgeDate()}Z\r\nPath:ssml\r\n\r\n${ssml}`);
 
   await done;
-  if (!audioBytes) throw new Error("소리를 받지 못했어요");
+  if (!audioBytes) throw new Error(`소리를 받지 못했어요 (글 ${dbg.text} · 소리 조각 ${dbg.bin} · ${[...dbg.types].join(",")} · ${dbg.heads.join(" / ")})`);
   const mp3 = new Uint8Array(audioBytes);
   let o = 0;
   for (const c of chunks) { mp3.set(c, o); o += c.length; }
