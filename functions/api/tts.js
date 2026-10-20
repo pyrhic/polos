@@ -234,7 +234,8 @@ async function edgeOnce(host, { text, voice, rate, pitch }) {
         if (u8.length < 2) return;
         const hl = (u8[0] << 8) | u8[1];
         const head = new TextDecoder().decode(u8.subarray(2, 2 + hl));
-        if (!/Path:audio/i.test(head)) return;
+        // 새 주소(api.msedgeservices.com)는 바이너리 머리에 "Path:audio"를 안 붙이고 Content-Type만 준다 → 둘 중 하나만 있어도 소리로 본다
+        if (!/Path:audio/i.test(head) && !/Content-Type:audio\//i.test(head)) return;
         const audio = u8.subarray(2 + hl);
         if (audio.length && /Content-Type:audio\/mpeg/i.test(head)) { chunks.push(audio.slice()); audioBytes += audio.length; }
       } catch (e) { finish(e); }
