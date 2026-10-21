@@ -11,75 +11,62 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
   .px-note { color:var(--muted); font-size:0.78rem; line-height:1.5; margin:6px 0 12px; }
+  .px-note a { color:var(--accent); }
   .px-card { background:var(--card); border-radius:3px; padding:14px; margin-bottom:14px; }
-  .px-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .px-row input[type="number"] { width:80px; margin:0; }
+  .px-fmt { display:flex; gap:8px; }
+  .px-fmt button { flex:1; margin:0; padding:12px 8px; background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--btn-ring); text-transform:none; letter-spacing:0; line-height:1.35; }
+  .px-fmt button small { display:block; font-size:0.7rem; font-weight:400; color:var(--muted); margin-top:2px; }
+  .px-fmt button.on { background:var(--accent-dim); color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent); }
+  .px-fmt button.on small { color:var(--accent); }
   #startBtn { background:var(--btn); color:var(--text); box-shadow:inset 0 0 0 1px var(--text); margin-top:12px; }
   #startBtn:hover { background:var(--hover); color:var(--on-accent); }
-  .px-list a { display:flex; gap:8px; align-items:center; background:var(--card); border-radius:3px; padding:10px 12px; margin-bottom:6px; color:var(--text); text-decoration:none; }
-  .px-list a:hover { background:var(--hover); color:var(--on-accent); }
-  .px-list .t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.88rem; }
-  .px-tag { font-size:0.68rem; font-weight:800; padding:2px 8px; border-radius:10px; background:var(--line); color:var(--text-2); flex-shrink:0; }
-  .px-tag.ok { background:var(--accent-dim); color:var(--accent); }
 </style>
 </head>
 <body>
   <div class="wrap">
     <a class="back" href="/youtube/search.html">← Search</a>
     <h1 style="font-size:1.4rem;margin-bottom:0.6rem;">Pexels</h1>
-    <p class="px-note">주제만 정하면 <b>AI가 기획</b>해요 — 제목, 항목(이름·설명 자막), 사진 고르기까지. 나는 고칠 곳을 첨삭·피드백하고, 마음에 들면 <b>결재</b>해서 영상으로 만들어요.</p>
+    <p class="px-note"><b>AI가 주제와 사진 수까지 정해서 기획</b>해요 — 제목, 항목(이름·설명 자막), 사진 고르기까지. 전에 만든 주제와 겹치지 않게 골라요. 나는 고칠 곳만 첨삭·피드백하고 바로 영상으로 만들어요.</p>
 
     <div class="px-card">
-      <label for="topic" style="margin-top:0;">주제</label>
-      <input type="text" id="topic" maxlength="100" placeholder="예: 세상에서 가장 이색적인 장소">
-      <div class="px-row" style="margin-top:8px;">
-        <label for="count" style="margin:0;">사진 수</label>
-        <input type="number" id="count" min="3" max="30" value="10">
+      <label style="margin-top:0;">형식</label>
+      <div class="px-fmt" id="fmt" role="radiogroup" aria-label="형식">
+        <button type="button" data-f="short" role="radio">숏폼<small>세로 9:16 · 1~2분</small></button>
+        <button type="button" data-f="long" role="radio">롱폼<small>가로 16:9 · 길이 제한 없음</small></button>
       </div>
       <label for="note">요청 (선택)</label>
-      <input type="text" id="note" maxlength="300" placeholder="예: 아시아 위주로">
+      <input type="text" id="note" maxlength="300" placeholder="예: 동물 위주로">
       <button type="button" id="startBtn">AI 기획 시작</button>
       <div class="msg" id="msg"></div>
     </div>
 
-    <h2 style="font-size:1rem;margin:18px 0 8px;">내 슬라이드쇼</h2>
-    <div class="px-list" id="list"><div class="px-note">불러오는 중…</div></div>
+    <p class="px-note">만든 슬라이드쇼는 <a href="/youtube/storyboard.html">Scenes</a> 목록에 "슬라이드쇼" 표시로 함께 있어요.</p>
   </div>
 
 <script src="/config.js"></script>
-<script src="/youtube/generate.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let format = "short";
+  try { if (localStorage.getItem("pexelsFormat") === "long") format = "long"; } catch { /* 기본 숏폼 */ }
+  function renderFmt() {
+    document.querySelectorAll("#fmt button").forEach((b) => { const on = b.dataset.f === format; b.classList.toggle("on", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
+  }
+  $("fmt").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-f]"); if (!b) return;
+    format = b.dataset.f; renderFmt();
+    try { localStorage.setItem("pexelsFormat", format); } catch { /* 기억 못 해도 괜찮다 */ }
+  });
+  renderFmt();
 
-  // 주제를 편집 화면으로 넘긴다. 편집 화면이 바로 AI 기획을 시작하고, 결과가 오면 저장한다
+  // 형식·요청을 편집 화면으로 넘긴다. 편집 화면이 바로 AI 기획(주제·사진 수까지 AI가 정함)을 시작하고, 결과가 오면 저장한다
   function start() {
-    const topic = $("topic").value.trim();
-    if (!topic) { $("msg").className = "msg err"; $("msg").textContent = "주제를 입력하세요."; $("topic").focus(); return; }
-    const count = Math.max(3, Math.min(30, Number($("count").value) || 10));
-    try { sessionStorage.setItem("pexelsTopic", JSON.stringify({ topic, count, note: $("note").value.trim() })); }
-    catch { $("msg").className = "msg err"; $("msg").textContent = "주제를 넘기지 못했어요. 다시 시도해주세요."; return; }
+    try { sessionStorage.setItem("pexelsTopic", JSON.stringify({ format, note: $("note").value.trim() })); }
+    catch { $("msg").className = "msg err"; $("msg").textContent = "넘기지 못했어요. 다시 시도해주세요."; return; }
     location.href = "/youtube/pexels-edit.html";
   }
   $("startBtn").addEventListener("click", start);
-  $("topic").addEventListener("keydown", (e) => { if (e.key === "Enter") start(); });
-
-  // 지금까지 만든 슬라이드쇼 (초안 / 결재 완료) — 눌러서 이어서 고치기
-  (async () => {
-    try {
-      const { SUPABASE_URL, SUPABASE_ANON_KEY } = POLOS_CONFIG;
-      const cats = PEXELS_CATEGORIES.map((c) => encodeURIComponent(c)).join(",");
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=id,hook,created_at,video_settings&category=in.(${cats})&order=created_at.desc&limit=30`, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
-      if (!res.ok) throw new Error();
-      const rows = await res.json();
-      $("list").innerHTML = rows.map((r) => {
-        const vs = r.video_settings || {};
-        const ok = !!vs.pexels_approved_at;
-        return `<a href="/youtube/pexels-edit.html?id=${encodeURIComponent(r.id)}"><span class="t">${esc(vs.title_text || vs.name || r.hook || "(제목 없음)")}</span><span class="px-tag${ok ? " ok" : ""}">${ok ? "결재 완료" : "초안"}</span></a>`;
-      }).join("") || '<div class="px-note">아직 없어요. 위에서 주제를 넣고 시작하세요.</div>';
-    } catch { $("list").innerHTML = '<div class="px-note">목록을 불러오지 못했어요.</div>'; }
-  })();
+  $("note").addEventListener("keydown", (e) => { if (e.key === "Enter") start(); });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 })();
 </script>

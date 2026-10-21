@@ -178,6 +178,7 @@
   .cj-badge { display:inline-block; font-size:0.68rem; font-weight:700; padding:1px 7px; border-radius:9px; margin-left:6px; vertical-align:middle; background:var(--line); color:var(--text-2); }
   .cj-badge.run { background:var(--accent-dim); color:var(--accent); }
   .cj-badge.err { background:var(--danger-bg); color:var(--danger); }
+  .cj-badge.ss { background:var(--inset); color:var(--text-2); box-shadow:inset 0 0 0 1px var(--line-strong); }
   .cj-err-text { color:var(--danger); font-size:0.8rem; line-height:1.4; margin-top:6px; }
   .cj-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
   .cj-actions button { width:auto; margin:0; padding:6px 10px; font-size:0.75rem; }
@@ -599,6 +600,9 @@
   };
   const jsonHeaders = { ...headers, "Content-Type": "application/json" };
   let scripts = [];
+  let slideshows = [];   // Pexels 슬라이드쇼 행 (목록에만 보이고, 열면 pexels-edit.html)
+  const isSlideshowRow = (r) => !!r && (isPexelsCategory(r.category) || isPexelsMode((r.video_settings || {}).mode));
+  const openSlideshow = (id) => { location.href = `/youtube/pexels-edit.html?id=${encodeURIComponent(id)}`; };
   let segments = [];
 
   function escapeAttr(s) {
@@ -2451,8 +2455,15 @@
     sel.innerHTML = '<option value="">선택하세요</option>' +
       scripts.map((r) => `<option value="${r.id}">${escapeHtml(nameOf(r))}</option>`).join("");
     sel.value = keep;
-    $("contiList").innerHTML = scripts.length
-      ? scripts.map((r) => `<div class="conti-item${contiIncomplete(r) ? " cj-pending" : ""}" role="button" tabindex="0" data-id="${r.id}">
+    // Pexels 슬라이드쇼도 같은 목록에 "슬라이드쇼" 표시로 섞어 보여 준다 (만든 날짜 순). 편집 화면이 달라서 누르면 pexels-edit.html로 간다
+    const all = [...scripts, ...slideshows].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+    $("contiList").innerHTML = all.length
+      ? all.map((r) => isSlideshowRow(r)
+        ? `<div class="conti-item" role="button" tabindex="0" data-id="${r.id}" data-slideshow="1">
+          <div class="title">${escapeHtml(nameOf(r))} <span class="cj-badge ss">슬라이드쇼${(r.video_settings || {}).pexels_format === "long" || (r.video_settings || {}).orientation === "landscape" ? " · 롱폼" : ""}</span></div>
+          <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>
+        </div>`
+        : `<div class="conti-item${contiIncomplete(r) ? " cj-pending" : ""}" role="button" tabindex="0" data-id="${r.id}">
           <div class="title">${escapeHtml(nameOf(r))}${contiBadge(r)}</div>
           <div class="meta">${escapeHtml((r.created_at || "").slice(0, 10))}</div>${contiErrorBox(r)}
         </div>`).join("")
@@ -2462,8 +2473,12 @@
   async function loadScripts() {
     const sel = document.getElementById("scriptSelect");
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&category=not.in.(${PEXELS_CATEGORIES.map((c) => encodeURIComponent(c)).join(",")})&order=created_at.desc`, { headers });
-      scripts = await res.json();
+      // 슬라이드쇼(Pexels)는 목록에만 보이고 콘티 편집·자동 채우기 등에는 쓰지 않는다 → scripts와 따로 둔다
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=*&status=eq.approved&order=created_at.desc`, { headers });
+      if (!res.ok) throw new Error(await res.text());
+      const rows = await res.json();
+      scripts = rows.filter((r) => !isSlideshowRow(r));
+      slideshows = rows.filter(isSlideshowRow);
       renderScriptList();
       schedulePendingRefresh();
     } catch (err) {
@@ -4975,12 +4990,13 @@
       else retryConti(item.dataset.id, act.dataset.act === "browser");
       return;
     }
+    if (item.dataset.slideshow) { openSlideshow(item.dataset.id); return; }
     openConti(item.dataset.id);
   });
   $("contiList").addEventListener("keydown", (e) => {
     if (e.target.closest("[data-act]")) return;
     const item = e.target.closest(".conti-item");
-    if (item && e.key === "Enter") openConti(item.dataset.id);
+    if (item && e.key === "Enter") { if (item.dataset.slideshow) openSlideshow(item.dataset.id); else openConti(item.dataset.id); }
   });
 
   function showListMsg(text, ok) {
@@ -4992,7 +5008,7 @@
   // 콘티 하나를 통째로 지운다: 만든 영상(파일+기록), 올려둔 사진/음악, 장면, 콘티 순서.
   // 유튜브에 이미 올린 영상은 유튜브에 그대로 남는다(여기서는 지울 수 없다).
   async function deleteConti(id) {
-    const row = scripts.find((r) => String(r.id) === String(id));
+    const row = scripts.find((r) => String(r.id) === String(id)) || slideshows.find((r) => String(r.id) === String(id));
     if (!row) return;
     if (row.generation_status === "running") { showListMsg("영상 생성 중인 콘티는 끝난 뒤에 삭제할 수 있습니다.", false); return; }
     if (contiPending(row) && !ContiCore.isStale(row)) { showListMsg("콘티를 만드는 중이라 다 만든 뒤에 삭제할 수 있어요.", false); return; }
@@ -5465,8 +5481,10 @@
       id = params.get("open");
       params.delete("open");
       history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "") + location.hash);
+      if (slideshows.some((r) => String(r.id) === String(id))) { openSlideshow(id); return; }   // 슬라이드쇼는 편집 화면이 따로다
       if (!scripts.some((r) => String(r.id) === String(id))) { showListMsg("그 콘티를 찾을 수 없어요 (삭제됐을 수 있어요).", false); id = null; }
     }
+    if (id && slideshows.some((r) => String(r.id) === String(id))) { openSlideshow(id); return; }
     if (id) openConti(id);
   });
   openNewContiFromTrend();

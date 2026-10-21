@@ -235,6 +235,8 @@ async function genStart(row, segRows, version) {
     secs_per_photo: vs.secs_per_photo,
     caption_mode: vs.caption_mode,   // off / name / name_desc
     caption_font: vs.caption_font,   // sans(고딕) / serif(명조)
+    // Pexels 슬라이드쇼 화면 방향: 숏폼 portrait(1080x1920) / 롱폼 landscape(1920x1080). 다른 영상은 보내지 않는다
+    ...(isPexelsMode(vs.mode) ? { orientation: vs.orientation === "landscape" || vs.pexels_format === "long" ? "landscape" : "portrait" } : {}),
   };
   const res = await fetch("/api/trigger-generation", {
     method: "POST",
