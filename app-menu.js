@@ -180,4 +180,13 @@
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
+
+  // 업데이트 알림(update.js)도 여기서 같이 불러온다 - 이 스크립트가 도는 모든 화면(홈 + 섹션 메인)에서 동작
+  // (update.js 안에 중복 로드 가드가 있어 띠가 두 번 뜨지 않음)
+  if (!window.__polosUpdateLoaded && !document.querySelector('script[src="/update.js"]')) {
+    const s = document.createElement("script");
+    s.src = "/update.js";
+    s.defer = true;
+    document.head.appendChild(s);
+  }
 })();

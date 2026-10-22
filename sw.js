@@ -33,6 +33,15 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+// 업데이트 적용(update.js)에서 보내는 메시지 - 대기 중인 새 워커 즉시 활성화 / 캐시 전체 삭제 요청
+self.addEventListener("message", (event) => {
+  const type = event.data && event.data.type;
+  if (type === "SKIP_WAITING") self.skipWaiting();
+  if (type === "CLEAR_CACHES") {
+    event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))));
+  }
+});
+
 // 영상 완성 알림을 누르면 Studio 페이지를 연다
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
