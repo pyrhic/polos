@@ -2,7 +2,7 @@
 // 사용자는 첨삭·피드백만 한다. 제미나이 하루 한도가 작아서 모드마다 호출은 딱 1번.
 // POST /api/gemini-pexels
 //   { mode: "plan",    format: "short"|"long", secs, note, past: [string] }
-//        -> { topic, title, subject, items: [item × N], range: {min, max} }   N은 AI가 정한다 (숏폼: 1~2분이 되도록 secs로 범위 계산, 롱폼: 기획에 맞게)
+//        -> { topic, title, subject, items: [item × N], range: {min, max} }   N은 AI가 정한다 (숏폼: 10~12장, 롱폼: 기획에 맞게)
 //        past = 지금까지 만든 슬라이드쇼 주제·제목 (최근 50개) — 이것들과 분명히 다른 주제를 고른다
 //   { mode: "revise",  topic, note, title, subject, format, feedback, count, keep: [{name, keyword}], previous: [{name, keyword, desc}] }
 //        -> { title, subject, items: [item × count] }  (keep은 그대로 두는 항목이라 결과에 넣지 않는다)
@@ -16,11 +16,11 @@ const str = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 const MAX_ITEMS = 40;
 const SUBJECTS = ["people", "animal", "place", "thing", "food", "nature", "other"];
 
-// 사진 수 범위: 숏폼은 전체 1~2분(사진 수 x 사진당 초), 롱폼은 길이 제한 없이 기획에 맞게
+// 사진 수 범위: 숏폼은 10~12장, 롱폼은 길이 제한 없이 기획에 맞게
 function countRange(format, secs) {
   if (format === "long") return { min: 8, max: MAX_ITEMS };
-  const s = Math.max(1.5, Math.min(10, Number(secs) || 3.5));
-  const min = Math.max(3, Math.ceil(60 / s)), max = Math.min(MAX_ITEMS, Math.max(min, Math.floor(120 / s)));
+  // 숏폼은 사진 10~12장으로 고정 (사진 한 장당 5초 기본이면 약 1분)
+  const min = 10, max = 12;
   return { min: Math.min(min, max), max };
 }
 
@@ -50,7 +50,7 @@ const listSchema = (min, max, withTopic) => ({
 
 const formatLine = (format) => format === "long"
   ? "[형식] 롱폼 — 가로(16:9) 영상, 길이 제한 없음"
-  : "[형식] 숏폼 — 세로(9:16) 쇼츠, 전체 1~2분";
+  : "[형식] 숏폼 — 세로(9:16) 쇼츠, 약 1분";
 
 const head = (topic, note, format, subject) => `너는 사진 슬라이드쇼 유튜브 영상의 기획자다. 사용자는 기획을 검토하고 고치는 편집자다.
 
@@ -61,7 +61,7 @@ function planPrompt(b) {
   const range = b.min === b.max ? `${b.min}개` : `${b.min}~${b.max}개`;
   const howMany = b.format === "long"
     ? `사진 수는 기획에 맞게 네가 정한다 (${range}). 주제를 충분히 보여 줄 만큼만, 억지로 늘리지 않는다.`
-    : `사진 한 장이 ${b.secs}초씩 나오므로, 전체 1~2분이 되도록 사진 수를 ${range} 안에서 네가 정한다.`;
+    : `사진 한 장이 ${b.secs}초씩 나온다. 사진 수는 ${range} 안에서 네가 정한다.`;
   return `${head("", b.note, b.format, "")}
 [할 일] 주제도 네가 정한다. 무료 스톡 사진(Pexels)만으로 충분히 채울 수 있고, 시청자가 끝까지 넘겨 보고 싶은 사진 슬라이드쇼 주제를 하나 골라라.${b.note ? " 작성자 요청을 따른다." : ""}
 ${b.past.length ? `[이미 만든 주제·제목 — 이것들과 분명히 다른 주제를 골라라. 표현만 바꾼 같은 주제(예: "이색적인 장소" ↔ "독특한 장소")도 안 된다]\n${b.past.map((p) => `- ${p}`).join("\n")}\n` : ""}
@@ -135,7 +135,7 @@ export async function onRequestPost(context) {
       prompt = revisePrompt({ topic, note, title, subject, format, feedback, keep, previous, count: min });
       schema = listSchema(min, max, false);
     } else {
-      const secs = Math.max(1.5, Math.min(10, Number(body.secs) || 3.5));
+      const secs = Math.max(1.5, Math.min(10, Number(body.secs) || 5));
       ({ min, max } = countRange(format, secs));
       const past = (Array.isArray(body.past) ? body.past : []).slice(0, 50).map((p) => str(p, 80)).filter(Boolean);
       prompt = planPrompt({ format, secs, note, past, min, max });

@@ -90,7 +90,7 @@
         <h2>영상 설정</h2>
         <div class="cu-row">
           <label style="margin:0;">사진 한 장당</label>
-          <input type="number" id="curSecs" min="1.5" max="10" step="0.5" value="3.5">
+          <input type="number" id="curSecs" min="1.5" max="10" step="0.5" value="5">
           <label style="margin:0;">초 · 전환</label>
           <select id="curTrans" style="width:auto;">
             <option value="fade">부드럽게 (페이드)</option>
@@ -163,7 +163,7 @@
   let curRow = null;       // DB의 콘티 행
   let busy = false;        // AI 기획·사진 고르기 중 (그동안 구조를 바꾸는 버튼은 막는다)
   const genWatch = new Map();
-  const DEFAULT_SECS = 3.5;   // 사진 한 장당 기본 초 (AI가 숏폼 사진 수를 1~2분에 맞춰 정할 때 쓴다)
+  const DEFAULT_SECS = 5;   // 사진 한 장당 기본 초 (숏폼은 사진 10~12장 → 약 1분)
   const MAX_ITEMS = 40;
   const orientOf = (format) => (format === "long" ? "landscape" : "portrait");
 
@@ -223,7 +223,7 @@
 
   const SUBJECT_KO = { people: "사람", animal: "동물", place: "장소", thing: "사물", food: "음식", nature: "자연", other: "기타" };
   function renderTopicLine() {
-    const fmt = cur.format === "long" ? "롱폼 · 가로 16:9" : "숏폼 · 세로 9:16 · 1~2분";
+    const fmt = cur.format === "long" ? "롱폼 · 가로 16:9" : "숏폼 · 세로 9:16 · 사진 10~12장";
     const topic = cur.topic ? `주제 <b>${esc(cur.topic)}</b>` : busy ? "AI가 주제를 고르는 중…" : "주제 (AI 기획 전)";
     $("topicLine").innerHTML = `<span class="cu-fmt">${fmt}</span>${topic}${cur.subject && SUBJECT_KO[cur.subject] ? ` · 사진 주인공 ${SUBJECT_KO[cur.subject]}` : ""}${cur.note ? ` · 요청 ${esc(cur.note)}` : ""}${cur.similarTo ? `<div class="cu-err" style="font-size:0.78rem;margin-top:4px;">이전 주제 '${esc(cur.similarTo)}'와 비슷해요 — 다른 주제를 원하면 아래 전체 피드백으로 바꾸세요.</div>` : ""}`;
   }
@@ -281,14 +281,14 @@
     const n = cur.items.filter((it) => it.photo).length;
     const total = n * cur.secs; // 페이드 전환은 사진 시간 안에서 겹쳐서, 전체 길이 = 사진 수 x 사진당 시간
     $("sum").textContent = n ? `사진 ${n}장 · 예상 길이 약 ${total.toFixed(1)}초 (${(total / 60).toFixed(1)}분)` : "사진이 정해지면 예상 길이가 표시됩니다.";
-    if (n && cur.format !== "long" && (total < 60 || total > 120)) $("sum").textContent += " · 숏폼은 1~2분을 권장해요";
+    if (n && cur.format !== "long" && (total < 45 || total > 120)) $("sum").textContent += " · 숏폼은 1분 안팎을 권장해요";
     const missing = cur.items.length - n;
     if (missing > 0) $("sum").textContent += ` · 사진이 없는 항목 ${missing}개는 영상에서 빠집니다`;
   }
 
   // ───────── 설정 입력 ─────────
   $("curTitle").addEventListener("input", (e) => { cur.title = e.target.value; queueSave(); });
-  $("curSecs").addEventListener("input", (e) => { cur.secs = Math.max(1.5, Math.min(10, Number(e.target.value) || 3.5)); updateSum(); queueSave(); });
+  $("curSecs").addEventListener("input", (e) => { cur.secs = Math.max(1.5, Math.min(10, Number(e.target.value) || 5)); updateSum(); queueSave(); });
   $("curTrans").addEventListener("change", (e) => { cur.transition = e.target.value; updateSum(); queueSave(); });
   $("curCap").addEventListener("change", (e) => { cur.caption_mode = e.target.value; queueSave(); });
   $("curCapFont").addEventListener("change", (e) => { cur.caption_font = e.target.value; queueSave(); });
