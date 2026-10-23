@@ -81,6 +81,9 @@
   .gen-main-btn:disabled { background:var(--line-strong); color:var(--muted-2); box-shadow:none; }
   .runtime-summary .note { color:var(--muted); font-weight:400; font-size:0.75rem; display:block; margin-top:2px; }
   .runtime-summary > .gen-main-btn:first-child { margin-top:0; }
+  .autoup-row { display:flex; align-items:center; gap:8px; margin:10px 0 0; font-size:0.8rem; font-weight:600; color:var(--text-2, var(--text)); cursor:pointer; }
+  .autoup-row input { width:18px; height:18px; flex-shrink:0; margin:0; padding:0; accent-color:var(--accent); }
+  .autoup-row .autoup-ch { color:var(--muted); font-weight:400; font-size:0.75rem; }
   /* 전체 미리보기 (화면 전체) */
   .fpv { display:none; position:fixed; inset:0; z-index:45; background:#000; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
   .fpv.open { display:flex; }
@@ -585,6 +588,8 @@
     </div>
     <div class="runtime-summary" id="runtimeSummary" style="display:none;">
       <button type="button" id="genBtn" class="gen-main-btn">영상 생성</button>
+      <!-- 콘티마다 저장(video_settings.auto_upload). 켜면 완성 영상이 콘티의 채널에 비공개로 올라간다 (upload.js의 Studio 업로드 기본값과 같은 제목·설명·태그) -->
+      <label class="autoup-row" for="autoUpChk"><input type="checkbox" id="autoUpChk"> <span>생성되면 자동으로 비공개 업로드 <span class="autoup-ch" id="autoUpCh"></span></span></label>
       <div class="note" id="genNote" style="display:none;color:var(--danger);"></div>
     </div>
 
@@ -605,6 +610,8 @@
 <script src="/youtube/conti-create-modal.js"></script>
 <!-- 후킹 공식·후킹 점수·제목 점검 (Pages Functions와 같은 파일) -->
 <script src="/youtube/hook-kit.js"></script>
+<!-- 생성 후 자동 업로드: Studio 업로드와 같은 제목·설명·태그·채널 기본값(ytAutoUploadPayload) -->
+<script src="/youtube/upload.js"></script>
 <script>
   const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
   const SUPABASE_ANON_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
@@ -1976,11 +1983,12 @@ ${detail}`;
     name: ["name"],
     card: ["subscribe_card_id", "channel_slot"],   // 채널 카드 불러오기: 고른 카드와 그 채널만
     voice: ["tts_voice", "tts_rate", "tts_pitch", "voice_name", "voice_sync"],   // 채널 카드 목소리 동기화(켜기·끄기·카드 목소리 반영): 바로 저장
+    autoup: ["auto_upload"],   // 영상 생성 버튼 아래 "생성되면 자동으로 비공개 업로드": 바로 저장
   };
   const PART_BTN = { main: "settingsSaveBtn", sound: "soundSaveBtn" };
   const dirtyParts = new Set();
   const savingParts = new Set();
-  const partEdits = { main: 0, sound: 0, cap: 0, name: 0, mood: 0, card: 0, voice: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
+  const partEdits = { main: 0, sound: 0, cap: 0, name: 0, mood: 0, card: 0, voice: 0, autoup: 0 };   // 저장하는 동안 또 고쳤는지 알기 위한 수정 횟수
   const justSavedParts = new Set();
   let saveChain = Promise.resolve();   // 저장은 하나씩 차례로(앞 저장 결과 위에 다음 저장을 덮어쓰도록)
 
@@ -2206,6 +2214,7 @@ ${detail}`;
     $("ttsRate").value = currentSettings.tts_rate;
     $("ttsPitch").value = currentSettings.tts_pitch;
     updateVoiceLabels();
+    renderAutoUpload();
     card.style.display = "block";
     $("contiNameWrap").style.display = "block";
     $("soundCard").style.display = "block";
@@ -2335,6 +2344,7 @@ ${detail}`;
           if (same()) savedBgmPath = next.bgm_path || null;
         }
         if (part === "name") renderScriptList();   // 콘티 목록·선택 칸의 이름도 같이 바뀐다
+        if (part === "card" && same()) renderAutoUpload();   // 채널이 바뀌면 자동 업로드 채널 표시도 바뀐다
         scheduleDefaultsSave(next);   // 마지막으로 저장한 설정이 곧 기본값
         if (same()) {
           if (partEdits[part] === edit) dirtyParts.delete(part);   // 저장하는 동안 또 고쳤으면 "저장 안 됨" 유지
@@ -2345,7 +2355,7 @@ ${detail}`;
         }
         return true;
       } catch (err) {
-        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름", mood: "분위기", card: "채널 카드 설정", voice: "목소리" }[part];
+        const what = { main: "설정", sound: "음향", cap: "자막", name: "이름", mood: "분위기", card: "채널 카드 설정", voice: "목소리", autoup: "자동 업로드 설정" }[part];
         showMsg(`${what} 저장 실패: ${err.message}`, false);
         if (same()) dirtyParts.add(part);
         return false;
@@ -5142,6 +5152,30 @@ ${detail}`;
 
   $("addMediaBtn").addEventListener("click", addArticleMedia);
 
+  // ───── 생성 후 자동 업로드 (video_settings.auto_upload, 콘티마다): 켜면 완성 영상이 콘티의 채널에 비공개로 올라간다 ─────
+  // 제목·설명·태그·채널은 Studio 업로드 폼의 처음 값과 같다 (upload.js ytAutoUploadPayload). 체크는 바꾸는 즉시 저장한다
+  let autoUpSeq = 0;
+  let ytChannelsReady = null;   // 채널 표는 화면을 열고 한 번만 읽는다
+  const primeYtChannels = () => ytChannelsReady || (ytChannelsReady = ytPrimeChannels());
+  async function renderAutoUpload() {
+    const seq = ++autoUpSeq;
+    $("autoUpChk").checked = currentSettings.auto_upload === true;
+    $("autoUpCh").textContent = "";
+    const row = scripts.find((r) => String(r.id) === String($("scriptSelect").value));
+    if (!row) return;
+    await primeYtChannels();
+    if (seq !== autoUpSeq) return;
+    const slot = ytDefaultSlot({ ...row, video_settings: { ...(row.video_settings || {}), channel_slot: currentSettings.channel_slot } });
+    const ch = ytChannels().find((c) => c.slot === slot);
+    $("autoUpCh").textContent = ch ? `→ ${ch.label}` : "";
+  }
+  $("autoUpChk").addEventListener("change", () => {
+    if (!scripts.some((r) => String(r.id) === String($("scriptSelect").value))) return;
+    currentSettings.auto_upload = $("autoUpChk").checked;
+    partEdits.autoup++;
+    savePart("autoup");
+  });
+
   // ───── 영상 생성: 시작하면 "생성 중"으로 바뀌고, 끝나면 알림. 완성 영상은 Studio에서 확인 ─────
   const genWatch = new Map(); // scriptId -> 타이머
   async function refreshGenState(scriptId) {
@@ -5176,6 +5210,15 @@ ${detail}`;
       genWatch.delete(String(scriptId));
       const row = scripts.find((r) => String(r.id) === String(scriptId));
       if (row) row.generation_status = status;
+      // 워크플로우가 video_settings에 쓴 값(자동 업로드 기록 youtube_last·youtube_history, 실패 정보 last_error)을 받아 둔다.
+      // 옛 값 위에 설정을 저장하면 이 기록이 지워지기 때문
+      if (row) {
+        try {
+          const fr = await fetch(`${SUPABASE_URL}/rest/v1/youtube_scripts?select=video_settings&id=eq.${encodeURIComponent(scriptId)}`, { headers });
+          const fresh = fr.ok ? (((await fr.json())[0] || {}).video_settings || {}) : null;
+          if (fresh) row.video_settings = { ...(row.video_settings || {}), youtube_last: fresh.youtube_last, youtube_history: fresh.youtube_history, last_error: fresh.last_error };
+        } catch { /* 못 읽으면 그대로 */ }
+      }
       const name = row ? ((row.video_settings && row.video_settings.name) || (row.hook || "").slice(0, 20)) : "";
       genNotify(name, status === "done");
       if (String($("scriptSelect").value) === String(scriptId)) refreshGenState(scriptId);
@@ -5207,15 +5250,25 @@ ${detail}`;
         return;
       }
       const version = await genNextVersion(scriptId);
-      if (!confirm(`v${version} 영상 생성을 시작할까요? 몇 분 걸리고, 완성되면 알려드립니다. 영상은 Studio에서 확인하세요.`)) { btn.disabled = false; return; }
-      genRequestPermission();
       // 자막 줄 길이를 계산한 목소리 속도(화면에 보이는 값)를 그대로 넘긴다 — 저장된 설정에 tts_rate가 없을 때도 콘티 길이 = 요청 길이
       // 콘티 화면의 영상은 늘 "제목 + 영상 + 출처"(framed). Pexels 슬라이드쇼는 pexels-edit.html에서 따로 genStart를 부르므로 영향 없음
-      await genStart({ ...row, video_settings: { ...(row.video_settings || {}), layout: "framed", tts_rate: ttsRateNow() } }, segments, version);
+      const genRow = { ...row, video_settings: { ...(row.video_settings || {}), layout: "framed", tts_rate: ttsRateNow() } };
+      // 생성되면 자동으로 비공개 업로드: Studio에서 이 버전을 올릴 때의 처음 값(제목·설명·태그·채널)을 지금 만들어 같이 보낸다
+      let autoUpload = null, autoUpText = "";
+      if ($("autoUpChk").checked) {
+        await primeYtChannels();
+        autoUpload = ytAutoUploadPayload(genRow, version);
+        if (!autoUpload.title) throw new Error("자동 업로드 제목이 비어 있어요 — 콘티 이름을 정하거나 자동 업로드를 끄세요.");
+        const ch = ytChannels().find((c) => c.slot === autoUpload.channelSlot);
+        autoUpText = `\n\n완성되면 "${ch ? ch.label : `채널 ${autoUpload.channelSlot}`}" 채널에 비공개로 자동 업로드합니다 (제목: ${autoUpload.title}).`;
+      }
+      if (!confirm(`v${version} 영상 생성을 시작할까요? 몇 분 걸리고, 완성되면 알려드립니다. 영상은 Studio에서 확인하세요.${autoUpText}`)) { btn.disabled = false; return; }
+      genRequestPermission();
+      await genStart(genRow, segments, version, autoUpload ? { autoUpload } : undefined);
       row.generation_status = "running";
       btn.textContent = "영상 생성 중... (몇 분 걸려요)";
       watchGeneration(scriptId);
-      showMsg("영상 생성을 시작했습니다. 완성되면 알림이 뜹니다.", true);
+      showMsg(autoUpload ? "영상 생성을 시작했습니다. 완성되면 유튜브에 비공개로 자동 업로드하고 알려 드려요." : "영상 생성을 시작했습니다. 완성되면 알림이 뜹니다.", true);
     } catch (err) {
       btn.disabled = false;
       showMsg("영상 생성 실패: " + err.message, false);

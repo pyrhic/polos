@@ -1,5 +1,6 @@
 // 영상 버전 카드의 "유튜브에 바로 업로드" UI (Studio 페이지에서 사용).
-// 쓰는 페이지에 escapeHtml(), videoName(row)가 있어야 한다. 항상 비공개로 올라간다.
+// 쓰는 페이지에 escapeHtml()가 있어야 한다 (videoName(row)가 있으면 그것을, 없으면 generate.js의 genVideoName). 항상 비공개로 올라간다.
+// 콘티 화면(storyboard.html)도 "생성되면 자동 업로드"의 제목·설명·태그·채널 기본값을 같은 함수(ytUploadDefaults)로 만든다.
 const YT_DISCLAIMER = "이 영상은 공개된 자료를 바탕으로 재구성한 이야기이며, 이해를 돕기 위해 일부 각색이 포함될 수 있습니다.";
 const YT_RESPONSIBILITY = "정확한 사실 확인은 원본 자료를 참고해주세요.";
 
@@ -75,7 +76,8 @@ function ytReauthHelpHtml() {
 // 롱폼에서 만든 쇼츠는 버전마다 제목이 따로 있다 (video_settings.titles). 없으면 콘티 이름.
 function ytTitleFor(row, o) {
   const t = ((row.video_settings || {}).titles || {})[o.version];
-  return (t || videoName(row)).slice(0, 100);
+  const name = typeof videoName === "function" ? videoName(row) : genVideoName(row);
+  return (t || name).slice(0, 100);
 }
 
 // 영상 첫 화면에 크게 나오는 제목 줄 (뉴스·위키: title1·title2, 슬라이드쇼: title_text) — 업로드 제목과 한 짝으로 점검한다
@@ -122,19 +124,39 @@ function ytHistoryHtml(row, o) {
   </details>`;
 }
 
+// 업로드 폼의 처음 값 (Studio 폼과 콘티 화면의 자동 업로드가 같이 쓴다). o = { version } 이면 된다.
+// 지난번 이 버전을 올릴 때 쓴 값(youtube_last)이 있으면 그 값, 없으면 기본 규칙 (제목 = 버전 제목/콘티 이름, 설명 = 안내 문구 + 출처, 태그 없음, 채널 = ytDefaultSlot)
+// ytPrimeChannels()를 먼저 한 번 기다려 둬야 채널 표(youtube_channels) 기준으로 고른다.
+function ytUploadDefaults(row, o) {
+  const last = ytLastFor(row, o) || {};
+  return {
+    title: last.title != null ? String(last.title).slice(0, 100) : ytTitleFor(row, o),
+    description: last.description != null ? last.description : ytDefaultDescription(row),
+    tags: last.tags || "",
+    channelSlot: last.channel_slot != null && ytChannels().some((c) => c.slot === String(last.channel_slot)) ? String(last.channel_slot) : ytDefaultSlot(row),
+  };
+}
+// "생성되면 자동으로 비공개 업로드"를 켠 콘티의 업로드 값 — Studio에서 업로드 시작을 누를 때 /api/trigger-upload로 보내는 값과 같다
+// (제목은 Studio처럼 앞뒤 공백을 떼고, < > 제거·길이 검사는 서버(/api/trigger-generation)가 trigger-upload와 같은 규칙으로 한다)
+function ytAutoUploadPayload(row, version) {
+  const d = ytUploadDefaults(row, { version: Number(version) });
+  return { title: d.title.trim(), description: d.description, tags: d.tags, channelSlot: d.channelSlot };
+}
+
 function uploadBlockHtml(o, row) {
   if (o.youtube_status === "uploading") {
     return `<div class="yt-block" style="margin-top:8px;font-size:0.85rem;color:var(--accent);">유튜브 업로드 중... (몇 분 걸릴 수 있어요)</div>`;
   }
   const done = o.youtube_status === "done" && o.youtube_video_id;
   const last = ytLastFor(row, o) || {};
-  const slot = last.channel_slot != null && ytChannels().some((c) => c.slot === String(last.channel_slot)) ? String(last.channel_slot) : ytDefaultSlot(row);
+  const dflt = ytUploadDefaults(row, o);
+  const slot = dflt.channelSlot;
   // 실제로 올린 채널 이름 (업로드 때 남긴 youtube_last의 채널, 준비 중으로 바뀐 채널도 이름은 보인다). 기록이 없는 옛 업로드는 생략
   const allCh = ytChannelCache || (globalThis.POLOS_CONFIG || {}).YT_CHANNELS || [];
   const upCh = last.channel_slot != null ? allCh.find((c) => String(c.slot) === String(last.channel_slot)) : null;
   const upChannel = upCh ? upCh.label : "";
   const doneNote = done
-    ? `<div style="font-size:0.85rem;"><span style="font-weight:700;">업로드 완료</span> · <a class="accent" href="https://youtu.be/${escapeHtml(o.youtube_video_id)}" target="_blank" rel="noopener">유튜브에서 보기 ↗</a>${upChannel ? ` · ${escapeHtml(upChannel)}` : ""}</div>` : "";
+    ? `<div style="font-size:0.85rem;"><span style="font-weight:700;">업로드 완료</span> · <a class="accent" href="https://youtu.be/${escapeHtml(o.youtube_video_id)}" target="_blank" rel="noopener">유튜브에서 보기 ↗</a>${upChannel ? ` · ${escapeHtml(upChannel)}` : ""}${last.auto ? ` <span style="color:var(--muted);font-size:0.75rem;">(생성 후 자동 업로드 · 비공개)</span>` : ""}</div>` : "";
   const errorNote = o.youtube_status === "error"
     ? `<div class="msg err" style="display:block;font-size:0.8rem;">업로드 실패: ${escapeHtml(o.youtube_error || "알 수 없는 오류")}</div>${ytReauthHelpHtml()}` : "";
   // 이미 유튜브에 올라간 영상 id가 있으면(완료, 또는 재업로드가 실패해 옛 id가 남은 경우) "다시 업로드"는 새 영상을 하나 더 올리는 것
@@ -148,12 +170,12 @@ function uploadBlockHtml(o, row) {
       <label>올릴 채널</label>
       <select class="yt-channel">${ytChannels().map((c) => `<option value="${escapeHtml(c.slot)}"${c.slot === slot ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")}</select>
       <label>제목 (100자 이내)</label>
-      <input type="text" class="yt-title" maxlength="100" value="${escapeHtml(last.title != null ? String(last.title).slice(0, 100) : ytTitleFor(row, o))}">
+      <input type="text" class="yt-title" maxlength="100" value="${escapeHtml(dflt.title)}">
       <div class="yt-title-lint" data-thumb="${escapeHtml(JSON.stringify(ytThumbLines(row)))}" title="어림 규칙(휴리스틱) 점검이에요. 업로드를 막지 않아요." style="font-size:0.72rem;color:var(--muted);line-height:1.5;margin:-2px 0 8px;"></div>
       <label>설명</label>
-      <textarea class="yt-desc" style="min-height:140px;">${escapeHtml(last.description != null ? last.description : ytDefaultDescription(row))}</textarea>
+      <textarea class="yt-desc" style="min-height:140px;">${escapeHtml(dflt.description)}</textarea>
       <label>태그 (콤마로 구분, 선택)</label>
-      <input type="text" class="yt-tags" placeholder="예: 미스터리, 이슈" value="${escapeHtml(last.tags || "")}">
+      <input type="text" class="yt-tags" placeholder="예: 미스터리, 이슈" value="${escapeHtml(dflt.tags)}">
       <div style="color:var(--muted);font-size:0.75rem;margin:6px 0;">비공개로 올라갑니다. 공개 전환은 유튜브 스튜디오에서 직접 하세요.${reupload ? " 다시 올리면 새 영상이 하나 더 생기고, 이 버전의 링크는 새 영상으로 바뀝니다." : ""}</div>
       ${o.youtube_status === "error" ? "" : `<details style="margin:6px 0;"><summary style="color:var(--muted);font-size:0.78rem;cursor:pointer;">업로드가 실패하거나 유튜브 인증이 만료됐나요?</summary>${ytReauthHelpHtml()}</details>`}
       <div style="display:flex;gap:8px;">

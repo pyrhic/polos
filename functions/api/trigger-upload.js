@@ -1,15 +1,12 @@
 // 완성 영상(버전)을 유튜브에 업로드하는 깃허브 액션(upload-youtube.yml)을 실행시킨다. 항상 비공개로 올린다.
 import "../../config.js"; // 주소/키/저장소 이름은 루트의 config.js 한 곳에서 관리한다
-import { loadChannels, isValidSlot } from "../_lib/channels.js";
+import { checkUploadMeta } from "../_lib/upload-meta.js";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, GITHUB_REPO: REPO } = globalThis.POLOS_CONFIG;
 const WORKFLOW = "upload-youtube.yml";
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status, headers: { "Content-Type": "application/json" },
 });
-
-// 유튜브 API는 제목/설명의 < > 를 허용하지 않는다.
-const clean = (s) => String(s || "").replace(/[<>]/g, "").trim();
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -18,20 +15,15 @@ export async function onRequestPost(context) {
 
   try {
     const { outputId, videoUrl, title, description, tags, channelSlot, reupload } = await request.json();
-    const slot = String(channelSlot || "1");
-    const channel = isValidSlot(slot) && (await loadChannels()).find((c) => c.slot === slot);
-    if (!channel) return json({ error: "올릴 채널 번호가 올바르지 않습니다" }, 400);
-    if (!channel.ready) return json({ error: "이 채널은 아직 로그인 연결이 끝나지 않았습니다" }, 400);
-    if (!outputId || !videoUrl || !clean(title)) {
+    if (!outputId || !videoUrl) {
       return json({ error: "outputId, videoUrl, title이 필요합니다" }, 400);
     }
+    // 채널(준비된 채널만)·제목·설명 검사와 < > 제거는 생성 후 자동 업로드와 같은 규칙 (functions/_lib/upload-meta.js)
+    const { meta, error } = await checkUploadMeta({ title, description, tags, channelSlot });
+    if (error) return json({ error }, 400);
     if (!String(videoUrl).startsWith(`${SUPABASE_URL}/storage/v1/object/public/youtube-outputs/`)) {
       return json({ error: "허용되지 않은 영상 주소입니다" }, 400);
     }
-    const cleanTitle = clean(title);
-    if (cleanTitle.length > 100) return json({ error: "제목은 100자 이내여야 합니다" }, 400);
-    const cleanDesc = clean(description);
-    if (cleanDesc.length > 5000) return json({ error: "설명은 5000자 이내여야 합니다" }, 400);
 
     const supaHeaders = {
       apikey: SUPABASE_ANON_KEY,
@@ -64,10 +56,10 @@ export async function onRequestPost(context) {
         inputs: {
           output_id: String(outputId),
           video_url: videoUrl,
-          title: cleanTitle,
-          description: cleanDesc,
-          tags: clean(tags),
-          channel_slot: slot,
+          title: meta.title,
+          description: meta.description,
+          tags: meta.tags,
+          channel_slot: meta.channel_slot,
         },
       }),
     });

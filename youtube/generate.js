@@ -211,7 +211,10 @@ async function genFetchStatus(scriptId) {
 }
 
 // 깃허브 액션에 영상 생성을 시킨다. 실패하면 Error를 던진다.
-async function genStart(row, segRows, version) {
+// opts.autoUpload (선택): { title, description, tags, channelSlot } — 완성되면 그 채널에 비공개로 자동 업로드 (upload.js의 ytAutoUploadPayload로 만든 값).
+//   이 기기가 결과를 지켜보다가 업로드가 끝나면(또는 실패하면) 알린다 (아래 autoUpJobs)
+async function genStart(row, segRows, version, opts) {
+  const autoUpload = opts && opts.autoUpload ? opts.autoUpload : null;
   const vs = row.video_settings || {};
   const segments = genBuildSegments(segRows, vs);
   const settings = {
@@ -241,10 +244,11 @@ async function genStart(row, segRows, version) {
   const res = await fetch("/api/trigger-generation", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scriptId: row.id, scriptContent: genToMarkdown(row, segRows), segments, settings, channel: "wizard-yt", version }),
+    body: JSON.stringify({ scriptId: row.id, scriptContent: genToMarkdown(row, segRows), segments, settings, channel: "wizard-yt", version, ...(autoUpload ? { autoUpload } : {}) }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "알 수 없는 오류");
+  if (autoUpload) autoUpJobsAdd(row.id, version, genVideoName(row));
 }
 
 // ───── 완료 알림: 화면 안 알림창 + (허용했다면) 기기 알림 ─────
@@ -377,3 +381,73 @@ function contiJobWatch() {
   if (contiJobsGet().length) contiJobCheckNow();   // 화면을 열 때 한 번 (앱을 닫아 둔 사이 끝난 것)
 }
 contiJobWatch();
+
+// ───── 생성 후 자동 업로드 감시: 영상이 완성되면 워크플로우가 유튜브(비공개)에 올린다. 끝나면 알린다 ─────
+// 자동 업로드로 생성을 시작한 콘티·버전을 이 기기 localStorage "autoUpJobs"에 적어 두고, 이 파일을 불러오는 모든 유튜브 화면이 확인한다.
+// 완성 영상(youtube_outputs의 그 버전)의 youtube_status가 done/error가 되면 알리고 목록에서 뺀다.
+// 영상 생성이 실패하면(generation_status error) 업로드도 없으니 조용히 뺀다 (생성 실패 알림은 콘티·Studio 화면이 따로 띄운다). 3시간 넘으면 뺀다.
+const AUTOUP_JOBS_KEY = "autoUpJobs";
+const AUTOUP_POLL_MS = 15000;
+const AUTOUP_STALE_MS = 3 * 60 * 60 * 1000;
+function autoUpJobsGet() {
+  try { const v = JSON.parse(localStorage.getItem(AUTOUP_JOBS_KEY) || "[]"); return Array.isArray(v) ? v.filter((j) => j && j.id != null && j.version != null) : []; } catch { return []; }
+}
+function autoUpJobsSet(list) {
+  try { if (list.length) localStorage.setItem(AUTOUP_JOBS_KEY, JSON.stringify(list)); else localStorage.removeItem(AUTOUP_JOBS_KEY); } catch { /* 저장 못 하면 알림만 못 받는다 */ }
+}
+const autoUpKey = (j) => `${Number(j.id)}:${Number(j.version)}`;
+function autoUpJobsAdd(id, version, name) {
+  const j = { id: Number(id), version: Number(version), name: name || "", at: Date.now() };
+  autoUpJobsSet([...autoUpJobsGet().filter((x) => autoUpKey(x) !== autoUpKey(j)), j]);
+  autoUpWatch();
+}
+function autoUpJobsRemove(j) {
+  autoUpJobsSet(autoUpJobsGet().filter((x) => autoUpKey(x) !== autoUpKey(j)));
+}
+let autoUpChecking = null;
+function autoUpCheckNow() {
+  if (!autoUpChecking) autoUpChecking = autoUpCheck().finally(() => { autoUpChecking = null; });
+  return autoUpChecking;
+}
+async function autoUpCheck() {
+  const jobs = autoUpJobsGet();
+  if (!jobs.length) return;
+  const ids = [...new Set(jobs.map((j) => Number(j.id)))].join(",");
+  let scripts, outs;
+  try {
+    const [sr, or] = await Promise.all([
+      fetch(`${GEN_SUPABASE_URL}/rest/v1/youtube_scripts?select=id,generation_status&id=in.(${ids})`, { headers: genHeaders }),
+      fetch(`${GEN_SUPABASE_URL}/rest/v1/youtube_outputs?select=id,script_id,version,youtube_status,youtube_error,youtube_video_id&script_id=in.(${ids})`, { headers: genHeaders }),
+    ]);
+    if (!sr.ok || !or.ok) return;   // 다음에 다시
+    scripts = await sr.json();
+    outs = await or.json();
+  } catch { return; }
+  const now = Date.now();
+  for (const j of jobs) {
+    if (!autoUpJobsGet().some((x) => autoUpKey(x) === autoUpKey(j))) continue;   // 다른 탭이 먼저 알렸다
+    const s = scripts.find((x) => String(x.id) === String(j.id));
+    if (!s) { autoUpJobsRemove(j); continue; }   // 지운 콘티
+    const o = outs.find((x) => String(x.script_id) === String(j.id) && Number(x.version) === Number(j.version));
+    const url = `/youtube/review.html#${encodeURIComponent(j.id)}`;
+    if (o && o.youtube_status === "done") {
+      autoUpJobsRemove(j);
+      genNotify(j.name, true, { title: "자동 업로드 완료 (비공개)", body: `${j.name} v${j.version} · 유튜브 스튜디오에서 확인하고 공개로 바꾸세요`, url, linkText: "Studio" });
+    } else if (o && o.youtube_status === "error") {
+      autoUpJobsRemove(j);
+      genNotify(j.name, false, { title: "자동 업로드 실패", body: `${j.name} v${j.version}${o.youtube_error ? " · " + o.youtube_error : ""} · Studio에서 다시 업로드하세요`, url, linkText: "Studio" });
+    } else if (!o && s.generation_status === "error") {
+      autoUpJobsRemove(j);   // 영상이 안 만들어져 올릴 것도 없다
+    } else if (now - (Number(j.at) || 0) > AUTOUP_STALE_MS) {
+      autoUpJobsRemove(j);
+    }
+  }
+}
+let autoUpTimer = null;
+function autoUpWatch() {
+  if (autoUpTimer) return;
+  autoUpTimer = setInterval(() => { if (!document.hidden && autoUpJobsGet().length) autoUpCheckNow(); }, AUTOUP_POLL_MS);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && autoUpJobsGet().length) autoUpCheckNow(); });
+  if (autoUpJobsGet().length) autoUpCheckNow();   // 화면을 열 때 한 번 (앱을 닫아 둔 사이 끝난 것)
+}
+autoUpWatch();
