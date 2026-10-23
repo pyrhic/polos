@@ -5,3 +5,6 @@ polos-writing-*.json
 
 # Supabase CLI 임시 파일
 supabase/.temp/
+
+# 파이썬 캐시
+__pycache__/

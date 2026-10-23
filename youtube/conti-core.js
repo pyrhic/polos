@@ -67,7 +67,7 @@ const ContiCore = (() => {
   function applyCard(segs, card, photo) {
     if (!card) return segs;
     return segs.map((s) => s.section === SUB_SECTION
-      ? { ...s, script_text: card.script_text || s.script_text, direction: card.direction || s.direction, asset_paths: photo }
+      ? { ...s, script_text: card.script_text || s.script_text, subtitle_text: null, direction: card.direction || s.direction, asset_paths: photo }
       : s);
   }
 
@@ -164,14 +164,23 @@ const ContiCore = (() => {
 
     // 다시 만들기라면 지난번 장면을 먼저 지운다
     await restJson(deps, `youtube_segments?script_id=eq.${row.id}`, { method: "DELETE" }, "이전 장면 정리");
-    const created = await restJson(deps, "youtube_segments", {
-      method: "POST", headers: { Prefer: "return=representation" },
-      body: JSON.stringify(segs.map((s, i) => ({
-        // 여러 행을 한 번에 넣을 땐 모든 행의 칸 이름이 같아야 한다 (PGRST102). undefined 칸은 JSON에서 빠지므로 모두 문자열/배열로 채운다
-        script_id: row.id, order_no: i + 1, section: s.section || "", script_text: s.script_text || "", keyword: s.keyword || "", direction: s.direction || "",
-        asset_paths: (s.asset_paths && s.asset_paths.length) ? s.asset_paths : [],
-      }))),
-    }, "장면 저장");
+    const segRows = segs.map((s, i) => ({
+      // 여러 행을 한 번에 넣을 땐 모든 행의 칸 이름이 같아야 한다 (PGRST102). undefined 칸은 JSON에서 빠지므로 모두 문자열/배열/null로 채운다
+      // subtitle_text: 화면 자막(문자열 = 새 장면). 채널 카드·구독 장면처럼 값이 없으면 null = SCRIPT 줄이 그대로 자막 (계약서 16절)
+      script_id: row.id, order_no: i + 1, section: s.section || "", script_text: s.script_text || "",
+      subtitle_text: typeof s.subtitle_text === "string" ? s.subtitle_text : null, keyword: s.keyword || "", direction: s.direction || "",
+      asset_paths: (s.asset_paths && s.asset_paths.length) ? s.asset_paths : [],
+    }));
+    const saveSegs = (rows) => restJson(deps, "youtube_segments", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(rows) }, "장면 저장");
+    let created;
+    try {
+      created = await saveSegs(segRows);
+    } catch (e) {
+      // subtitle_text 칸이 아직 없는 DB(youtube_tables_18_subtitle.sql 실행 전, PGRST204): 그 칸만 빼고 다시 (자막 = SCRIPT 줄인 옛 장면이 된다)
+      if (!/subtitle_text/.test(String(e && e.message)) || !/PGRST204|column|schema/i.test(String(e && e.message))) throw e;
+      created = await saveSegs(segRows.map(({ subtitle_text, ...r }) => r));
+      note = (note ? note + " " : "") + "※ 화면 자막(SUBTITLE) 칸이 DB에 아직 없어 자막을 저장하지 못했어요 — youtube_tables_18_subtitle.sql을 실행해 주세요.";
+    }
     created.sort((a, b) => a.order_no - b.order_no);
     const pending = isNews ? planNews(d, created) : planWiki(d, created);
     const req2 = { ...req, pending_images: pending, images_total: pending.length, images_ok: 0, videos_ok: 0, result_note: note };

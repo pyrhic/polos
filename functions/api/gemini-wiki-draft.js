@@ -4,6 +4,7 @@
 import { getArticle, getFreeImages, creditLine } from "../_lib/wiki.js";
 import { callGemini } from "../_lib/gemini.js";
 import { HookKit, hookPromptBlock } from "../_lib/hooks.js";
+import { subtitlePromptBlock, SUBTITLE_SCHEMA, cleanScript, cleanSubtitle } from "../_lib/subtitle.js";
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status, headers: { "Content-Type": "application/json" },
@@ -75,6 +76,7 @@ ${KIND_RULE[kind]}
 - direction: 카메라 연출 하나, 반드시 다음 중에서: ${DIRECTIONS.map((d) => `"${d}"`).join(", ")} (같은 연출이 연속되지 않게)
 - image: 이 카드에 어울리는 사진 번호(위 목록). 적당한 사진이 없으면 -1. 같은 사진을 너무 반복해서 쓰지 말고, 첫 카드에는 ${KIND_LEAD_IMAGE[kind]}이 있으면 쓴다.
 - name: 콘티 이름 (${KIND_CONTI_NAME[kind]}, 20자 이내). title1: ${KIND_NAME[kind]} 이름(또는 핵심 키워드) 공백 포함 12자 이내, title2: 이 이야기를 한 줄로 14자 이내. 궁금증을 불러일으키는 낚시성 표현과 물음표·느낌표는 써도 되지만, 위키백과에 있는 사실만 쓰고 실존 인물을 조롱·비방하지 않는다.
+${subtitlePromptBlock(kind === "person" ? "인물·작품·장소" : "인물·사건·작품·장소·개념")}
 - mood: 문서 내용의 분위기를 판단해 영상 색감 분위기를 다음 id 중 하나로 고른다: "neutral"(기본), "mystery"(어둡고 긴장감 있는 미스터리 — 미제 사건·의문의 죽음·괴담·수수께끼 등), "bright"(밝고 경쾌 — 유쾌한 일화·발명·성공담 등), "calm"(차분하고 담담한 다큐 — 생애·역사·참사·과학 지식 등). 판단이 어렵거나 애매하면 "neutral".
 
 ${hookPromptBlock("wiki", "첫 카드(도입 첫 장)의 첫 문장(후킹)")}
@@ -93,10 +95,10 @@ ${hookPromptBlock("wiki", "첫 카드(도입 첫 장)의 첫 문장(후킹)")}
               items: {
                 type: "OBJECT",
                 properties: {
-                  section: { type: "STRING" }, script_text: { type: "STRING" }, keyword: { type: "STRING" },
+                  section: { type: "STRING" }, script_text: { type: "STRING" }, subtitle: SUBTITLE_SCHEMA, keyword: { type: "STRING" },
                   direction: { type: "STRING" }, image: { type: "INTEGER" },
                 },
-                required: ["section", "script_text", "keyword", "direction", "image"],
+                required: ["section", "script_text", "subtitle", "keyword", "direction", "image"],
               },
             },
             mood: { type: "STRING", enum: MOOD_IDS },
@@ -124,7 +126,7 @@ ${hookPromptBlock("wiki", "첫 카드(도입 첫 장)의 첫 문장(후킹)")}
     const title20 = (s) => String(s || "").trim().slice(0, 20);   // 화면 제목은 물음표·느낌표 허용
     const segments = parsed.cards.filter((c) => c.script_text && c.script_text.trim()).map((c) => ({
       section: ["도입", "전개", "의미", "마무리"].includes(c.section) ? c.section : "전개",
-      script_text: c.script_text.trim(), keyword: c.keyword || "", direction: DIRECTIONS.includes(c.direction) ? c.direction : "천천히 줌인",
+      script_text: cleanScript(c.script_text), subtitle_text: cleanSubtitle(c.subtitle), keyword: c.keyword || "", direction: DIRECTIONS.includes(c.direction) ? c.direction : "천천히 줌인",
       image: Number.isInteger(c.image) && c.image >= 0 && c.image < images.length ? c.image : -1,
     }));
     // 구독/좋아요 안내 카드는 항상 마지막에 (사진은 영상 만들 때 자동으로 들어간다)

@@ -293,13 +293,21 @@ const ContiCreateModal = (() => {
     const photo = card ? await pickCardMedia(card, row.id) : [];
     // 여러 행을 한 번에 넣을 땐 모든 행의 칸 이름이 같아야 한다 (PGRST102) — 모든 칸을 채운다
     const rows = [];
-    for (let i = 0; i < EMPTY_SCENES; i++) rows.push({ script_id: row.id, order_no: i + 1, section: "", script_text: "", keyword: "", direction: "", asset_paths: [] });
+    // subtitle_text: 빈 장면은 ""(새 장면 — SCRIPT와 SUBTITLE을 따로 쓴다), 채널 카드 장면은 null(카드 문구가 그대로 자막, 계약서 16절)
+    for (let i = 0; i < EMPTY_SCENES; i++) rows.push({ script_id: row.id, order_no: i + 1, section: "", script_text: "", subtitle_text: "", keyword: "", direction: "", asset_paths: [] });
     rows.push({
       script_id: row.id, order_no: EMPTY_SCENES + 1, section: SUB_SECTION,
-      script_text: (card && card.script_text) || SUBSCRIBE_TEXT, keyword: SUBSCRIBE_KEYWORD,
+      script_text: (card && card.script_text) || SUBSCRIBE_TEXT, subtitle_text: null, keyword: SUBSCRIBE_KEYWORD,
       direction: (card && card.direction) || SUBSCRIBE_DIRECTION, asset_paths: photo,
     });
-    const s = await fetch(`${SB}/rest/v1/youtube_segments`, { method: "POST", headers: JH, body: JSON.stringify(rows) });
+    let s = await fetch(`${SB}/rest/v1/youtube_segments`, { method: "POST", headers: JH, body: JSON.stringify(rows) });
+    if (!s.ok && s.status === 400) {
+      // subtitle_text 칸이 아직 없는 DB(youtube_tables_18_subtitle.sql 실행 전, PGRST204): 그 칸만 빼고 다시 (옛 장면으로 만들어진다)
+      const t0 = await s.clone().text();
+      if (/subtitle_text/.test(t0) && /PGRST204|column|schema/i.test(t0)) {
+        s = await fetch(`${SB}/rest/v1/youtube_segments`, { method: "POST", headers: JH, body: JSON.stringify(rows.map(({ subtitle_text, ...r }) => r)) });
+      }
+    }
     if (!s.ok) {
       const t = await s.text();
       fetch(`${SB}/rest/v1/youtube_scripts?id=eq.${row.id}`, { method: "DELETE", headers: H }).catch(() => {});   // 장면 없는 콘티는 남기지 않는다

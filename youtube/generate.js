@@ -100,6 +100,60 @@ function genCaptionSecsForRequest(lines, capSecs, ttsRate) {
   });
 }
 
+// ───── 새 방식: SCRIPT(읽는 대본)와 SUBTITLE(화면 자막) 분리 (youtube-automation docs/storyboard-contract.md 16절) ─────
+// 장면의 subtitle_text가 null/없음 = 옛 장면(SCRIPT 줄이 곧 자막, 6~11절 규칙 그대로). 문자열이면 새 장면("" = 자막 없음).
+// 파이프라인(core/02_tts.py script_sentences / subtitle_times)과 글자 하나까지 같은 규칙이다.
+function genIsNewScene(seg) {
+  return !!seg && seg.subtitle_text != null;
+}
+// SUBTITLE 줄: 줄바꿈 = 화면 자막 한 줄(넘치면 감싼다). 빈 줄은 무시. 기호 규칙 없음(**강조**만 그대로)
+function genSubtitleLines(text) {
+  return String(text || "").replace(/\r/g, "").split("\n").map((l) => l.trim()).filter(Boolean);
+}
+const GEN_SENT_END_RE = /[.!?…。！？~]["'”’)\]]*$/;
+const GEN_WORD_RE = /[\p{L}\p{N}_]/u;
+// 새 장면의 SCRIPT → 읽는 문장 목록. 줄 끝과 문장부호(. ! ? … ~ 등)로 끝나는 낱말 뒤에서 나눈다.
+// 옛 기호가 남아 있어도 읽기만 자연스럽게: **는 지우고, [..]는 안의 글자를 읽고, {..}는 빼고, 따로 떨어진 - 와 / 는 뺀다(쉼 없음)
+function genScriptSentences(text) {
+  const out = [];
+  String(text || "").replace(/\r/g, "").split("\n").forEach((line) => {
+    const s = line.replace(/\*\*/g, "").replace(/\[([^\[\]]*)\]/g, " $1 ").replace(/\{[^{}]*\}/g, " ");
+    let cur = [];
+    s.split(/\s+/).filter((t) => t && !/^-+$/.test(t) && t !== "/").forEach((t) => {
+      cur.push(t);
+      if (GEN_SENT_END_RE.test(t)) { out.push(cur.join(" ")); cur = []; }
+    });
+    if (cur.length) out.push(cur.join(" "));
+  });
+  return out.filter((x) => GEN_WORD_RE.test(x));
+}
+// 자막 줄 비중 = 글자 수(공백·** 제외, 최소 1)
+function genSubtitleWeight(line) {
+  return Math.max(1, String(line || "").replace(/\*\*/g, "").replace(/\s+/g, "").length);
+}
+// 자막 줄 시각 (장면 안 초): spans = 문장별 [시작, 끝] (실제 목소리 또는 예상), total = 장면 길이
+//   - 자막 줄 수 = 문장 수이면 i번째 줄은 i번째 문장이 읽히는 동안
+//   - 다르면 장면 전체를 줄 글자 수 비율로 나눈다
+//   - 자막이 없으면 [] (그 장면은 자막 없음)
+function genSubtitleTimes(lines, spans, total) {
+  const n = lines.length;
+  if (!n || !(total > 0)) return [];
+  if (Array.isArray(spans) && spans.length === n) return lines.map((l, i) => ({ line: l, s0: spans[i][0], s1: spans[i][1] }));
+  const w = lines.map(genSubtitleWeight);
+  const W = w.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  return lines.map((l, i) => {
+    const s0 = total * acc / W;
+    acc += w[i];
+    return { line: l, s0, s1: total * acc / W };
+  });
+}
+// 새 장면의 예상 길이(목소리 전 콘티 화면용): 문장별 예상 길이(6-2절 est, 쉼 없음)를 이어 붙인 구간
+function genSentenceSpansEst(sentences, ttsRate) {
+  let acc = 0;
+  return sentences.map((s) => { const d = genCaptionEst(s, ttsRate); const r = [acc, acc + d]; acc += d; return r; });
+}
+
 // 콘티(장면)의 대사를 이어붙인 것이 실제 음성/자막의 원본이 된다. 대사에서 **글자**로 표시한 부분은 강조 자막이 된다.
 function genToMarkdown(r, segRows) {
   const baseTerms = (r.emphasize_terms || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -151,15 +205,25 @@ function genBuildSegments(segRows, videoSettings) {
     // 자막 줄과 줄별 길이 (계약서 11절). { } 전용 줄에 정한 값만 숫자, 읽는 줄은 null. weight_seconds는 콘티 화면 예상 합계(그 밖의 줄 = est)
     const capLines = lineMode ? genCaptionLines(s.script_text) : [];
     const capSecs = genCaptionSecsForRequest(capLines, trims.__cap_secs, vs.tts_rate);
-    const capSum = Number(genCaptionSecs(capLines, trims.__cap_secs, vs.tts_rate).reduce((a, b) => a + b, 0).toFixed(2));
+    let capSum = Number(genCaptionSecs(capLines, trims.__cap_secs, vs.tts_rate).reduce((a, b) => a + b, 0).toFixed(2));
+    let hasSpoken = capLines.length > 0;
+    // 새 장면(계약서 16절): 자막은 subtitle_text에서만, 장면 길이 = 읽는 문장의 예상 길이 합(쉼 없음).
+    // caption_lines는 옛 파이프라인이 받아도 깨지지 않게 SCRIPT 줄을 그대로 둔다(새 파이프라인은 무시)
+    const isNew = lineMode && genIsNewScene(s);
+    if (isNew) {
+      const spans = genSentenceSpansEst(genScriptSentences(s.script_text), vs.tts_rate);
+      hasSpoken = spans.length > 0;
+      capSum = hasSpoken ? Number(spans[spans.length - 1][1].toFixed(2)) : 0;
+    }
     return {
       section: s.section,
       script_text: s.script_text,
+      ...(isNew ? { subtitle_text: String(s.subtitle_text) } : {}),
       keyword: s.keyword,
       direction: s.direction,
       ...(lineMode ? { caption_lines: capLines, caption_secs: capSecs } : {}),
-      // 자막 줄이 있으면 줄 길이 합. 없으면(빈 "내 의견" 등) 노출 시간(target_seconds), 그것도 없으면 대사 길이 추정(빈 대사면 1)
-      weight_seconds: capLines.length ? capSum : s.target_seconds > 0 ? Number(s.target_seconds) : genEstimateSeconds(s.script_text),
+      // 자막 줄(새 장면은 읽는 문장)이 있으면 그 길이 합. 없으면(빈 "내 의견" 등) 노출 시간(target_seconds), 그것도 없으면 대사 길이 추정(빈 대사면 1)
+      weight_seconds: hasSpoken ? capSum : s.target_seconds > 0 ? Number(s.target_seconds) : genEstimateSeconds(s.script_text),
       asset_urls: (s.asset_paths || []).map(genAssetUrl),
       // 영상/GIF 소재별 사용 구간 (소재 주소 -> {start, end}). __focus/__weights/__autofill/__cleared/__pexels/__cap_secs 같은 "__" 칸은 소재가 아니라서 뺀다
       asset_trims: Object.fromEntries(Object.entries(trims).filter(([k]) => !k.startsWith("__")).map(([path, t]) => [genAssetUrl(path), t])),

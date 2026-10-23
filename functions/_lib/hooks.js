@@ -1,4 +1,4 @@
-// 후킹 공식·후킹 점수·제목 점검 도구를 Pages Functions에서 쓰기 위한 다리.
+// 후킹 공식(youtube/hook-kit.js)을 Pages Functions에서 쓰기 위한 다리.
 // 실제 내용은 youtube/hook-kit.js 한 곳에만 있다 (브라우저와 같은 파일 — 복사본 없음). esbuild가 함께 묶는다.
 // adapted from Jakeschincariol/youtube-agent-skill (MIT)
 import "../../youtube/hook-kit.js";

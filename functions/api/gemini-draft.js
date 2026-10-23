@@ -2,6 +2,7 @@ import { fetchArticle } from "../_lib/article.js";
 import { findPerspectiveArticles } from "../_lib/news.js";
 import { callGemini } from "../_lib/gemini.js";
 import { HookKit, hookPromptBlock } from "../_lib/hooks.js";
+import { subtitlePromptBlock, SUBTITLE_SCHEMA, cleanScript, cleanSubtitle } from "../_lib/subtitle.js";
 
 // Trend에서 고른 주제 + 관련 기사로 대본과 장면(콘티)을 만든다.
 // 1) 구글 뉴스 검색(무료)으로 관련 칼럼·분석 기사 수집  2) 기사 + 관점 자료로 대본/장면 작성 (제미나이 호출은 1번)
@@ -16,8 +17,8 @@ const json = (obj, status) => new Response(JSON.stringify(obj), {
 
 const CARD_SCHEMA = {
   type: "OBJECT",
-  properties: { script_text: { type: "STRING" }, keyword: { type: "STRING" }, direction: { type: "STRING" } },
-  required: ["script_text", "keyword", "direction"],
+  properties: { script_text: { type: "STRING" }, subtitle: SUBTITLE_SCHEMA, keyword: { type: "STRING" }, direction: { type: "STRING" } },
+  required: ["script_text", "subtitle", "keyword", "direction"],
 };
 
 const researchUsable = (text) => !!text && text.trim().length > 0;
@@ -80,6 +81,7 @@ ${summaryRule}
 - direction: 카메라 연출 한 가지, 반드시 다음 중에서: "천천히 줌인", "줌아웃", "좌에서 우로 패닝", "우에서 좌로 패닝", "틸트업", "틸트다운" (같은 연출이 연속되지 않게)
 - name: 이 콘티의 이름, 주제를 20자 이내로 요약
 - title1, title2: "제목 + 영상 + 출처" 화면 구성에서 영상 위에 크게 나오는 제목 두 줄이다. title1은 노란 글씨로, 이슈의 핵심 키워드나 사건을 공백 포함 12자 이내로(예: "대법원장 격려금 논란"). title2는 흰 글씨로, title1을 보충해 무엇이 쟁점인지 공백 포함 14자 이내로. 둘 다 기사에 있는 사실만 쓴다. 궁금증을 불러일으키는 낚시성 표현과 물음표·느낌표는 써도 되지만, 기사에 없는 내용을 지어내거나 실존 인물을 조롱·비방하는 표현은 쓰지 않는다
+${subtitlePromptBlock("인물·단체·작품·장소")}
 - mood: 기사 내용의 분위기를 판단해 영상 색감 분위기를 다음 id 중 하나로 고른다: "neutral"(기본·일반 소식), "mystery"(어둡고 긴장감 있는 미스터리 — 미제 사건·의문사·수사 중인 사건 등), "bright"(밝고 경쾌 — 축제·수상·스포츠 승리·좋은 소식 등), "calm"(차분하고 담담한 다큐 — 사고·재난·추모·역사·사회 문제 등). 판단이 어렵거나 애매하면 "neutral"
 
 ${hookRule}
@@ -137,7 +139,8 @@ export async function onRequestPost(context) {
       },
     };
     const usePerspectives = researchUsable(researched.text);
-    const card = (part) => (c) => ({ section: part, script_text: String(c.script_text || "").trim(), keyword: c.keyword || "", direction: c.direction || "" });
+    // script_text = 성우가 읽는 말(기호 없음), subtitle_text = 화면 자막(계약서 16절)
+    const card = (part) => (c) => ({ section: part, script_text: cleanScript(c.script_text), subtitle_text: cleanSubtitle(c.subtitle), keyword: c.keyword || "", direction: c.direction || "" });
 
     // 응답이 중간에 잘려 JSON이 깨지거나 대본이 너무 짧게 나오는 건 가끔 있는 일시적 현상이라, 이 경우만 한 번 더 시도함
     let parsed = null, lastProblem = "";

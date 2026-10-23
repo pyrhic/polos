@@ -28,18 +28,21 @@
   .seg-duration-edit, .seg-duration-save { width:auto; padding:4px 10px; font-size:0.7rem; margin:0; }
   .seg-duration-input { width:64px; padding:4px 6px; font-size:0.8rem; margin:0; }
   .seg-item input, .seg-item textarea { font-size:0.9rem; padding:8px 10px; margin-bottom:8px; }
-  .seg-script, .seg-direction { min-height:50px; background:var(--input); color:#ffffff; resize:none; overflow:hidden; }
+  .seg-script, .seg-subtitle, .seg-direction { min-height:50px; background:var(--input); color:#ffffff; resize:none; overflow:hidden; }
   /* 자막 칸: 한 줄 = 자막 한 번 (줄바꿈이 그대로 보이게) */
-  .seg-item .seg-script { white-space:pre-wrap; }
+  .seg-item .seg-script, .seg-item .seg-subtitle { white-space:pre-wrap; }
   .seg-side-lab { color:var(--muted); font-size:0.66rem; font-weight:700; letter-spacing:0.06em; margin-top:2px; }
   /* 옆 칸은 미리보기 높이(250px)에 맞춘다: SCRIPT가 남는 높이를 다 쓰고(넘치면 칸 안에서 스크롤), ACTION·검색어는 고정 */
   .seg-stage-side { height:250px; gap:3px; }
   .seg-stage-side .seg-pv-time, .seg-stage-side .seg-pv-info { display:none; }
-  .seg-stage-side .seg-script, .seg-stage-side .seg-direction { margin:0; padding:6px 8px; font-size:0.8rem; line-height:1.5; min-height:0; }
+  .seg-stage-side .seg-script, .seg-stage-side .seg-subtitle, .seg-stage-side .seg-direction { margin:0; padding:6px 8px; font-size:0.8rem; line-height:1.5; min-height:0; }
   .seg-stage-side .seg-script { flex:1 1 auto; overflow-y:auto; }
+  /* SUBTITLE(화면 자막, 계약서 16절): SCRIPT와 남는 높이를 나눠 쓴다 */
+  .seg-stage-side .seg-subtitle { flex:1 1 auto; overflow-y:auto; }
+  .seg-item .seg-subtitle:disabled { opacity:0.55; }
   /* ACTION은 검색어 칸과 같은 한 줄 높이 (줄바꿈 없음, 넘치면 칸 안에서 가로로 밀린다) */
   .seg-stage-side .seg-direction { flex:0 0 auto; height:auto; line-height:normal; white-space:pre; overflow:hidden; border:none; border-radius:3px; }
-  .seg-item .seg-script::placeholder { color:var(--muted-2); }
+  .seg-item .seg-script::placeholder, .seg-item .seg-subtitle::placeholder { color:var(--muted-2); }
   .seg-thumb-empty { width:100%; height:50px; border-radius:3px; background:var(--inset); margin-bottom:8px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:0.8rem; text-align:center; padding:8px; }
   .seg-icon-btn { width:26px; height:26px; padding:0; margin:0; border-radius:50%; background:var(--btn); color:var(--muted); font-size:0.95rem; line-height:1; flex-shrink:0; text-transform:none; }
   .seg-icon-btn:hover { background:var(--hover); color:var(--on-accent); }
@@ -144,18 +147,6 @@
   .ov-parts .ov-sep { color:var(--muted); font-weight:600; }
   .settings-card .sr-input::placeholder { color:var(--muted-2); font-weight:400; }
   .settings-card .sr-input:focus { outline:none; background:var(--input); }
-  /* 후킹 점수(첫 장면)·제목 점검: 작게, 막지 않는 힌트. 점수 계산은 youtube/hook-kit.js (어림 규칙) */
-  .seg-hook { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px; margin:2px 0 6px; font-size:0.72rem; color:var(--muted); line-height:1.45; }
-  .seg-hook .hk-badge { flex-shrink:0; border:1px solid var(--line-strong); border-radius:10px; padding:1px 8px; font-weight:800; color:var(--text-2); background:var(--inset); cursor:pointer; font-size:0.7rem; }
-  .seg-hook .hk-badge.s { color:var(--accent); border-color:var(--accent-dim); }
-  .seg-hook .hk-badge.w { color:var(--point); border-color:var(--point-dim); }
-  .seg-hook .hk-tip { flex:1 1 180px; min-width:0; }
-  .seg-hook .hk-detail { display:none; flex-basis:100%; color:var(--muted-2); }
-  .seg-hook.open .hk-detail { display:block; }
-  .title-lint { margin:6px 0 0; font-size:0.72rem; color:var(--muted); line-height:1.5; }
-  .title-lint .tl-x { color:var(--text-2); }
-  .title-lint .tl-x::before { content:"· "; color:var(--point); }
-  .title-lint .tl-ok { color:var(--muted-2); }
   /* 카드 위 페이지 제목 = 콘티 이름 (누르면 그 자리에서 고침) */
   .conti-name-wrap { margin:18px 0 0; min-width:0; }
   .conti-name-wrap + #settingsCard { margin-top:8px !important; }
@@ -413,7 +404,6 @@
         <div class="sr"><span class="k">제목 2줄</span><span class="v"><input class="sr-input" id="srT2" maxlength="20" placeholder="흰색"></span></div>
         <div class="sr"><span class="k">출처 문구</span><span class="v"><input class="sr-input" id="srSrc" maxlength="60" placeholder="영상 아래 작은 글씨"></span></div>
       </div>
-      <div class="title-lint" id="titleLint" title="어림 규칙(휴리스틱) 점검이에요. 저장을 막지 않아요."></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
         <button type="button" class="tok tok-btn" id="settingsSaveBtn" style="display:none;margin-left:0;">저장</button>
       </div>
@@ -513,15 +503,15 @@
         </div>
       </div>
     </div>
-    <div class="cap-modal" id="capGuideModal" role="dialog" aria-modal="true" aria-label="자막 쓰는 법">
+    <div class="cap-modal" id="capGuideModal" role="dialog" aria-modal="true" aria-label="SCRIPT와 SUBTITLE">
       <div class="cap-modal-box" style="max-width:340px;position:relative;padding-bottom:0;">
         <button type="button" id="capGuideX" class="trim-x" title="닫기">✕</button>
-        <div class="cap-modal-hint" style="font-size:0.9rem;font-weight:700;color:var(--text);">자막 쓰는 법</div>
+        <div class="cap-modal-hint" style="font-size:0.9rem;font-weight:700;color:var(--text);">SCRIPT와 SUBTITLE</div>
         <div class="capguide-list">
-          · <b>줄바꿈</b> = 자막 한 줄. 한 줄씩 화면에 나와요.<br>
-          · <b>[ ]</b> 안은 읽기만 하고 자막엔 숨겨요.<br><span class="ex">&nbsp;&nbsp;예) [구독 좋아요 해주시면] 나도 좋아요 → 자막은 "나도 좋아요"만</span><br>
-          · <b>{ }</b> 안은 자막에만 보이고 읽지 않아요(무음).<br><span class="ex">&nbsp;&nbsp;예) 구독은 {무료입니다} → 목소리는 "구독은"만</span><br>
-          · 앞뒤를 띄운 <b>" - "</b> = 0.3초 쉼. 여러 개면 개수만큼 쉬어요(<b>- -</b> = 0.6초).<br><span class="ex">&nbsp;&nbsp;K-pop, 코로나-19처럼 붙은 하이픈은 쉼이 아니에요.</span><br>
+          · <b>SCRIPT</b> = 성우가 읽는 말이에요. 화면에는 안 나와요. 기호 없이 말하듯 쓰세요.<br>
+          · <b>SUBTITLE</b> = 화면 자막이에요. <b>줄바꿈</b> = 자막 한 줄. 누가·무엇인지 짧게 써 주세요.<br><span class="ex">&nbsp;&nbsp;예) 5위 류수영 / 경찰의 날 1,100인분 재능기부</span><br>
+          · SCRIPT 문장 수와 SUBTITLE 줄 수가 같으면 문장을 읽는 동안 그 줄이 나와요. 다르면 장면 시간을 글자 수대로 나눠요.<br>
+          · SUBTITLE을 비우면 그 장면은 자막이 없어요. (예전에 만든 장면·채널 카드 장면은 비워 두면 예전처럼 SCRIPT 줄이 자막)<br>
           · <b>**글자**</b> = 노란 강조 자막.
         </div>
         <label class="capguide-never"><input type="checkbox" id="capGuideNever"> 다시 보지 않기</label>
@@ -608,8 +598,6 @@
 <script src="/youtube/conti-job.js"></script>
 <!-- 콘티 만들기 팝업 (Trend와 같이 씀) -->
 <script src="/youtube/conti-create-modal.js"></script>
-<!-- 후킹 공식·후킹 점수·제목 점검 (Pages Functions와 같은 파일) -->
-<script src="/youtube/hook-kit.js"></script>
 <!-- 생성 후 자동 업로드: Studio 업로드와 같은 제목·설명·태그·채널 기본값(ytAutoUploadPayload) -->
 <script src="/youtube/upload.js"></script>
 <script>
@@ -710,60 +698,12 @@
   function isSubscribeSeg(seg) {
     return partOf(seg.section) === SUBSCRIBE_PART;
   }
-  // 후킹 점수를 보여 줄 장면: 맨 앞 장면(첫 대사). 채널 카드 장면이면 보이지 않는다
-  function isHookSeg(seg) {
-    return !!window.HookKit && segments.length > 0 && segments[0] === seg && !isSubscribeSeg(seg);
-  }
-  // 첫 장면 SCRIPT 칸 아래: 후킹 점수 + 가장 약한 속성 고치는 법. 배지를 누르면 5가지 점수를 펼친다 (입력할 때마다 바로 다시 계산)
-  function updateHookBadge(el) {
-    const box = el.querySelector(".seg-hook");
-    if (!box || !window.HookKit) return;
-    const r = HookKit.scoreHook(el.querySelector(".seg-script").value);
-    if (!r.hook) { box.style.display = "none"; return; }
-    box.style.display = "";
-    const p = r.properties;
-    const ai = HookKit.formulaById(currentSettings.hook_formula);
-    const cls = r.band === "STRONG" ? "s" : r.band === "WEAK" ? "w" : "";
-    const detail = `구체성 ${p.SPECIFICITY} · 말 걸기 ${p.ADDRESS} · 걸린 것 ${p.STAKES} · 궁금증 ${p.CURIOSITY} · 길이 ${p.BREVITY} (첫 문장 ${r.chars}자)` +
-      ` · 문장 모양: ${r.formula.id ? r.formula.ko : "공식 없음"}${ai ? ` · AI가 고른 공식: ${ai.ko}` : ""} — ${HookKit.HEURISTIC_NOTE}`;
-    box.innerHTML = `<span class="hk-badge ${cls}" role="button" tabindex="0">후킹 ${r.verdict} · ${r.band_ko}</span>` +
-      `<span class="hk-tip">${r.band === "STRONG" ? "첫 문장이 잘 걸려요" : escapeHtml(r.tip)}</span><span class="hk-detail">${escapeHtml(detail)}</span>`;
-    box.title = `첫 문장: ${r.hook}
-${detail}`;
-    if (!box._bound) {
-      box._bound = true;
-      const toggle = (e) => { if (!e.target.closest(".hk-badge")) return; e.preventDefault(); box.classList.toggle("open"); };
-      box.addEventListener("click", toggle);
-      box.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") toggle(e); });
-    }
-  }
-  // 제목 카드 아래: 화면 제목(title1·title2)과 업로드 제목을 한 짝으로 점검 (막지 않는 힌트)
-  // 업로드 제목 = 마지막으로 올린 제목(youtube_last), 없으면 Studio 업로드 칸의 기본값인 콘티 이름
-  function uploadTitleGuess() {
-    const last = Object.values(currentSettings.youtube_last || {}).filter((v) => v && v.title)
-      .sort((a, b) => String(b.uploaded_at || "").localeCompare(String(a.uploaded_at || "")))[0];
-    return last ? String(last.title) : String(currentSettings.name || "");
-  }
-  function updateTitleLint() {
-    const box = $("titleLint");
-    if (!box || !window.HookKit) return;
-    const t1 = $("title1").value.trim(), t2 = $("title2").value.trim();
-    if (!t1 && !t2) { box.innerHTML = ""; return; }
-    const up = uploadTitleGuess();
-    const r = HookKit.lintPair(up, [t1, t2]);
-    // 업로드 제목 자체의 길이 문제는 Studio에서 보여 주고, 여기서는 화면 제목과 짝 문제만
-    const mine = r.issues.filter((i) => /^thumb|duplicate/.test(i.key));
-    if (!up) { const v = HookKit.lintPair("", [t1, t2]); mine.push(...v.issues.filter((i) => i.key === "thumb-specific")); }
-    box.innerHTML = mine.length
-      ? mine.slice(0, 3).map((i) => `<div class="tl-x">${escapeHtml(i.msg)}</div>`).join("") + (up ? `<div class="tl-ok">비교한 업로드 제목: “${escapeHtml(up.slice(0, 40))}”</div>` : "")
-      : `<div class="tl-ok">✓ 화면 제목 점검: 걸리는 곳 없음${up ? " (업로드 제목과 겹치지 않아요)" : ""}</div>`;
-  }
   // 장면 길이: 카드가 화면에 있으면 입력 중인 자막 기준, 없으면 저장된 값 기준 (자막 줄이 있으면 줄 길이 합)
   function segSecondsOf(seg) {
     const el = document.querySelector(`.seg-item[data-id="${seg.id}"]`);
     if (el) return effectiveSeconds(el, seg);
-    const st = capState(seg.script_text, seg, null);
-    if (st.lines.length) return st.total;
+    const st = capState(seg.script_text, seg, null, seg.subtitle_text != null ? seg.subtitle_text : null);
+    if (st.isNew || st.lines.length) return st.total;
     return seg.target_seconds > 0 ? Number(seg.target_seconds) : estimateSeconds(seg.script_text);
   }
   function clipWeights(seg) {
@@ -1426,9 +1366,11 @@ ${detail}`;
   }
 
   // 장면 길이 = 자막 줄 길이 합 (자막이 없는 장면만 노출 시간 target_seconds, 그것도 없으면 1초)
+  // 새 장면(SUBTITLE 칸을 쓰는 장면, 계약서 16절)은 읽는 문장의 예상 길이 합 (읽을 문장이 없으면 같은 규칙)
   function effectiveSeconds(el, seg) {
     const text = el.querySelector(".seg-script").value;
-    const st = capState(text, seg, capLiveOf(el));
+    const st = capState(text, seg, capLiveOf(el), subOf(el, seg));
+    if (st.isNew) return st.total;
     if (st.lines.length) return st.total;
     if (seg && seg.target_seconds > 0) return Number(seg.target_seconds);
     return estimateSeconds(text);
@@ -1438,8 +1380,25 @@ ${detail}`;
     const secs = effectiveSeconds(el, seg);
     return hasCaps(el) ? secs : Math.max(2, secs);
   }
+  // 읽는 글(목소리)이 있는 장면인지. 옛 장면은 자막 줄 = 읽는 줄, 새 장면은 SCRIPT 문장
   function hasCaps(el) {
-    return genCaptionLines(el.querySelector(".seg-script").value).length > 0;
+    const text = el.querySelector(".seg-script").value;
+    return subOf(el, segOfEl(el)) != null ? genScriptSentences(text).length > 0 : genCaptionLines(text).length > 0;
+  }
+  // ───── SCRIPT / SUBTITLE 분리 (계약서 16절) ─────
+  // 이 장면의 SUBTITLE(문자열 = 새 장면, "" = 자막 없음) 또는 null(옛 장면: SCRIPT 줄이 그대로 자막, 6~11절 규칙).
+  // 카드에 입력 중인 값 기준. 옛 장면은 SUBTITLE 칸에 글을 쓰는 순간부터 새 장면으로 본다
+  function subOf(el, seg) {
+    const f = el && el.querySelector(".seg-subtitle");
+    const v = f ? f.value : seg ? seg.subtitle_text : null;
+    if (seg && seg.subtitle_text != null) return v == null ? "" : String(v);
+    return v != null && String(v).trim() ? String(v) : null;
+  }
+  // DB에 subtitle_text 칸이 있는지 (youtube_tables_18_subtitle.sql 실행 전이면 장면 행에 칸 자체가 없다)
+  let subColMissing = false;
+  // 새 장면이 하나라도 있는 콘티 (새로 넣는 빈 장면도 새 장면으로)
+  function contiIsNew() {
+    return segments.some((sg) => sg.subtitle_text != null);
   }
 
   // ───── 자막 줄 = 화면 단위 (docs/storyboard-contract.md 6절). 식은 generate.js의 genCaption* 를 같이 쓴다 ─────
@@ -1451,7 +1410,19 @@ ${detail}`;
     return Number(currentSettings.tts_rate) || 0;
   }
   // 줄, 줄별 길이, 최소(예상 목소리) 길이, 직접 정한 줄인지. live: 끄는 중인 값 배열(없으면 저장된 __cap_secs)
-  function capState(text, seg, live) {
+  // sub: 새 장면의 SUBTITLE(문자열). 이때 lines = 자막 줄, 시각은 genSubtitleTimes(문장 예상 길이 기준), sents/spans = 읽는 문장
+  function capState(text, seg, live, sub) {
+    if (sub != null) {
+      const rate = ttsRateNow();
+      const sents = genScriptSentences(text);
+      const spans = genSentenceSpansEst(sents, rate);
+      const total = sents.length ? spans[spans.length - 1][1] : (seg && seg.target_seconds > 0 ? Number(seg.target_seconds) : estimateSeconds(text));
+      const subs = genSubtitleLines(sub);
+      const times = genSubtitleTimes(subs, spans, total);
+      const secs = times.map((t) => t.s1 - t.s0);
+      return { isNew: true, sents, spans, lines: subs, secs, est: secs, custom: subs.map(() => false), muteOnly: subs.map(() => false),
+        starts: times.map((t) => t.s0), total, spoken: sents.length > 0 };
+    }
     const lines = genCaptionLines(text);
     const src = live || ((seg && seg.asset_trims) || {}).__cap_secs || [];
     const rate = ttsRateNow();
@@ -1466,7 +1437,7 @@ ${detail}`;
     return { lines, secs, est, custom, muteOnly, starts, total: acc };
   }
   function capStateOf(el, seg) {
-    return capState(el.querySelector(".seg-script").value, seg, capLiveOf(el));
+    return capState(el.querySelector(".seg-script").value, seg, capLiveOf(el), subOf(el, seg));
   }
   // 줄별 길이 원본: 끄는 중인 값 > 아직 저장 전인 초안(자동 끊기 직후) > 저장된 값(null을 돌려주면 capState가 저장된 값을 쓴다)
   function capLiveOf(el) {
@@ -1506,7 +1477,7 @@ ${detail}`;
       return;
     }
     const anyCustom = st.custom.some(Boolean);
-    const sig = JSON.stringify([st.lines, st.custom, st.muteOnly, anyCustom]);
+    const sig = JSON.stringify([!!st.isNew, st.lines, st.custom, st.muteOnly, anyCustom]);
     if (host._sig !== sig && !host.dataset.dragging) {
       host._sig = sig;
       host.innerHTML = `
@@ -1514,7 +1485,7 @@ ${detail}`;
         <div class="seg-tl-row">
           <div class="seg-tl-col">
             <div class="seg-cap-track">
-              ${st.lines.map((l, i) => `<div class="seg-cap-blk${st.custom[i] ? " set" : ""}" data-i="${i}"><div class="seg-cap-in"><span class="t">${capTrackHtml(l)}</span><span class="s"></span></div>${st.muteOnly[i] ? `<div class="seg-cap-handle" data-i="${i}"></div>` : ""}</div>`).join("")}
+              ${st.lines.map((l, i) => `<div class="seg-cap-blk${st.custom[i] ? " set" : ""}" data-i="${i}"><div class="seg-cap-in"><span class="t">${st.isNew ? escapeHtml(capPlainText(l)) : capTrackHtml(l)}</span><span class="s"></span></div>${st.muteOnly[i] ? `<div class="seg-cap-handle" data-i="${i}"></div>` : ""}</div>`).join("")}
               <div class="seg-cap-play"></div>
             </div>
           </div>
@@ -1617,9 +1588,9 @@ ${detail}`;
     });
   }
 
-  // 자막 블록을 누르면 미리보기 옆 SCRIPT 칸에서 그 줄을 선택해 바로 고칠 수 있게 한다
+  // 자막 블록을 누르면 미리보기 옆 SCRIPT 칸(새 장면은 SUBTITLE 칸)에서 그 줄을 선택해 바로 고칠 수 있게 한다
   function capEditToggle(el, i) {
-    const ta = el.querySelector(".seg-script");
+    const ta = el.querySelector(subOf(el, segOfEl(el)) != null ? ".seg-subtitle" : ".seg-script");
     if (!ta) return;
     let pos = 0, n = -1;
     for (const line of ta.value.split("\n")) {   // i번째 자막 줄(빈 줄 제외)
@@ -1811,6 +1782,7 @@ ${detail}`;
     const seg = segOfEl(el);
     const ta = el.querySelector(".seg-script");
     if (!seg || !ta) return false;
+    if (subOf(el, seg) != null) return false;   // 새 장면: SCRIPT는 읽기만 하고 화면에 안 나온다
     const now = ta.value;
     if (beforeText != null && now === beforeText) return false;   // 고친 게 없으면 그대로
     const trims = el._trimsDraft || seg.asset_trims || {};
@@ -1848,7 +1820,7 @@ ${detail}`;
     for (const seg of segments.slice()) {
       if (String($("scriptSelect").value) !== String(scriptId)) return;   // 그 사이 다른 콘티로 넘어갔다
       const trims = seg.asset_trims || {};
-      if (trims.__cap_manual) continue;
+      if (trims.__cap_manual || seg.subtitle_text != null) continue;   // 새 장면은 SCRIPT를 화면에 안 보여서 끊지 않는다
       const el = document.querySelector(`.seg-item[data-id="${seg.id}"]`);
       if (!el || el.dataset.dirty || el._trimsDraft || el.contains(document.activeElement)) continue;   // 고치는 중인 카드는 건드리지 않는다
       const ta = el.querySelector(".seg-script");
@@ -2095,7 +2067,6 @@ ${detail}`;
   function updateSettingsSummary() {
     const mirror = (srId, ctlId) => { const el = $(srId); if (document.activeElement !== el) el.value = $(ctlId).value; };
     mirror("srT1", "title1"); mirror("srT2", "title2"); mirror("srSrc", "sourceText");
-    updateTitleLint();
     const label = (key) => {
       const cfg = WHEELS[key], v = $(cfg.ctl).value;
       const hit = cfg.opts().find((o) => o[0] === v);
@@ -2760,6 +2731,7 @@ ${detail}`;
     list.innerHTML = '<div class="empty">불러오는 중...</div>';
     const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=*&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
     segments = await res.json();
+    subColMissing = segments.length > 0 && !segments.some((sg) => "subtitle_text" in sg);   // SQL 실행 전 DB: SUBTITLE 칸을 잠그고 안내
     regenWrap.style.display = "block";
     render();
     updateSettingsPreview();
@@ -2811,6 +2783,18 @@ ${detail}`;
     $("addCardSegBtn").style.display = row && !segments.some(isSubscribeSeg) ? "block" : "none";
   }
 
+  // SCRIPT / SUBTITLE 칸 안내 (계약서 16절)
+  function scriptPlaceholder(seg) {
+    const mine = /내 의견/.test(seg.section || "");
+    if (seg.subtitle_text != null) return mine ? "내 의견을 말하듯 써 넣으세요 (성우가 읽는 말, 화면엔 안 나와요). 비워두면 이 장면은 1초만 나와요" : "성우가 읽는 말 (화면엔 안 나와요)";
+    return mine ? "내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요" : "한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)";
+  }
+  function subtitlePlaceholder(seg) {
+    if (subColMissing) return "SUBTITLE 칸이 DB에 아직 없어요 — youtube_tables_18_subtitle.sql을 실행하세요";
+    if (seg.subtitle_text != null) return "화면 자막 — 한 줄 = 자막 한 번 (예: 5위 류수영). 비우면 자막 없음";
+    return isSubscribeSeg(seg) ? "비우면 채널 카드 문구(SCRIPT 줄)가 그대로 자막" : "비우면 예전처럼 SCRIPT 줄이 자막. 쓰면 이 칸만 자막이 돼요";
+  }
+
   function render() {
     pvStopAll();   // 카드를 새로 그리면 재생 중이던 미리보기는 멈춘다
     updateHelperButtons();
@@ -2853,7 +2837,9 @@ ${detail}`;
               <div class="seg-pv-time">00:00 / 00:00</div>
               <div class="seg-pv-info"></div>
               <div class="seg-side-lab">SCRIPT</div>
-              <textarea class="seg-script" placeholder="${/내 의견/.test(seg.section || '') ? '내 의견을 직접 써 넣으세요. 한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막). 비워두면 이 장면은 1초만 나와요' : '한 줄 = 자막 한 번 (줄을 바꾸면 다음 자막)'}">${escapeHtml(normalizeScript(seg.script_text))}</textarea>
+              <textarea class="seg-script" placeholder="${escapeAttr(scriptPlaceholder(seg))}">${escapeHtml(seg.subtitle_text != null ? String(seg.script_text || "").replace(/\r/g, "") : normalizeScript(seg.script_text))}</textarea>
+              <div class="seg-side-lab">SUBTITLE</div>
+              <textarea class="seg-subtitle"${subColMissing ? " disabled" : ""} placeholder="${escapeAttr(subtitlePlaceholder(seg))}">${escapeHtml(String(seg.subtitle_text || "").replace(/\r/g, ""))}</textarea>
               <div class="seg-side-lab">ACTION</div>
               <textarea class="seg-direction" rows="1" wrap="off" placeholder="예: 천천히 줌인">${escapeHtml(oneLine(seg.direction))}</textarea>
               <div class="seg-side-lab">SEARCHING KEY WORD</div>
@@ -2863,7 +2849,6 @@ ${detail}`;
               </div>
             </div>
           </div>
-          ${isHookSeg(seg) ? '<div class="seg-hook"></div>' : ""}
           <div class="seg-tl-area"></div>
           <div class="seg-cap-area"></div>
           <div class="seg-add-menu">
@@ -2903,9 +2888,12 @@ ${detail}`;
         clearTimeout(el._pvTimer);
         el._pvTimer = setTimeout(() => { if (pvActive && pvActive.el === el && !pvActive.playing) pvRefreshCard(id); }, 500);
       };
-      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); pvTextChanged(); updateHookBadge(el); });
+      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); pvTextChanged(); });
       autoGrow(scriptEl);
-      updateHookBadge(el);
+      // SUBTITLE(화면 자막): SCRIPT처럼 고치면 미리보기·자막 트랙·장면 길이를 바로 다시 그리고, 카드에서 나가면 자동 저장
+      const subEl = el.querySelector(".seg-subtitle");
+      subEl.addEventListener("input", () => { autoGrow(subEl); markDirty(); updateRuntimeSummary(); pvTextChanged(); });
+      autoGrow(subEl);
       // 입력 중에는 끊지 않고, 칸에서 나갈 때 화면 폭을 넘는 줄만 자동으로 나눈다 (직접 합친 줄은 그대로)
       scriptEl.addEventListener("focus", () => { el._capFocusText = scriptEl.value; });
       scriptEl.addEventListener("blur", () => {
@@ -3111,6 +3099,7 @@ ${detail}`;
   async function refreshSegments(scriptId) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?select=*&script_id=eq.${scriptId}&order=order_no.asc`, { headers });
     segments = await res.json();
+    subColMissing = segments.length > 0 && !segments.some((sg) => "subtitle_text" in sg);
     const scrollY = window.scrollY;
     render();
     updateSettingsPreview();
@@ -3141,12 +3130,15 @@ ${detail}`;
     const direction = el.querySelector(".seg-direction").value;
     const section = el.querySelector(".seg-section").value;
     const keyword = el.querySelector(".seg-keyword").value;
+    // 화면 자막: 새 장면은 늘 저장(""도), 옛 장면은 글을 썼을 때만 (비워 두면 null 그대로 = SCRIPT 줄이 자막)
+    const subText = subOf(el, segments.find((s) => String(s.id) === id));
     delete el.dataset.dirty;
     stateEl.className = "seg-save-state";
     stateEl.textContent = "저장 중…";
     // 자막 줄이 줄었으면 줄별 길이(__cap_secs)도 줄 수만큼만 남긴다 (인덱스 기준 유지, 넘치는 건 버림)
     const seg0 = segments.find((s) => String(s.id) === id);
     const fields = { script_text: scriptText, direction, section, keyword };
+    if (subText != null && !subColMissing) fields.subtitle_text = subText;
     // 자동 끊기로 줄이 늘었으면(또는 직접 합친 줄 표시) asset_trims 초안이 있다. 대사와 같이 저장한다
     const draft = el._trimsDraft || null;
     const baseTrims = draft || (seg0 && seg0.asset_trims) || {};
@@ -3160,16 +3152,27 @@ ${detail}`;
       fields.asset_trims = nextTrims;
     }
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
+      const patch = (f) => fetch(`${SUPABASE_URL}/rest/v1/youtube_segments?id=eq.${id}`, {
         method: "PATCH",
         headers: jsonHeaders,
         keepalive: true,
-        body: JSON.stringify(fields),
+        body: JSON.stringify(f),
       });
-      if (!res.ok) throw new Error(await res.text());
+      let res = await patch(fields);
+      if (!res.ok) {
+        const t = await res.text();
+        // subtitle_text 칸이 아직 없는 DB(PGRST204): 자막 칸만 빼고 다시 저장하고 SQL 실행을 안내한다
+        if (!("subtitle_text" in fields) || !/subtitle_text/.test(t) || !/PGRST204|column|schema/i.test(t)) throw new Error(t);
+        delete fields.subtitle_text;
+        subColMissing = true;
+        res = await patch(fields);
+        if (!res.ok) throw new Error(await res.text());
+        showMsg("SUBTITLE(화면 자막)은 저장하지 못했어요 — DB에 칸이 없어요. Supabase에서 youtube_tables_18_subtitle.sql을 실행해 주세요.", false);
+      }
       const seg = segments.find((s) => String(s.id) === id);
       const keywordChanged = seg && (seg.keyword || "").trim() !== keyword.trim();
       if (seg) { seg.script_text = scriptText; seg.direction = direction; seg.section = section; seg.keyword = keyword; }
+      if (seg && "subtitle_text" in fields) seg.subtitle_text = fields.subtitle_text;
       if (seg && fields.asset_trims) seg.asset_trims = fields.asset_trims;
       if (draft && el._trimsDraft === draft) el._trimsDraft = null;
       if (keywordChanged) enqueueAutofill(id);   // 키워드를 바꿨으면 (모자란 장면이고 직접 지운 적 없으면) 새 키워드로 자동 배치
@@ -3231,14 +3234,16 @@ ${detail}`;
 
     const scriptEl = el.querySelector(".seg-script");
     const directionEl = el.querySelector(".seg-direction");
-    scriptEl.value = normalizeScript(seg.script_text);
+    scriptEl.value = seg.subtitle_text != null ? String(seg.script_text || "").replace(/\r/g, "") : normalizeScript(seg.script_text);
     directionEl.value = oneLine(seg.direction);
+    const subEl = el.querySelector(".seg-subtitle");
+    subEl.value = String(seg.subtitle_text || "").replace(/\r/g, "");
+    autoGrow(subEl);
     el._trimsDraft = null;
     el.querySelector(".seg-section").value = seg.section || "";
     el.querySelector(".seg-keyword").value = seg.keyword || "";
     autoGrow(scriptEl);
     autoGrow(directionEl);
-    updateHookBadge(el);
 
     delete el.dataset.dirty;
     el.querySelector(".seg-save-state").textContent = "";
@@ -3571,13 +3576,25 @@ ${detail}`;
     return img.animate(f, { duration: len * 1000, fill: "forwards", easing: "linear" });
   }
   // 자막 구간: 자막 한 줄 = 화면 한 번. 줄마다 정확한 시작·끝(초)을 자막 트랙과 같은 값으로 (영상 생성과 같은 규칙, 계약서 6절)
+  // 새 장면(계약서 16절)은 SUBTITLE 줄을 genSubtitleTimes 시각으로 (show = 화면에 그대로 보일 글)
   function capGroups(el, seg) {
     const st = capStateOf(el, seg);
+    if (st.isNew) return st.lines.map((l, i) => ({ raw: l, show: l, text: capPlainText(l), s0: st.starts[i], s1: st.starts[i] + st.secs[i] }));
     return st.lines.map((l, i) => ({ raw: l, text: capPlainText(genCaptionSpoken(l)), s0: st.starts[i], s1: st.starts[i] + st.secs[i] }));
+  }
+  // 휴대폰 목소리로 읽을 구간: 옛 장면은 자막 줄 그대로, 새 장면은 SCRIPT 문장(예상 길이)
+  function capSpeechItems(el, seg) {
+    const st = capStateOf(el, seg);
+    if (st.isNew) return st.sents.map((t, i) => ({ raw: t, s0: st.spans[i][0], s1: st.spans[i][1] }));
+    return capGroups(el, seg);
+  }
+  // 그 줄이 화면에 보일 글 (옛 장면은 [숨김]을 빼고 { }는 기호만 뗀다)
+  function capShownOf(g) {
+    return g ? (g.show != null ? g.show : genCaptionShown(g.raw)) : "";
   }
   // 정지 화면에 잡아 둘 줄: 처음으로 화면에 보이는 줄 (전부 [숨김]이면 첫 줄 → 자리 표시)
   function pvFirstVisible(groups) {
-    return groups.find((g) => capPlainText(genCaptionShown(g.raw)).trim()) || groups[0] || null;
+    return groups.find((g) => capPlainText(capShownOf(g)).trim()) || groups[0] || null;
   }
 
   // ───── 카드 안 미리보기 ─────
@@ -3623,7 +3640,7 @@ ${detail}`;
   // [숨김] 부분은 빼고 보여준다. 줄 전체가 숨김이면 재생 중엔 비우고, 멈춘 화면(still)에선 잡을 수 있게 자리 표시만
   function pvCapShow(cap, g, size, wt, still) {
     cap._g = g || null;
-    const shown = g && capPlainText(genCaptionShown(g.raw)).trim() ? genCaptionShown(g.raw) : "";
+    const shown = g && capPlainText(capShownOf(g)).trim() ? capShownOf(g) : "";
     cap.innerHTML = shown ? capLineHtml(shown) : "";   // 숨김 줄은 실제 영상처럼 미리보기에도 아무것도 안 보인다
     cap.style.fontFamily = `${wt.family}, sans-serif`;
     cap.style.fontWeight = wt.weight;
@@ -3747,8 +3764,9 @@ ${detail}`;
     if (!paths.length && !stage) P.media.appendChild(pvEmptyNode(el, seg));   // 전체 미리보기는 검은 화면 + 자막만
     P.ref.style.display = "none";   // pvShow가 지금 클립에 맞춰 켠다
     const groups = groupsOver || capGroups(el, seg);
+    const spItems = groupsOver ? null : capSpeechItems(el, seg);   // 휴대폰 목소리용 (실제 목소리를 쓰면 필요 없다)
     P.info.innerHTML = pvInfoHtml(seg, plan, secs);
-    return { el, id: String(seg.id), P, secs, cuts, cutEnds, groups, size, wt, framed,
+    return { el, id: String(seg.id), P, secs, cuts, cutEnds, groups, spItems, size, wt, framed,
       t: 0, playing: false, cutIdx: -1, shown: -2, raf: 0, t0: 0 };
   }
   function pvActivate(el) {
@@ -3917,13 +3935,15 @@ ${detail}`;
     return { speak, pauses, nchars, hasVoice: nchars > 0 };
   }
   // 장면 입력: { lines, secs(줄별 콘티 길이 — { } 전용 줄의 무음 길이로 쓴다), empty(자막 없는 장면 길이) }
+  // 새 장면(계약서 16절): lines = 읽는 문장(쉼·무음 없음), sub = SUBTITLE 줄 → 목소리를 만든 뒤 문장 구간으로 자막 시각을 정한다
   function vaSceneInput(el, seg, emptySecs) {
     const st = capStateOf(el, seg);
+    if (st.isNew) return { lines: st.sents, secs: st.sents.map(() => 0), empty: st.sents.length ? null : emptySecs, sub: st.lines };
     return { lines: st.lines, secs: st.secs, empty: st.lines.length ? null : emptySecs };
   }
   function vaSceneKey(input) {
     const s = vaSettings();
-    return JSON.stringify([s.voice, s.rate, s.pitch, input.lines, input.lines.map((l, i) => (genCaptionIsMuteOnly(l) ? input.secs[i] : 0))]);
+    return JSON.stringify([s.voice, s.rate, s.pitch, input.lines, input.lines.map((l, i) => (!input.sub && genCaptionIsMuteOnly(l) ? input.secs[i] : 0)), input.sub || null]);
   }
   function vaHasVoice(input) {
     return input.lines.some((l) => vaLine(l).hasVoice);
@@ -3999,7 +4019,7 @@ ${detail}`;
     const s = vaSettings();
     const items = [];
     const plans = scenes.map((sc) => {
-      if (!sc.lines.length) return { empty: Math.max(0, Number(sc.empty) || 0) };
+      if (!sc.lines.length) return { empty: Math.max(0, Number(sc.empty) || 0), sub: sc.sub || null };
       const its = sc.lines.map((raw, li) => {
         const L = vaLine(raw);
         let mute = Number(sc.secs[li]) || 0;
@@ -4008,7 +4028,7 @@ ${detail}`;
         return { raw, ...L, mute };
       });
       its.forEach((it) => { if (it.hasVoice) items.push(it); });
-      return { lines: its };
+      return { lines: its, sub: sc.sub || null };
     });
     if (!items.length) throw new Error("읽을 글자가 없어요");
     const chunks = vaChunks(items);
@@ -4063,7 +4083,7 @@ ${detail}`;
     const cur = () => outLen / sr;
     const outScenes = plans.map((plan) => {
       const s0 = cur();
-      const groups = [];
+      let groups = [];
       if (plan.empty != null) sil(plan.empty);
       else plan.lines.forEach((it) => {
         const ls = cur();
@@ -4075,6 +4095,9 @@ ${detail}`;
         }
         groups.push({ raw: it.raw, text: capPlainText(genCaptionSpoken(it.raw)), s0: ls - s0, s1: cur() - s0 });
       });
+      // 새 장면: 문장 구간(실제 목소리)으로 SUBTITLE 줄 시각을 정한다 — 파이프라인 subtitle_times와 같은 규칙
+      if (plan.sub) groups = genSubtitleTimes(plan.sub, groups.map((g) => [g.s0, g.s1]), cur() - s0)
+        .map((t) => ({ raw: t.line, show: t.line, text: capPlainText(t.line), s0: t.s0, s1: t.s1 }));
       return { s0, secs: cur() - s0, groups };
     });
     const ctx = vaAudio();
@@ -4311,7 +4334,7 @@ ${detail}`;
     ctx.playing = true;
     ctx.shown = -2;
     if (ctx.voice) vpStart(ctx.voice.buffer, ctx.voice.off, ctx.t, ctx.secs);   // 실제 목소리: 그 시점부터
-    else spStart(ctx.groups, ctx.t);   // 휴대폰 목소리: 재생을 시작한 그 줄부터 장면 끝까지 이어 읽는다
+    else spStart(ctx.spItems || ctx.groups, ctx.t);   // 휴대폰 목소리: 재생을 시작한 그 줄부터 장면 끝까지 이어 읽는다
     ctx.P.play.textContent = "❚❚";
     ctx.P.play.classList.add("on");
     ctx.t0 = performance.now() - ctx.t * 1000;
@@ -4359,18 +4382,19 @@ ${detail}`;
     $("pvGuideNever").onclick = () => close(true);
     m.classList.add("open");
   }
-  // 자막(대사) 칸을 처음 누르면 자막 쓰는 법을 한 번 보여준다. "다시 보지 않기"를 체크하고 닫기 전까지는 화면을 열 때마다 한 번
+  // SCRIPT·SUBTITLE 칸을 처음 누르면 두 칸의 차이를 한 번 보여준다. "다시 보지 않기"를 체크하고 닫기 전까지는 화면을 열 때마다 한 번
+  // (예전 "자막 쓰는 법" 안내와 다른 내용이라 저장 키도 새로: subGuideOff)
   let capGuideShownThisVisit = false;
   function capGuideNeeded() {
     if (capGuideShownThisVisit) return false;
-    try { return localStorage.getItem("capGuideOff") !== "1"; } catch { return true; }
+    try { return localStorage.getItem("subGuideOff") !== "1"; } catch { return true; }
   }
   function capShowGuide(field) {
     capGuideShownThisVisit = true;
     const m = $("capGuideModal");
     $("capGuideNever").checked = false;
     const close = () => {
-      if ($("capGuideNever").checked) { try { localStorage.setItem("capGuideOff", "1"); } catch { /* 저장 못 하면 다음에 또 보인다 */ } }
+      if ($("capGuideNever").checked) { try { localStorage.setItem("subGuideOff", "1"); } catch { /* 저장 못 하면 다음에 또 보인다 */ } }
       m.classList.remove("open");
       document.removeEventListener("keydown", onKey, true);
       if (field && field.isConnected) field.focus();   // 쓰던 자막 칸으로 돌아간다
@@ -4385,7 +4409,7 @@ ${detail}`;
   }
   document.addEventListener("focusin", (e) => {
     const t = e.target;
-    if (t && t.matches && t.matches(".seg-script") && capGuideNeeded()) capShowGuide(t);
+    if (t && t.matches && t.matches(".seg-script, .seg-subtitle") && capGuideNeeded()) capShowGuide(t);
   });
   // 그 시점으로 이동 (재생 중이면 거기서 이어서, 목소리는 끊고 그 줄부터 다시 이어 읽는다)
   function pvSeek(el, t) {
@@ -4396,7 +4420,7 @@ ${detail}`;
       ctx.t0 = performance.now() - t * 1000;
       ctx.shown = -2;
       if (ctx.voice) vpStart(ctx.voice.buffer, ctx.voice.off, t, ctx.secs);
-      else spStart(ctx.groups, t);   // 옮긴 자리의 줄부터 다시 읽는다
+      else spStart(ctx.spItems || ctx.groups, t);   // 옮긴 자리의 줄부터 다시 읽는다
     }
     pvShow(ctx, t, true);
   }
@@ -4758,7 +4782,7 @@ ${detail}`;
     fpv.total = acc;
     // 목소리용: 모든 장면의 자막 줄을 전체 시간축으로 이어 붙인다
     fpv.items = [];
-    fpv.scenes.forEach((sc) => capGroups(sc.el, sc.seg).forEach((g) => fpv.items.push({ raw: g.raw, s0: sc.s0 + g.s0, s1: sc.s0 + g.s1 })));
+    fpv.scenes.forEach((sc) => capSpeechItems(sc.el, sc.seg).forEach((g) => fpv.items.push({ raw: g.raw, s0: sc.s0 + g.s0, s1: sc.s0 + g.s1 })));
     if (!fpv.scenes.length) { showMsg("미리볼 장면이 없어요.", false); return; }
     fpv.open = true;
     fpv.playing = false;
@@ -5286,6 +5310,7 @@ ${detail}`;
         body: JSON.stringify({
           script_id: Number(scriptId), order_no: nextOrder,
           section: "", script_text: "", keyword: "", direction: "", asset_paths: [],
+          ...(contiIsNew() ? { subtitle_text: "" } : {}),   // 새 콘티(SUBTITLE을 쓰는 콘티)면 새 장면으로, 옛 콘티는 옛 장면 그대로
         }),
       });
       if (!res.ok) throw new Error(await res.text());
