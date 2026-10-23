@@ -159,6 +159,7 @@ const ContiCore = (() => {
     const photo = card ? await pickCardMedia(deps, card, row.id) : [];
     const segs = applyCard(d.segments, card, photo);
     const mood = req.mood || d.mood;   // 직접 고른 분위기 > 제미나이 판단
+    const hookFormula = { hook_formula: d.hook_formula || null };   // 첫 문장이 따른 후킹 공식 id (다시 만들면 새 값으로 바뀐다)
     const vs0 = row.video_settings || {};
     const cardSettings = card ? { subscribe_card_id: card.id, channel_slot: card.channel_slot, ...cardVoiceSettings(card, vs0) } : (req.channel_slot != null ? { channel_slot: req.channel_slot } : {});
     const texts = segs.map((s) => s.script_text || "");
@@ -171,7 +172,7 @@ const ContiCore = (() => {
           ...articles.map((a) => a.url).filter(Boolean),
           ...((d.research && d.research.sources) || []).slice(0, 4).map((s) => `${s.title} — ${s.url}`),
         ].join("\n"),
-        video_settings: { ...vs0, name: String(d.name || req.topic || "").slice(0, 40), ...screenText(d, articles), ...(mood ? { mood } : {}), ...cardSettings },
+        video_settings: { ...vs0, name: String(d.name || req.topic || "").slice(0, 40), ...screenText(d, articles), ...(mood ? { mood } : {}), ...hookFormula, ...cardSettings },
       };
       note = d.research && d.research.ok
         ? `관점 자료로 관련 칼럼·분석 기사 ${d.research.sources.length}건을 참고했습니다.`
@@ -181,7 +182,7 @@ const ContiCore = (() => {
       const sourceLines = [...(d.sources || []).map((s) => `${s.title} (CC BY-SA 4.0) ${s.url}`), ...(d.credits || [])];
       patch = {
         hook: texts[0], story: texts.slice(1).join("\n"), fact_sources: sourceLines.join("\n"),
-        video_settings: { ...vs0, name: String(d.name || (req.idea && req.idea.title) || "").slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과", ...(mood ? { mood } : {}), ...cardSettings },
+        video_settings: { ...vs0, name: String(d.name || (req.idea && req.idea.title) || "").slice(0, 40), title1: d.title1, title2: d.title2, source_text: "출처: 위키백과", ...(mood ? { mood } : {}), ...hookFormula, ...cardSettings },
       };
       note = `카드 ${d.segments.length}장 · 글자 ${d.totalChars || 0}자`;
     }

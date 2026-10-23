@@ -78,6 +78,27 @@ function ytTitleFor(row, o) {
   return (t || videoName(row)).slice(0, 100);
 }
 
+// 영상 첫 화면에 크게 나오는 제목 줄 (뉴스·위키: title1·title2, 슬라이드쇼: title_text) — 업로드 제목과 한 짝으로 점검한다
+function ytThumbLines(row) {
+  const vs = (row && row.video_settings) || {};
+  const lines = [vs.title1, vs.title2].map((s) => String(s || "").trim()).filter(Boolean);
+  return lines.length ? lines : [String(vs.title_text || "").trim()].filter(Boolean);
+}
+// 업로드 제목 칸 아래 힌트: 잘림·화면 제목과 겹침·흐릿한 말·숫자 없음 (youtube/hook-kit.js의 lintPair, 막지 않음)
+function ytRenderTitleLint(block) {
+  const box = block.querySelector(".yt-title-lint");
+  if (!box || !globalThis.HookKit) return;
+  let thumb = [];
+  try { thumb = JSON.parse(box.dataset.thumb || "[]"); } catch { thumb = []; }
+  const title = block.querySelector(".yt-title").value.trim();
+  if (!title) { box.innerHTML = ""; return; }
+  const r = globalThis.HookKit.lintPair(title, thumb);
+  const head = `<span style="color:var(--text-2);font-weight:700;">제목 점검 ${r.score}</span>${thumb.length ? ` · 화면 제목: ${escapeHtml(thumb.join(" / "))}` : ""}`;
+  box.innerHTML = head + (r.issues.length
+    ? r.issues.slice(0, 4).map((i) => `<div><span style="color:var(--point);">·</span> ${escapeHtml(i.msg)}</div>`).join("")
+    : `<div>✓ 걸리는 곳 없음</div>`);
+}
+
 // 지난번 업로드 때 쓴 제목·설명·태그·채널 (콘티 video_settings.youtube_last[버전]). 없으면 null.
 // youtube_outputs 표에는 JSON 칸이 없어서, 콘티(youtube_scripts)의 video_settings에 버전별로 둔다.
 function ytLastFor(row, o) {
@@ -128,6 +149,7 @@ function uploadBlockHtml(o, row) {
       <select class="yt-channel">${ytChannels().map((c) => `<option value="${escapeHtml(c.slot)}"${c.slot === slot ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")}</select>
       <label>제목 (100자 이내)</label>
       <input type="text" class="yt-title" maxlength="100" value="${escapeHtml(last.title != null ? String(last.title).slice(0, 100) : ytTitleFor(row, o))}">
+      <div class="yt-title-lint" data-thumb="${escapeHtml(JSON.stringify(ytThumbLines(row)))}" title="어림 규칙(휴리스틱) 점검이에요. 업로드를 막지 않아요." style="font-size:0.72rem;color:var(--muted);line-height:1.5;margin:-2px 0 8px;"></div>
       <label>설명</label>
       <textarea class="yt-desc" style="min-height:140px;">${escapeHtml(last.description != null ? last.description : ytDefaultDescription(row))}</textarea>
       <label>태그 (콤마로 구분, 선택)</label>
@@ -181,6 +203,9 @@ function bindUploadBlocks(reload) {
     const form = block.querySelector(".yt-form");
     const openBtn = block.querySelector(".yt-open-btn");
     openBtn.addEventListener("click", () => { form.style.display = "block"; openBtn.style.display = "none"; });
+    const titleEl = block.querySelector(".yt-title");
+    titleEl.addEventListener("input", () => ytRenderTitleLint(block));   // 입력할 때마다 바로 다시 점검
+    ytRenderTitleLint(block);
     block.querySelector(".yt-cancel-btn").addEventListener("click", () => { form.style.display = "none"; openBtn.style.display = ""; });
     block.querySelector(".yt-start-btn").addEventListener("click", async (e) => {
       const title = block.querySelector(".yt-title").value.trim();

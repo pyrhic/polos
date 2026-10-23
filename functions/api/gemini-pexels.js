@@ -10,6 +10,7 @@
 //   item = { name, desc, why, keyword }   name·desc는 영상 사진 밑 자막, why는 화면에만 보이는 메모
 //   subject = "people"|"animal"|"place"|"thing"|"food"|"nature"|"other" — 사진 주인공 (people이 아니면 사진 자동 선택에서 사람 사진을 감점)
 import { callGemini } from "../_lib/gemini.js";
+import { HookKit, hookPromptBlock } from "../_lib/hooks.js";
 
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
 const str = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
@@ -34,6 +35,8 @@ const RULES = `[규칙]
 - why: 이 항목을 고른 이유 메모 (한국어, 40자 이내. 영상에는 안 나온다)
 - keyword: Pexels 사진 검색어 (영어 3~6단어. 대상 + 보이는 모습을 구체적으로. 예: "Salar de Uyuni salt flat reflection"). 사람이 주인공인 주제(subject가 people)라면 사람을 가리키는 단어(woman, man, portrait, skin close up 등)를 넣어도 된다. 그 밖의 주제라면 사람이 주인공인 사진이 나오지 않게 풍경·건물·자연·사물을 가리키는 단어를 쓴다 (person, woman, man, people, portrait 같은 단어 금지).`;
 const TITLE_RULE = `- title: 영상 첫 화면 제목. 끝까지 보고 싶게 만드는 후킹이되 내용과 맞고 과장 없이 정직하게 (한국어, 28자 이내. 항목 수가 들어가면 실제 개수와 맞춘다).`;
+// 제목(첫 화면)은 후킹 공식 하나를 따르고, 따른 공식 id를 hook_formula로 돌려준다 (plan·revise만. replace는 제목을 안 쓴다)
+const HOOK_RULE = hookPromptBlock("pexels", "title(영상 첫 화면 제목)");
 const SUBJECT_RULE = `- subject: 이 영상 사진의 주인공 하나 — people(사람이 주인공), animal, place, thing, food, nature, other.`;
 
 const ITEM = { type: "OBJECT", properties: { name: { type: "STRING" }, desc: { type: "STRING" }, why: { type: "STRING" }, keyword: { type: "STRING" } }, required: ["name", "desc", "why", "keyword"] };
@@ -43,9 +46,10 @@ const listSchema = (min, max, withTopic) => ({
     ...(withTopic ? { topic: { type: "STRING" } } : {}),
     title: { type: "STRING" },
     subject: { type: "STRING", enum: SUBJECTS },
+    hook_formula: { type: "STRING", enum: HookKit.formulaIdsFor("pexels") },
     items: { type: "ARRAY", minItems: min, maxItems: max, items: ITEM },
   },
-  required: [...(withTopic ? ["topic"] : []), "title", "subject", "items"],
+  required: [...(withTopic ? ["topic"] : []), "title", "subject", "hook_formula", "items"],
 });
 
 const formatLine = (format) => format === "long"
@@ -70,6 +74,7 @@ ${b.past.length ? `[이미 만든 주제·제목 — 이것들과 분명히 다�
 ${RULES}
 ${TITLE_RULE}
 ${SUBJECT_RULE}
+${HOOK_RULE}
 - 시청자가 끝까지 넘겨 보고 싶어지도록 순서를 구성한다 (가장 인상적인 항목을 맨 앞이나 맨 끝에).`;
 }
 
@@ -82,7 +87,8 @@ ${b.keep.length ? `[그대로 두는 항목 — 결과에 넣지 말고, 이것�
 피드백을 반영해 새 항목 ${b.count}개와 제목을 써라. 제목은 그대로 두는 항목까지 합친 전체 영상(${b.count + b.keep.length}장)의 제목이다. subject는 피드백까지 반영한 전체 영상 사진의 주인공이다.
 ${RULES}
 ${TITLE_RULE}
-${SUBJECT_RULE}`;
+${SUBJECT_RULE}
+${HOOK_RULE}`;
 }
 
 function replacePrompt(b) {
@@ -162,9 +168,9 @@ export async function onRequestPost(context) {
     if (mode === "plan") {
       const outTopic = str(parsed.topic, 60) || outTitle;
       if (!outTopic) return json({ error: "주제가 정해지지 않았습니다. 다시 시도해주세요" }, 502);
-      return json({ topic: outTopic, title: outTitle || outTopic, subject: cleanSubject(parsed.subject), items, range: { min, max } });
+      return json({ topic: outTopic, title: outTitle || outTopic, subject: cleanSubject(parsed.subject), hook_formula: HookKit.normalizeFormula(parsed.hook_formula), items, range: { min, max } });
     }
-    return json({ title: outTitle || topic.slice(0, 60), subject: cleanSubject(parsed.subject, subject), items });
+    return json({ title: outTitle || topic.slice(0, 60), subject: cleanSubject(parsed.subject, subject), hook_formula: HookKit.normalizeFormula(parsed.hook_formula), items });
   } catch (err) {
     return json({ error: err.message }, 500);
   }

@@ -184,7 +184,7 @@
     const format = vs.pexels_format === "long" || vs.orientation === "landscape" ? "long" : "short";
     cur = {
       id, topic: vs.pexels_topic || vs.title_text || vs.name || "", note: vs.pexels_note || "", title: vs.title_text || vs.name || "",
-      format, orientation: orientOf(format), subject: vs.pexels_subject || "",
+      format, orientation: orientOf(format), subject: vs.pexels_subject || "", hook_formula: vs.hook_formula || null,
       secs: vs.secs_per_photo || DEFAULT_SECS, transition: "cut", caption_mode: vs.caption_mode || "name_desc", caption_font: vs.caption_font || "sans", bgm_path: vs.bgm_path || null,
       bgm_volume: vs.bgm_volume ?? 0.8, credit: vs.music_credit || "",
       items: segs.map((s) => {
@@ -347,6 +347,7 @@
         name: cur.title.trim() || cur.topic || "(제목 없음)", mode: "pexels", title_text: cur.title.trim(),
         secs_per_photo: cur.secs, transition: cur.transition, caption_mode: cur.caption_mode || "name_desc", caption_font: cur.caption_font || "sans", bgm_path: cur.bgm_path, bgm_volume: cur.bgm_volume, music_credit: cur.credit,
         pexels_topic: cur.topic, pexels_note: cur.note, pexels_format: cur.format, orientation: cur.orientation, pexels_subject: cur.subject || null,
+        hook_formula: cur.hook_formula || null,   // AI 제목이 따른 후킹 공식 id (youtube/hook-kit.js)
       };
       delete settings.pexels_approved_at;   // 예전 버전이 남긴 승인 표시 칸은 더 쓰지 않아 지운다
       const scriptBody = { hook: cur.title.trim() || cur.topic || "(제목 없음)", fact_sources: creditLines(), video_settings: settings };
@@ -510,6 +511,7 @@
       cur.similarTo = dup.score >= SIMILAR ? dup.line : "";
       cur.topic = data.topic || data.title || ""; cur.subject = data.subject || "";
       cur.title = data.title || cur.topic; $("curTitle").value = cur.title;
+      cur.hook_formula = data.hook_formula || null;
       cur.items = data.items.map(newItem);
       renderTopicLine(); renderItems();
       dirty = true; await saveNow();   // 기획을 바로 저장 — 사진을 고르는 중에 화면을 나가도 기획은 남는다
@@ -567,7 +569,7 @@
       let k = 0;
       for (let i = 0; i < total; i++) if (!slots[i]) slots[i] = fresh[k++] || null;
       cur.items = slots.filter(Boolean);
-      if (data.title) { cur.title = data.title; $("curTitle").value = cur.title; }
+      if (data.title) { cur.title = data.title; $("curTitle").value = cur.title; cur.hook_formula = data.hook_formula || null; }
       if (data.subject) { cur.subject = data.subject; renderTopicLine(); }   // 피드백으로 사진 주인공이 바뀔 수 있다 (예: "사람 위주로")
       renderItems(); dirty = true; await saveNow();
       const r = await autoPick();

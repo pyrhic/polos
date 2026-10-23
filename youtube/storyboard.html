@@ -141,6 +141,18 @@
   .ov-parts .ov-sep { color:var(--muted); font-weight:600; }
   .settings-card .sr-input::placeholder { color:var(--muted-2); font-weight:400; }
   .settings-card .sr-input:focus { outline:none; background:var(--input); }
+  /* 후킹 점수(첫 장면)·제목 점검: 작게, 막지 않는 힌트. 점수 계산은 youtube/hook-kit.js (어림 규칙) */
+  .seg-hook { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px; margin:2px 0 6px; font-size:0.72rem; color:var(--muted); line-height:1.45; }
+  .seg-hook .hk-badge { flex-shrink:0; border:1px solid var(--line-strong); border-radius:10px; padding:1px 8px; font-weight:800; color:var(--text-2); background:var(--inset); cursor:pointer; font-size:0.7rem; }
+  .seg-hook .hk-badge.s { color:var(--accent); border-color:var(--accent-dim); }
+  .seg-hook .hk-badge.w { color:var(--point); border-color:var(--point-dim); }
+  .seg-hook .hk-tip { flex:1 1 180px; min-width:0; }
+  .seg-hook .hk-detail { display:none; flex-basis:100%; color:var(--muted-2); }
+  .seg-hook.open .hk-detail { display:block; }
+  .title-lint { margin:6px 0 0; font-size:0.72rem; color:var(--muted); line-height:1.5; }
+  .title-lint .tl-x { color:var(--text-2); }
+  .title-lint .tl-x::before { content:"· "; color:var(--point); }
+  .title-lint .tl-ok { color:var(--muted-2); }
   /* 카드 위 페이지 제목 = 콘티 이름 (누르면 그 자리에서 고침) */
   .conti-name-wrap { margin:18px 0 0; min-width:0; }
   .conti-name-wrap + #settingsCard { margin-top:8px !important; }
@@ -398,6 +410,7 @@
         <div class="sr"><span class="k">제목 2줄</span><span class="v"><input class="sr-input" id="srT2" maxlength="20" placeholder="흰색"></span></div>
         <div class="sr"><span class="k">출처 문구</span><span class="v"><input class="sr-input" id="srSrc" maxlength="60" placeholder="영상 아래 작은 글씨"></span></div>
       </div>
+      <div class="title-lint" id="titleLint" title="어림 규칙(휴리스틱) 점검이에요. 저장을 막지 않아요."></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
         <button type="button" class="tok tok-btn" id="settingsSaveBtn" style="display:none;margin-left:0;">저장</button>
       </div>
@@ -590,6 +603,8 @@
 <script src="/youtube/conti-job.js"></script>
 <!-- 콘티 만들기 팝업 (Trend와 같이 씀) -->
 <script src="/youtube/conti-create-modal.js"></script>
+<!-- 후킹 공식·후킹 점수·제목 점검 (Pages Functions와 같은 파일) -->
+<script src="/youtube/hook-kit.js"></script>
 <script>
   const SUPABASE_URL = POLOS_CONFIG.SUPABASE_URL;
   const SUPABASE_ANON_KEY = POLOS_CONFIG.SUPABASE_ANON_KEY;
@@ -687,6 +702,54 @@
   }
   function isSubscribeSeg(seg) {
     return partOf(seg.section) === SUBSCRIBE_PART;
+  }
+  // 후킹 점수를 보여 줄 장면: 맨 앞 장면(첫 대사). 채널 카드 장면이면 보이지 않는다
+  function isHookSeg(seg) {
+    return !!window.HookKit && segments.length > 0 && segments[0] === seg && !isSubscribeSeg(seg);
+  }
+  // 첫 장면 SCRIPT 칸 아래: 후킹 점수 + 가장 약한 속성 고치는 법. 배지를 누르면 5가지 점수를 펼친다 (입력할 때마다 바로 다시 계산)
+  function updateHookBadge(el) {
+    const box = el.querySelector(".seg-hook");
+    if (!box || !window.HookKit) return;
+    const r = HookKit.scoreHook(el.querySelector(".seg-script").value);
+    if (!r.hook) { box.style.display = "none"; return; }
+    box.style.display = "";
+    const p = r.properties;
+    const ai = HookKit.formulaById(currentSettings.hook_formula);
+    const cls = r.band === "STRONG" ? "s" : r.band === "WEAK" ? "w" : "";
+    const detail = `구체성 ${p.SPECIFICITY} · 말 걸기 ${p.ADDRESS} · 걸린 것 ${p.STAKES} · 궁금증 ${p.CURIOSITY} · 길이 ${p.BREVITY} (첫 문장 ${r.chars}자)` +
+      ` · 문장 모양: ${r.formula.id ? r.formula.ko : "공식 없음"}${ai ? ` · AI가 고른 공식: ${ai.ko}` : ""} — ${HookKit.HEURISTIC_NOTE}`;
+    box.innerHTML = `<span class="hk-badge ${cls}" role="button" tabindex="0">후킹 ${r.verdict} · ${r.band_ko}</span>` +
+      `<span class="hk-tip">${r.band === "STRONG" ? "첫 문장이 잘 걸려요" : escapeHtml(r.tip)}</span><span class="hk-detail">${escapeHtml(detail)}</span>`;
+    box.title = `첫 문장: ${r.hook}
+${detail}`;
+    if (!box._bound) {
+      box._bound = true;
+      const toggle = (e) => { if (!e.target.closest(".hk-badge")) return; e.preventDefault(); box.classList.toggle("open"); };
+      box.addEventListener("click", toggle);
+      box.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") toggle(e); });
+    }
+  }
+  // 제목 카드 아래: 화면 제목(title1·title2)과 업로드 제목을 한 짝으로 점검 (막지 않는 힌트)
+  // 업로드 제목 = 마지막으로 올린 제목(youtube_last), 없으면 Studio 업로드 칸의 기본값인 콘티 이름
+  function uploadTitleGuess() {
+    const last = Object.values(currentSettings.youtube_last || {}).filter((v) => v && v.title)
+      .sort((a, b) => String(b.uploaded_at || "").localeCompare(String(a.uploaded_at || "")))[0];
+    return last ? String(last.title) : String(currentSettings.name || "");
+  }
+  function updateTitleLint() {
+    const box = $("titleLint");
+    if (!box || !window.HookKit) return;
+    const t1 = $("title1").value.trim(), t2 = $("title2").value.trim();
+    if (!t1 && !t2) { box.innerHTML = ""; return; }
+    const up = uploadTitleGuess();
+    const r = HookKit.lintPair(up, [t1, t2]);
+    // 업로드 제목 자체의 길이 문제는 Studio에서 보여 주고, 여기서는 화면 제목과 짝 문제만
+    const mine = r.issues.filter((i) => /^thumb|duplicate/.test(i.key));
+    if (!up) { const v = HookKit.lintPair("", [t1, t2]); mine.push(...v.issues.filter((i) => i.key === "thumb-specific")); }
+    box.innerHTML = mine.length
+      ? mine.slice(0, 3).map((i) => `<div class="tl-x">${escapeHtml(i.msg)}</div>`).join("") + (up ? `<div class="tl-ok">비교한 업로드 제목: “${escapeHtml(up.slice(0, 40))}”</div>` : "")
+      : `<div class="tl-ok">✓ 화면 제목 점검: 걸리는 곳 없음${up ? " (업로드 제목과 겹치지 않아요)" : ""}</div>`;
   }
   // 장면 길이: 카드가 화면에 있으면 입력 중인 자막 기준, 없으면 저장된 값 기준 (자막 줄이 있으면 줄 길이 합)
   function segSecondsOf(seg) {
@@ -2024,6 +2087,7 @@
   function updateSettingsSummary() {
     const mirror = (srId, ctlId) => { const el = $(srId); if (document.activeElement !== el) el.value = $(ctlId).value; };
     mirror("srT1", "title1"); mirror("srT2", "title2"); mirror("srSrc", "sourceText");
+    updateTitleLint();
     const label = (key) => {
       const cfg = WHEELS[key], v = $(cfg.ctl).value;
       const hit = cfg.opts().find((o) => o[0] === v);
@@ -2789,6 +2853,7 @@
               </div>
             </div>
           </div>
+          ${isHookSeg(seg) ? '<div class="seg-hook"></div>' : ""}
           <div class="seg-tl-area"></div>
           <div class="seg-cap-area"></div>
           <div class="seg-add-menu">
@@ -2828,8 +2893,9 @@
         clearTimeout(el._pvTimer);
         el._pvTimer = setTimeout(() => { if (pvActive && pvActive.el === el && !pvActive.playing) pvRefreshCard(id); }, 500);
       };
-      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); pvTextChanged(); });
+      scriptEl.addEventListener("input", () => { autoGrow(scriptEl); markDirty(); updateRuntimeSummary(); pvTextChanged(); updateHookBadge(el); });
       autoGrow(scriptEl);
+      updateHookBadge(el);
       // 입력 중에는 끊지 않고, 칸에서 나갈 때 화면 폭을 넘는 줄만 자동으로 나눈다 (직접 합친 줄은 그대로)
       scriptEl.addEventListener("focus", () => { el._capFocusText = scriptEl.value; });
       scriptEl.addEventListener("blur", () => {
@@ -3162,6 +3228,7 @@
     el.querySelector(".seg-keyword").value = seg.keyword || "";
     autoGrow(scriptEl);
     autoGrow(directionEl);
+    updateHookBadge(el);
 
     delete el.dataset.dirty;
     el.querySelector(".seg-save-state").textContent = "";
