@@ -42,13 +42,13 @@ self.addEventListener("message", (event) => {
   }
 });
 
-// 영상 완성 알림을 누르면 Studio 페이지를 연다
+// 알림을 누르면 알림에 담긴 주소(없으면 허브 홈)를 연다
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/youtube/review.html";
+  const url = (event.notification.data && event.notification.data.url) || "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((list) => {
-      for (const c of list) { if (c.url.includes("/youtube/") && "focus" in c) { c.navigate(url); return c.focus(); } }
+      for (const c of list) { if (new URL(c.url).origin === self.location.origin && "focus" in c) { c.navigate(url); return c.focus(); } }
       return self.clients.openWindow(url);
     })
   );

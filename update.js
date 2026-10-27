@@ -26,9 +26,6 @@
     "/todo/style.css",
     "/trading/",
     "/trading/style.css",
-    "/youtube/",
-    "/youtube/style.css",
-    "/youtube/generate.js",
   ];
   const FP_KEY = "polos_applied_fp";        // localStorage: 지금 적용된 버전 지문
   const PENDING_KEY = "polos_pending_fp";   // localStorage: 검사에서 발견한 새 지문 (페이지 이동 후에도 띠 복원용)

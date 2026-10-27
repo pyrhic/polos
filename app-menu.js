@@ -157,7 +157,7 @@
   }
 
   // 섹션 메인 화면(/todo, /todo/, /todo/index.html 등)에서만 하단 스킴밐스 로고를 붙인다
-  const MAIN_RE = /^\/(skimmmiks|todo|trading|youtube)(\/(index(\.html)?)?)?$/;
+  const MAIN_RE = /^\/(skimmmiks|todo|trading)(\/(index(\.html)?)?)?$/;
   function renderHomeLogo() {
     const m = location.pathname.match(MAIN_RE);
     if (!m) return;
