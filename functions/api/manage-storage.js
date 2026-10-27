@@ -8,7 +8,8 @@ export async function onRequestPost(context) {
     const body = await request.json();
     const { password, action } = body;
 
-    if (password !== env.ADMIN_PASSWORD) {
+    // 비밀번호 설정이 없으면 막는다 (없을 때 빈 요청이 그대로 통과하지 않게)
+    if (!env.ADMIN_PASSWORD || password !== env.ADMIN_PASSWORD) {
       return new Response(JSON.stringify({ error: "비밀번호가 틀렸습니다." }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
