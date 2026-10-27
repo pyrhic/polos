@@ -1,1 +1,5 @@
 /youtube/*  https://wizard-yt.pages.dev/youtube/:splat  301
+/wizard-yt.html  https://wizard-yt.pages.dev/wizard-yt  301
+/wizard-yt  https://wizard-yt.pages.dev/wizard-yt  301
+/privacy.html  https://wizard-yt.pages.dev/privacy  301
+/privacy  https://wizard-yt.pages.dev/privacy  301

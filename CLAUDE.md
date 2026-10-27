@@ -5,7 +5,7 @@ Cloudflare Pages 정적 앱 + Functions(`functions/api/*` → `/api/*`). 빌드 
 
 ## 방향
 
-- 유튜브 앱(wizard-yt)은 2026-10-27에 **`C:\Users\PC\youtube-automation`(web/)로 옮겼다** → https://wizard-yt.pages.dev . polos에는 유튜브 코드가 없다. 옛 `/youtube/*` 주소는 `_redirects`로 wizard-yt에 301.
+- 유튜브 앱(wizard-yt)은 2026-10-27에 **`C:\Users\PC\youtube-automation`(web/)로 옮겼다** → https://wizard-yt.pages.dev . polos에는 유튜브 코드가 없다. 옛 `/youtube/*`, `/wizard-yt`, `/privacy` 주소는 `_redirects`로 wizard-yt에 301 (구글 OAuth 동의 화면 주소는 2026-10-27 wizard-yt로 변경).
 - polos는 **스킴밐스 + 간단한 도구(투두·일정·투자)** 만 남긴다. 다른 앱은 하나씩 따로 떼어 낸다.
 - 나중엔 사람들이 만든 AI 기능·앱·영상을 공유하고 자랑하는 플랫폼(깃허브처럼)으로 키운다.
 
@@ -13,7 +13,6 @@ Cloudflare Pages 정적 앱 + Functions(`functions/api/*` → `/api/*`). 빌드 
 
 허브: `index.html`(로고 캐러셀) → `skimmmiks/`, `todo/`, `trading/`. 공통: `app-menu.js`, `sw.js`(네트워크 우선 캐시), `update.js`(새 버전 감지 — 섹션/공통 파일이 생기면 `WATCH_FILES`에 추가).
 서버: `functions/api/*.js` (주간보고서 생성, 로그 제출·조회, 구글 캘린더 일정, 저장소 관리).
-`wizard-yt.html`, `privacy.html`은 **지우지 말 것** — 구글 OAuth 동의 화면(유튜브 업로드 앱)이 이 polos 주소를 가리킨다. CSS는 파일 안에 직접 들어 있다.
 
 ## 확인
 
