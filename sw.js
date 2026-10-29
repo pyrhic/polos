@@ -1,5 +1,5 @@
 const CACHE_NAME = "polos-v1";
-const CORE_ASSETS = ["/", "/style.css", "/manifest.json"];
+const CORE_ASSETS = ["/", "/style.css", "/theme.js", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

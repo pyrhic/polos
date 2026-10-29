@@ -1,6 +1,6 @@
 (function () {
   // 허브 홈(/)과 4개 섹션 메인 화면에서 같이 쓰는 공통 스크립트
-  // 1) 오른쪽 위 "⋯" 버튼 + 작은 드롭다운 메뉴 (앱 설치하기 / 앱 정보)
+  // 1) 오른쪽 위 "⋯" 버튼 + 작은 드롭다운 메뉴 (앱 설치하기 / 앱 정보 / 테마: 자동·어둡게·밝게)
   // 2) 섹션 메인 화면 맨 아래 스킴밐스 로고 - 누르면 허브 홈의 로고 캐러셀로 바로 돌아감
 
   // 홈 화면 설치 이벤트는 페이지마다 따로 잡아둔다 (브라우저가 설치 가능하다고 판단할 때만 발생)
@@ -81,6 +81,35 @@
       box-shadow: none;
     }
     .app-menu-item:hover, .app-menu-item:active { color: var(--accent, #4fc3f7); background: transparent; }
+    /* 테마 고르기: 한 줄에 글자 버튼 셋, 고른 것만 하늘색 */
+    .app-menu-theme {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px 10px 6px 16px;
+      font-size: 0.92rem;
+      color: var(--muted, #9a9a9a);
+    }
+    .app-menu-theme .app-menu-theme-label { margin-right: 6px; }
+    .app-menu-theme button {
+      display: inline-block;
+      width: auto;
+      margin: 0;
+      padding: 6px 6px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted, #9a9a9a);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+      cursor: pointer;
+      box-shadow: none;
+    }
+    .app-menu-theme button:hover { color: var(--text, #ffffff); background: transparent; }
+    .app-menu-theme button.on { color: var(--accent, #4fc3f7); font-weight: 700; }
     .app-menu-info {
       padding: 8px 16px 10px;
       font-size: 0.8rem;
@@ -101,6 +130,8 @@
     }
     .app-home-logo:active { transform: translateX(-50%) scale(0.94); }
     .app-home-logo img { width: 64px; height: auto; display: block; }
+    /* 밝은 테마: 흰 글자 스킴밐스 로고를 뒤집어 검정 글자로(파도는 hue-rotate로 파랑 유지) */
+    :root[data-theme="light"] .app-home-logo img { filter: invert(1) hue-rotate(180deg); }
     body.has-home-logo { padding-bottom: 80px; }
   `;
 
@@ -116,6 +147,44 @@
     btn.classList.toggle("open", open);
     btn.setAttribute("aria-expanded", String(open));
     if (!open) info.hidden = true;
+  }
+
+  // 테마 줄 — 실제 적용·저장은 /theme.js(window.polosTheme)가 한다. 누르면 메뉴는 열린 채로 바로 바뀜
+  const THEME_CHOICES = [
+    { value: "auto", label: "자동" },
+    { value: "dark", label: "어둡게" },
+    { value: "light", label: "밝게" },
+  ];
+  function renderThemeRow() {
+    const row = document.createElement("div");
+    row.className = "app-menu-theme";
+    const label = document.createElement("span");
+    label.className = "app-menu-theme-label";
+    label.textContent = "테마";
+    row.appendChild(label);
+    const buttons = THEME_CHOICES.map((c) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = c.label;
+      b.dataset.value = c.value;
+      b.addEventListener("click", () => {
+        if (window.polosTheme) window.polosTheme.set(c.value);
+        mark();
+      });
+      row.appendChild(b);
+      return b;
+    });
+    function mark() {
+      const cur = window.polosTheme ? window.polosTheme.get() : "auto";
+      buttons.forEach((b) => {
+        const on = b.dataset.value === cur;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+    }
+    mark();
+    window.addEventListener("storage", mark); // 다른 탭에서 바꾼 경우
+    return row;
   }
 
   function renderMenu() {
@@ -137,6 +206,7 @@
       el.addEventListener("click", () => item.action());
       menu.appendChild(el);
     });
+    menu.appendChild(renderThemeRow());
     info = document.createElement("div");
     info.className = "app-menu-info";
     info.hidden = true;

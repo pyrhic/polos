@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/trading/style.css">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#000000">
+<script src="/theme.js"></script>
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
@@ -84,7 +85,7 @@
       .slice(-12);
 
     if (!points.length) {
-      svg.innerHTML = '<text x="200" y="70" text-anchor="middle" fill="#9a9a9a" font-size="12">아직 수익률 데이터가 없습니다 (2주 이상 쌓이면 표시됩니다)</text>';
+      svg.innerHTML = '<text x="200" y="70" text-anchor="middle" style="fill:var(--muted)" font-size="12">아직 수익률 데이터가 없습니다 (2주 이상 쌓이면 표시됩니다)</text>';
       return;
     }
 
@@ -94,14 +95,14 @@
     const scale = (h - padT - padB) / 2 / maxAbs;
     const bw = (w - padL - padR) / points.length;
 
-    let svgHtml = `<line x1="${padL}" y1="${baseline}" x2="${w - padR}" y2="${baseline}" stroke="#333333" stroke-width="1"/>`;
+    let svgHtml = `<line x1="${padL}" y1="${baseline}" x2="${w - padR}" y2="${baseline}" style="stroke:var(--line-strong)" stroke-width="1"/>`;
     points.forEach((p, i) => {
       const x = padL + i * bw + bw * 0.2;
       const barW = bw * 0.6;
       const barH = Math.abs(p.pct) * scale;
       const y = p.pct >= 0 ? baseline - barH : baseline;
-      const color = p.pct >= 0 ? "#4fc3f7" : "#ff7a1a";
-      svgHtml += `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(barH, 2)}" rx="2" fill="${color}"
+      const color = p.pct >= 0 ? "var(--accent)" : "var(--point)"; // 테마 변수 — 테마를 바꾸면 다시 그리지 않아도 색이 따라 바뀜
+      svgHtml += `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(barH, 2)}" rx="2" style="fill:${color}"
         data-label="${p.label}" data-pct="${p.pct.toFixed(2)}" class="bar"/>`;
     });
     svg.innerHTML = svgHtml;

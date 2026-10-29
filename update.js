@@ -17,6 +17,7 @@
     "/",                    // 허브 홈 (index.html)
     "/style.css",
     "/app-menu.js",
+    "/theme.js",
     "/update.js",
     "/manifest.json",
     "/sw.js",
@@ -66,6 +67,7 @@
 
   // ── 띠 UI ──────────────────────────────────────────────────────────────
   const css = `
+    /* 색은 페이지의 테마 변수(--card, --btn 등)를 따름 — 괄호 안은 변수가 없을 때의 어두운 값 */
     .upd-bar {
       position: fixed;
       left: 50%;
@@ -79,9 +81,9 @@
       align-items: center;
       gap: 8px;
       padding: 10px 12px;
-      background: #141414;
-      color: #ffffff;
-      border: 1px solid #444444;
+      background: var(--card, #141414);
+      color: var(--text, #ffffff);
+      border: 1px solid var(--btn-ring, #444444);
       border-radius: 6px;
       font-family: -apple-system, "Malgun Gothic", sans-serif;
       font-size: 0.9rem;
@@ -99,11 +101,11 @@
       width: auto;
       margin: 0;
       padding: 7px 12px;
-      background: #000000;
-      color: #ffffff;
+      background: var(--btn, #000000);
+      color: var(--text, #ffffff);
       border: none;
       border-radius: 4px;
-      box-shadow: inset 0 0 0 1px #444444;
+      box-shadow: inset 0 0 0 1px var(--btn-ring, #444444);
       font-family: inherit;
       font-size: 0.85rem;
       font-weight: 400;
@@ -114,8 +116,8 @@
       white-space: nowrap;
       cursor: pointer;
     }
-    .upd-bar .upd-btn:hover, .upd-bar .upd-btn:active { background: #a8dcf6; color: #000000; }
-    .upd-bar .upd-btn:disabled { opacity: 0.5; cursor: default; background: #000000; color: #ffffff; box-shadow: inset 0 0 0 1px #444444; }
+    .upd-bar .upd-btn:hover, .upd-bar .upd-btn:active { background: var(--hover, #a8dcf6); color: var(--on-accent, #000000); }
+    .upd-bar .upd-btn:disabled { opacity: 0.5; cursor: default; background: var(--btn, #000000); color: var(--text, #ffffff); box-shadow: inset 0 0 0 1px var(--btn-ring, #444444); }
   `;
 
   let bar = null, msgEl, okBtn, laterBtn, styleAdded = false;

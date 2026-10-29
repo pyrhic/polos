@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/trading/style.css">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#000000">
+<script src="/theme.js"></script>
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
@@ -77,7 +78,7 @@
     const tooltip = document.getElementById("pointTooltip");
 
     if (points.length < 2) {
-      svg.innerHTML = '<text x="200" y="80" text-anchor="middle" fill="#9a9a9a" font-size="12">주간 리포트가 2주 이상 쌓이면 그래프가 표시됩니다</text>';
+      svg.innerHTML = '<text x="200" y="80" text-anchor="middle" style="fill:var(--muted)" font-size="12">주간 리포트가 2주 이상 쌓이면 그래프가 표시됩니다</text>';
       return;
     }
 
@@ -90,10 +91,10 @@
 
     const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.assets).toFixed(1)}`).join(" ");
 
-    let svgHtml = `<line x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}" stroke="#333333" stroke-width="1"/>`;
-    svgHtml += `<path d="${line}" fill="none" stroke="#4fc3f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    let svgHtml = `<line x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}" style="stroke:var(--line-strong)" stroke-width="1"/>`;
+    svgHtml += `<path d="${line}" fill="none" style="stroke:var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
     points.forEach((p, i) => {
-      svgHtml += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.assets).toFixed(1)}" r="4" fill="#4fc3f7"
+      svgHtml += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.assets).toFixed(1)}" r="4" style="fill:var(--accent)"
         data-label="${p.label}" data-assets="${p.assets}" class="pt"/>`;
     });
     svg.innerHTML = svgHtml;

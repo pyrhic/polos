@@ -1,7 +1,8 @@
 /* 색 규칙 — 기본 UI는 모노톤(검정·흰색·회색). 색(하늘색·주황)은 강조할 곳과 호버에만 쓴다.
-   버튼은 검정 바탕 + 흰 글자, 호버하면 연한 하늘색(--hover). 선택·진행·켬·링크는 하늘색, 경고·포인트는 주황.
+   (어두운 테마 기준) 버튼은 검정 바탕 + 흰 글자, 호버하면 연한 하늘색(--hover). 선택·진행·켬·링크는 하늘색, 경고·포인트는 주황.
    ※ 색은 아래 변수로만 바꾼다. 페이지 안에 직접 색을 적지 말 것. */
 :root {
+  color-scheme: dark;
   --bg: #000000;            /* 페이지 바탕 */
   --inset: #0a0a0a;         /* 카드 안쪽에 파인 칸(번호 원, 트랙 바탕 등) */
   --card: #141414;          /* 카드·팝업 */
@@ -24,6 +25,36 @@
   --point-dim: #3a1f0a;
   --danger: #ff6b6b;        /* 삭제·오류 */
   --danger-bg: #2a1212;
+  --shadow: rgba(0, 0, 0, 0.6);  /* 끌어 옮길 때 그림자 */
+}
+
+/* 밝은 테마 — 모노톤은 그대로(흰색·연회색 바탕 + 검정 글자). 버튼은 흰 바탕 + 검정 글자, 호버는 같은 연한 하늘색.
+   하늘색·주황·빨강은 흰 바탕에서 글자로 읽히도록 조금 짙게. (data-theme은 /theme.js가 <html>에 붙인다) */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --inset: #f4f4f4;
+  --card: #f2f2f2;
+  --card-2: #e9e9e9;
+  --input: #ffffff;
+  --btn: #ffffff;           /* 버튼 바탕 (흰색, 글자는 검정) */
+  --btn-ring: #c4c4c4;
+  --hover: #a8dcf6;
+  --line: #dddddd;
+  --line-strong: #cccccc;
+  --text: #000000;
+  --text-2: #333333;
+  --muted: #666666;
+  --muted-2: #7a7a7a;
+  --accent: #0288d1;        /* 흰 바탕에서 읽히는 짙은 하늘색 */
+  --accent-strong: #4fc3f7; /* 눌림: 검정 글자가 잘 보이는 하늘색 */
+  --accent-dim: #dcf0fb;
+  --on-accent: #000000;
+  --point: #e0640c;
+  --point-dim: #fde6d3;
+  --danger: #d32f2f;
+  --danger-bg: #fde3e3;
+  --shadow: rgba(0, 0, 0, 0.18);
 }
 
 * {

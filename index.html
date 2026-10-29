@@ -6,17 +6,34 @@
 <title>뽈로</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#000000">
+<script src="/theme.js"></script>
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
+  /* 허브는 style.css를 안 쓰므로 여기서 쓰는 색 변수만 따로 둔다 (값은 style.css와 같게).
+     app-menu.js·update.js도 이 변수를 쓴다. 밝은 테마는 /theme.js가 붙이는 data-theme="light" */
+  :root {
+    color-scheme: dark;
+    --bg: #000000; --card: #141414; --btn: #000000; --btn-ring: #444444; --hover: #a8dcf6;
+    --line: #2a2a2a; --text: #ffffff; --muted: #9a9a9a; --muted-2: #6a6a6a;
+    --accent: #4fc3f7; --on-accent: #000000;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #ffffff; --card: #f2f2f2; --btn: #ffffff; --btn-ring: #c4c4c4; --hover: #a8dcf6;
+    --line: #dddddd; --text: #000000; --muted: #666666; --muted-2: #7a7a7a;
+    --accent: #0288d1; --on-accent: #000000;
+  }
+  /* 스킴밐스 로고는 투명 바탕 + 흰 글자라 밝은 테마에선 글자가 안 보임 — 색을 뒤집고(검정 글자) 색상만 되돌려 파도는 파랑으로 */
+  :root[data-theme="light"] img[src="/skimmmiks/logo.png"] { filter: invert(1) hue-rotate(180deg); }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
-    background: #000000;
+    background: var(--bg);
     font-family: -apple-system, "Malgun Gothic", sans-serif;
-    color: #ffffff;
+    color: var(--text);
   }
 
   .screens {
@@ -47,7 +64,7 @@
   .quote-source {
     margin-top: 14px;
     font-size: 0.85rem;
-    color: #9a9a9a;
+    color: var(--muted);
   }
   .chevron-up {
     position: absolute;
@@ -55,7 +72,7 @@
     left: 50%;
     transform: translateX(-50%);
     font-size: 1.6rem;
-    color: #6a6a6a;
+    color: var(--muted-2);
     animation: bounceUp 1.8s ease-in-out infinite;
     cursor: pointer;
     padding: 16px;
@@ -73,7 +90,7 @@
     left: 50%;
     transform: translateX(-50%);
     font-size: 1.4rem;
-    color: #6a6a6a;
+    color: var(--muted-2);
     animation: bounceDown 1.8s ease-in-out infinite;
     cursor: pointer;
     padding: 16px;
@@ -141,7 +158,7 @@
   }
   /* 좌/우 1/4 구역 호버 힌트: 기존 chevron(︿ ﹀)을 90도 돌려 쓴 ‹ › 모양, 같은 회색 + 같은 깜빡임.
      크기/색/가장자리 거리는 여기 변수만 바꾸면 됨 (모노톤) */
-  :root { --edge-chev-size: 1.6rem; --edge-chev-color: #9a9a9a; --edge-chev-gap: 24px; }
+  :root { --edge-chev-size: 1.6rem; --edge-chev-color: var(--muted); --edge-chev-gap: 24px; }
   .edge-chev {
     position: fixed;
     top: 50%;
